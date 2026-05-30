@@ -36,5 +36,6 @@ fit_single <- function(conc, resp) {
                       lower = lower, upper = upper,
                       control = list(parscale = pmax(abs(start), 1e-8),
                                      factr = 1e-9, maxit = 1000))
-  list(par = res$par, ssr = res$value, convergence = res$convergence)
+  list(par = res$par, ssr = res$value, convergence = res$convergence,
+       kind = "single")
 }
