@@ -1,8 +1,30 @@
+#' Heuristic / fitted seed for a single chemical's curve
+#'
+#' When the marginal series has enough distinct points (>= 4) a full
+#' [fit_single()] is used; otherwise (tiny grids) it falls back to a cheap
+#' heuristic (`max` = largest response, `slope` = 1, `ec50` = median positive
+#' concentration). Either way it never errors, so seeding is robust on small
+#' synthetic designs as well as full experimental data.
+#' @keywords internal
+seed_one <- function(conc, resp) {
+  ok <- sum(!is.na(conc) & !is.na(resp))
+  if (ok >= 4 && length(unique(conc[!is.na(conc)])) >= 4) {
+    f <- tryCatch(fit_single(conc, resp), error = function(e) NULL)
+    if (!is.null(f))
+      return(c(max = f$par[["max"]], slope = f$par[["slope"]],
+               ec50 = f$par[["ec50"]]))
+  }
+  pos <- conc[!is.na(conc) & conc > 0]
+  c(max = max(resp, na.rm = TRUE),
+    slope = 1,
+    ec50 = if (length(pos)) stats::median(pos) else 1)
+}
+
 #' Seed starting values from per-chemical single-curve fits
 #'
-#' Fits one log-logistic curve per present chemical (chemical *i* seeded from the
-#' rows where every other concentration is 0) and names the seeds to match the
-#' active registry (`slope1..n` / `ec50..n`).
+#' Fits/estimates one log-logistic curve per present chemical (chemical *i* from
+#' the rows where every other concentration is 0) and names the seeds to match
+#' the active registry (`slope1..n` / `ec50..n`).
 #' @keywords internal
 seed_from_singles <- function(df, response) {
   resp_col <- if (response == "continuous") df$Res else df$Affected / df$Exposed
@@ -10,19 +32,19 @@ seed_from_singles <- function(df, response) {
   n <- length(cols)
   pnames <- model_spec("CA", "reference", n)$params  # max, slope1..n, ec50..n
 
-  fits <- lapply(seq_along(cols), function(i) {
+  seeds <- lapply(seq_along(cols), function(i) {
     others <- cols[-i]
     keep <- if (length(others) == 0) {
       rep(TRUE, nrow(df))
     } else {
       rowSums(df[others] == 0) == length(others)  # all other chemicals at 0
     }
-    fit_single(df[[cols[i]]][keep], resp_col[keep])
+    seed_one(df[[cols[i]]][keep], resp_col[keep])
   })
 
-  maxv   <- mean(vapply(fits, function(f) f$par[["max"]],   numeric(1)))
-  slopes <- vapply(fits, function(f) f$par[["slope"]], numeric(1))
-  ec50s  <- vapply(fits, function(f) f$par[["ec50"]],  numeric(1))
+  maxv   <- mean(vapply(seeds, function(s) s[["max"]],   numeric(1)))
+  slopes <- vapply(seeds, function(s) s[["slope"]], numeric(1))
+  ec50s  <- vapply(seeds, function(s) s[["ec50"]],  numeric(1))
   stats::setNames(c(maxv, slopes, ec50s), pnames)
 }
 
