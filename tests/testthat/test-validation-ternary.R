@@ -85,4 +85,12 @@ test_that("ternary Advanced S/A engine reproduces the FBSA workbook", {
   # point: A4 captures ratio-specific ternary interaction strength). Magnitudes
   # are validated by the synthetic recovery test in test-fit-ternary-asa.R.
   expect_gt(stats::sd(res$individual$A4), 0)
+
+  # ternary_effect_table (the per-ratio A4 effect readout) must work on the real
+  # 419-row frame: one row per ternary ratio, the a4_effect identity holds, and
+  # the chosen near-EC50 point's CA prediction is a sensible response (0 < pred < max).
+  eff <- ternary_effect_table(res, df)
+  expect_equal(nrow(eff), nrow(res$individual))   # one row per ternary ratio
+  expect_equal(eff$a4_effect, eff$pred_ASA - eff$pred_SA, tolerance = 1e-8)
+  expect_true(all(eff$pred_CA > 0 & eff$pred_CA < res$base[["max"]]))
 })
