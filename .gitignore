@@ -5,3 +5,6 @@
 *.Rproj
 .DS_Store
 node_modules/
+
+# Research PDFs — not committed
+papers/
