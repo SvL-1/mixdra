@@ -76,10 +76,17 @@ fit_curve_from_singles <- function(df, reference, response,
 
 #' Analyse a mixture: fit reference + deviations and compare
 #'
+#' Fitting is staged: the curve parameters are fixed from the single-compound
+#' data, then only the interaction parameters (`a`, `b`, ...) are fitted to the
+#' mixture data. Each fit's `df` therefore counts only its free interaction
+#' parameters; likelihood-ratio tests use differences, so they are unaffected.
+#'
 #' @param df Mixture data frame (see [fit_model()]).
 #' @param reference "CA" or "IA".
 #' @param response "continuous" or "binary".
-#' @param start Optional named starting vector; if NULL, seeded from single fits.
+#' @param start Optional named vector of the curve parameters (`max`, `slope*`,
+#'   `ec50*`) to hold fixed. When `NULL` (default) they are estimated from the
+#'   single-compound data via [fit_curve_from_singles()].
 #' @param alpha Significance threshold for model selection.
 #' @param lower,upper Optional named numeric vectors of hard parameter bounds,
 #'   forwarded to every [fit_model()] call (the four models share the base
@@ -100,11 +107,32 @@ analyse_mixture <- function(df, reference, response = c("continuous", "binary"),
                             lower = NULL, upper = NULL, n_starts = 1,
                             time_limit = 30) {
   response <- match.arg(response)
-  if (is.null(start)) start <- seed_from_singles(df, response)
 
+  # Stage 1: estimate the curve parameters (max, slope*, ec50*) from the
+  # single-compound data and hold them fixed. A user-supplied `start` is taken as
+  # the fixed curve parameters directly.
+  base <- if (is.null(start)) {
+    seed <- fit_curve_from_singles(df, reference, response, lower, upper,
+                                   n_starts, time_limit)
+    # Refine on the full dataset so that the reference model is at its global
+    # minimum; this prevents the interaction fits from improving on the reference
+    # by absorbing any small residual left by the singles-only stage-1 fit.
+    ref_fit <- tryCatch(
+      fit_model(df, reference, "reference", response, start = seed,
+                lower = lower, upper = upper, n_starts = n_starts,
+                time_limit = time_limit),
+      error = function(e) NULL)
+    if (!is.null(ref_fit) && all(is.finite(ref_fit$par))) ref_fit$par else seed
+  } else {
+    start
+  }
+  base_names <- names(base)
+
+  # Stage 2: with the curve parameters fixed, fit only the interaction
+  # parameters (a, b, ...) to the full mixture data, once per deviation.
   devs <- c("reference", "SA", "DR", "DL")
   fits <- lapply(devs, function(d)
-    fit_model(df, reference, d, response, start = start,
+    fit_model(df, reference, d, response, start = base, fixed = base_names,
               lower = lower, upper = upper, n_starts = n_starts,
               time_limit = time_limit))
   names(fits) <- devs

@@ -25,3 +25,23 @@ test_that("fit_curve_from_singles recovers curve params from the marginals", {
   expect_equal(unname(base[["slope1"]]), 4,   tolerance = 1e-2)
   expect_equal(unname(base[["slope2"]]), 1.5, tolerance = 1e-2)
 })
+
+test_that("analyse_mixture holds the curve params fixed across all four fits", {
+  d <- make_staged_binary_df()
+  res <- analyse_mixture(d, "CA", "continuous", n_starts = 1)
+  base <- c("max", "slope1", "slope2", "ec501", "ec502")
+  ref_base <- res$fits$reference$par[base]
+  for (m in c("SA", "DR", "DL"))
+    expect_equal(res$fits[[m]]$par[base], ref_base)
+  # df now counts only the free interaction params.
+  expect_equal(res$fits$reference$df, 0)
+  expect_equal(res$fits$SA$df, 1)   # a
+  expect_equal(res$fits$DR$df, 2)   # a, b
+  expect_equal(res$fits$DL$df, 2)   # a, b
+})
+
+test_that("analyse_mixture chooses reference on noiseless reference data", {
+  d <- make_staged_binary_df()
+  res <- analyse_mixture(d, "CA", "continuous", n_starts = 1)
+  expect_equal(res$chosen, "reference")
+})
