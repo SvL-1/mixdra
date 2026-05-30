@@ -46,3 +46,18 @@ dr_curve_data <- function(fit, df, chem = 1) {
        observed = data.frame(conc = conc, response = resp),
        chem     = conc_col)
 }
+
+#' Observed vs predicted response for any fit
+#'
+#' Mixture fits carry their fitted values in `fit$pred`; single-chemical fits do
+#' not, so predictions are recomputed from the log-logistic parameters.
+#' @param fit An enriched fit from [fit_model()] or [fit_single()].
+#' @param df The data frame the fit was built from.
+#' @return A data frame with `observed` and `predicted` columns.
+#' @keywords internal
+obs_pred_data <- function(fit, df) {
+  predicted <- if (!is.null(fit$pred)) fit$pred
+               else ll3_predict(df$C1, fit$par[["max"]], fit$par[["slope"]],
+                                fit$par[["ec50"]])
+  data.frame(observed = obs_response(df), predicted = predicted)
+}

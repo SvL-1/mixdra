@@ -33,3 +33,24 @@ plot_dose_response <- function(fit, df, chem = 1, log_x = TRUE) {
     xaxis = list(title = d$chem, type = if (log_x) "log" else "linear"),
     yaxis = list(title = "response"))
 }
+
+#' Plot observed vs predicted response
+#'
+#' Scatter of observed against predicted values with a 1:1 reference line, as a
+#' plotly object. Works for any fit.
+#' @param fit An enriched fit from [fit_model()] or [fit_single()].
+#' @param df The data frame the fit was built from.
+#' @return A plotly object.
+#' @export
+plot_obs_pred <- function(fit, df) {
+  require_plotly()
+  d <- obs_pred_data(fit, df)
+  lim <- range(c(d$observed, d$predicted), na.rm = TRUE)
+  p <- plotly::plot_ly()
+  p <- plotly::add_markers(p, x = d$observed, y = d$predicted, name = "points",
+                           marker = list(color = "black", size = 6))
+  p <- plotly::add_lines(p, x = lim, y = lim, name = "1:1",
+                         line = list(color = "grey", dash = "dash"))
+  plotly::layout(p, xaxis = list(title = "observed"),
+                 yaxis = list(title = "predicted"))
+}
