@@ -146,7 +146,8 @@ fit_model <- function(df, reference, deviation = "reference",
     # bisection solver's noise floor, so L-BFGS-B sees a zero gradient and never
     # moves them off 0. Floor them at 1 so their effect is actually detected.
     ps <- pmax(abs(theta_init), 1e-8)
-    if (length(spec$extra)) ps[spec$extra] <- pmax(ps[spec$extra], 1)
+    ex <- intersect(spec$extra, free)          # only the FREE deviation params
+    if (length(ex)) ps[ex] <- pmax(ps[ex], 1)
     res <- tryCatch(
       stats::optim(theta_init, obj_free, method = "L-BFGS-B",
                    lower = lower[free], upper = upper[free],
@@ -172,9 +173,9 @@ fit_model <- function(df, reference, deviation = "reference",
       # Deviation params start at 0, so multiplicative jitter leaves them at 0;
       # perturb additively over a broad symmetric range so the optimiser explores
       # interaction (a, b, ...) away from the reference model.
-      if (length(spec$extra))
-        theta_i[spec$extra] <- theta0[spec$extra] +
-          stats::runif(length(spec$extra), -10, 10)
+      ex <- intersect(spec$extra, free)        # only the FREE deviation params
+      if (length(ex))
+        theta_i[ex] <- theta0[ex] + stats::runif(length(ex), -10, 10)
     }
     res <- run_from(theta_i)
     if (!is.null(res) && is.finite(res$value) &&
