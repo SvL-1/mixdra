@@ -11,8 +11,8 @@ fit_model(
   response = c("continuous", "binary"),
   start,
   fixed = character(0),
-  lower_frac = 0.1,
-  upper_mult = 10,
+  lower = NULL,
+  upper = NULL,
   n_starts = 1
 )
 }
@@ -31,8 +31,15 @@ fit_model(
 
 \item{fixed}{Character vector of parameter names to hold fixed at \code{start}.}
 
-\item{lower_frac, upper_mult}{Box-constraint multipliers applied to positive
-base parameters (deviation params are unconstrained).}
+\item{lower, upper}{Optional named numeric vectors of hard bounds keyed by
+base curve parameter (\code{max}, \verb{slope*}, \verb{ec50*}). Any parameter not named
+falls back to the default: base params get positivity (\code{lower = 1e-8},
+\code{upper = Inf}); binary \code{max} additionally defaults to \code{upper = 1} (a value
+above 1 is capped, with a warning, since it is a probability). Deviation
+parameters (\code{a}, \code{b}, \code{b1/b2/b3}) are always left unconstrained and may not
+be named here, because downstream interaction analysis relies on their
+unconstrained values. A start value outside its bounds is clamped into
+range with a warning.}
 
 \item{n_starts}{Number of optimisation starts. The first uses \code{start}; each
 additional start log-uniformly perturbs \code{start} (clamped to the bounds) to

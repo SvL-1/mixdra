@@ -10,7 +10,9 @@ analyse_mixture(
   response = c("continuous", "binary"),
   start = NULL,
   alpha = 0.05,
-  n_starts = 20
+  lower = NULL,
+  upper = NULL,
+  n_starts = 1
 )
 }
 \arguments{
@@ -24,9 +26,14 @@ analyse_mixture(
 
 \item{alpha}{Significance threshold for model selection.}
 
+\item{lower, upper}{Optional named numeric vectors of hard parameter bounds,
+forwarded to every \code{\link[=fit_model]{fit_model()}} call (the four models share the base
+parameters). See \code{\link[=fit_model]{fit_model()}} for the bound semantics.}
+
 \item{n_starts}{Number of optimisation starts per model, forwarded to
-\code{\link[=fit_model]{fit_model()}}. The default uses multi-start to reliably escape the local
-minima of the CA bisection surface.}
+\code{\link[=fit_model]{fit_model()}}. Defaults to 1 (single start) for speed during testing;
+raise it (e.g. 20) to multi-start and more reliably escape the local
+minima of the CA bisection surface at the cost of runtime.}
 }
 \value{
 A list: \code{fits} (named list of model fits), \code{comparison} (data frame of

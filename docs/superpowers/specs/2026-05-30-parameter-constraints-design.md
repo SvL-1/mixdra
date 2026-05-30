@@ -97,6 +97,11 @@ Deviation params keep `-Inf/+Inf` regardless of `lower`/`upper`.
 - Replace the `lower`/`upper` construction block (current lines ~60–68) with the
   resolution above. `base <- setdiff(free, spec$extra)` already isolates the base
   params, so deviation params are left at `±Inf` by construction.
+- **Enforce bounds in the objective.** L-BFGS-B respects `lower`/`upper`
+  natively, but the Nelder-Mead *fallback* does not — so a parameter could
+  escape its bound whenever L-BFGS-B fails to converge and NM takes over.
+  `obj_free` therefore returns `1e12` for any infeasible `theta`, making the box
+  constraints bite regardless of which optimiser is active.
 - Multi-start jitter (lines ~96–108) is unchanged: it clamps base params to
   `[lower, upper]` (a no-op when `upper = Inf`) and jitters deviation params
   additively as before.
