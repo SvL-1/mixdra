@@ -26,3 +26,17 @@ test_that("plot_surface builds a plotly object", {
   p <- plot_surface(fit, df, n = 10)
   expect_s3_class(p, "plotly")
 })
+
+test_that("plot_isobole builds a plotly object, including a reference overlay", {
+  skip_if_not_installed("plotly")
+  fit <- list(reference = "CA", deviation = "SA", n_chem = 2,
+              conc_cols = c("C1", "C2"),
+              par = c(max = 1, slope1 = 3, slope2 = 3, ec501 = 0.5, ec502 = 0.5, a = 2))
+  ref <- list(reference = "CA", deviation = "reference", n_chem = 2,
+              conc_cols = c("C1", "C2"),
+              par = c(max = 1, slope1 = 3, slope2 = 3, ec501 = 0.5, ec502 = 0.5))
+  df <- data.frame(C1 = c(0, 0.5, 1), C2 = c(0, 0.5, 1),
+                   Affected = c(10, 5, 1), Exposed = rep(10, 3))
+  p <- plot_isobole(fit, df, levels = c(0.25, 0.5, 0.75), reference_fit = ref, n = 30)
+  expect_s3_class(p, "plotly")
+})

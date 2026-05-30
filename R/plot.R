@@ -78,3 +78,34 @@ plot_surface <- function(fit, df, n = 100) {
     yaxis = list(title = g$labels$y),
     zaxis = list(title = "response")))
 }
+
+#' Plot 2-D isoboles (equal-response contours) of a binary mixture
+#'
+#' Draws contour lines of equal response in the (C1, C2) plane at the requested
+#' effect levels (solid, black). If `reference_fit` is supplied, its isoboles are
+#' overlaid (dashed, red) so departures from additivity are visible. Binary fits
+#' only.
+#' @param fit An enriched binary fit from [fit_model()].
+#' @param df The data frame the fit was built from.
+#' @param levels Effect levels as fractions of `max` (default
+#'   `c(0.1, 0.25, 0.5, 0.75, 0.9)`).
+#' @param reference_fit Optional enriched reference fit to overlay (dashed).
+#' @param n Grid resolution per axis.
+#' @return A plotly object.
+#' @export
+plot_isobole <- function(fit, df, levels = c(0.1, 0.25, 0.5, 0.75, 0.9),
+                         reference_fit = NULL, n = 100) {
+  require_plotly()
+  d <- isobole_data(fit, df, levels = levels, reference_fit = reference_fit, n = n)
+  labs <- attr(d, "labels")
+  p <- plotly::plot_ly()
+  for (grp in unique(d$group)) {
+    seg <- d[d$group == grp, ]
+    is_ref <- seg$source[1] == "reference"
+    p <- plotly::add_lines(p, x = seg$x, y = seg$y, showlegend = FALSE,
+                           name = paste0(seg$source[1], " ", signif(seg$level[1], 3)),
+                           line = list(color = if (is_ref) "red" else "black",
+                                       dash  = if (is_ref) "dash" else "solid"))
+  }
+  plotly::layout(p, xaxis = list(title = labs$x), yaxis = list(title = labs$y))
+}

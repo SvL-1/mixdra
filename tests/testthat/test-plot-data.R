@@ -60,3 +60,36 @@ test_that("surface_grid_data does not error when some cells are NaN", {
   expect_silent(g <- surface_grid_data(fit, df, n = 10))
   expect_equal(dim(g$z), c(10, 10))
 })
+
+test_that("isobole_data returns contour paths at the requested effect levels", {
+  fit <- list(reference = "CA", deviation = "reference", n_chem = 2,
+              conc_cols = c("C1", "C2"),
+              par = c(max = 1, slope1 = 3, slope2 = 3, ec501 = 0.5, ec502 = 0.5))
+  df <- data.frame(C1 = c(0, 0.5, 1), C2 = c(0, 0.5, 1),
+                   Affected = c(10, 5, 1), Exposed = rep(10, 3))
+  d <- isobole_data(fit, df, levels = c(0.25, 0.5, 0.75), n = 40)
+  expect_true(all(c("source", "level", "group", "x", "y") %in% names(d)))
+  expect_setequal(unique(d$source), "fit")
+  expect_setequal(sort(unique(d$level)), sort(c(0.25, 0.5, 0.75) * 1))
+})
+
+test_that("isobole_data adds a reference set when reference_fit is given", {
+  fit <- list(reference = "CA", deviation = "SA", n_chem = 2,
+              conc_cols = c("C1", "C2"),
+              par = c(max = 1, slope1 = 3, slope2 = 3, ec501 = 0.5, ec502 = 0.5, a = 2))
+  ref <- list(reference = "CA", deviation = "reference", n_chem = 2,
+              conc_cols = c("C1", "C2"),
+              par = c(max = 1, slope1 = 3, slope2 = 3, ec501 = 0.5, ec502 = 0.5))
+  df <- data.frame(C1 = c(0, 0.5, 1), C2 = c(0, 0.5, 1),
+                   Affected = c(10, 5, 1), Exposed = rep(10, 3))
+  d <- isobole_data(fit, df, levels = 0.5, reference_fit = ref, n = 40)
+  expect_setequal(unique(d$source), c("fit", "reference"))
+})
+
+test_that("isobole_data rejects out-of-range levels", {
+  fit <- list(reference = "CA", deviation = "reference", n_chem = 2,
+              conc_cols = c("C1", "C2"),
+              par = c(max = 1, slope1 = 3, slope2 = 3, ec501 = 0.5, ec502 = 0.5))
+  df <- data.frame(C1 = c(0, 1), C2 = c(0, 1), Affected = c(10, 1), Exposed = c(10, 10))
+  expect_error(isobole_data(fit, df, levels = c(0.5, 1.5)), "between 0 and 1")
+})
