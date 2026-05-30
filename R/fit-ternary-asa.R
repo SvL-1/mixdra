@@ -170,5 +170,14 @@ ternary_effect_table <- function(res, df) {
                pred_CA = pCA, pred_SA = pSA, pred_ASA = pASA,
                a4_effect = pASA - pSA, stringsAsFactors = FALSE)
   })
-  res_df <- do.call(rbind, out); rownames(res_df) <- NULL; res_df
+  res_df <- if (length(out) == 0) {
+    data.frame(ratio = character(0), C1 = numeric(0), C2 = numeric(0),
+               C3 = numeric(0), pred_CA = numeric(0), pred_SA = numeric(0),
+               pred_ASA = numeric(0), a4_effect = numeric(0),
+               stringsAsFactors = FALSE)
+  } else {
+    do.call(rbind, out)
+  }
+  rownames(res_df) <- NULL
+  res_df
 }
