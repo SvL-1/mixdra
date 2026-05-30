@@ -1,6 +1,6 @@
 # mixdra Engine Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Build the headless computational engine of the `mixdra` R package — single-chemical and binary/ternary mixture dose–response fitting (CA/IA references + S/A/DR/DL deviations), maximum-likelihood objectives for continuous and binary data, and likelihood-ratio model comparison — fully validated against the existing Excel workbooks.
 
@@ -54,7 +54,7 @@
 - Create: `tests/testthat.R`
 - Create: `R/mixdra-package.R`
 
-- [ ] **Step 1: Create the package skeleton**
+- [x] **Step 1: Create the package skeleton**
 
 Create `DESCRIPTION`:
 ```
@@ -115,12 +115,12 @@ PackageUseDevtools: Yes
 PackageInstallArgs: --no-multiarch --with-keep.source
 ```
 
-- [ ] **Step 2: Verify the package loads**
+- [x] **Step 2: Verify the package loads**
 
 Run: `R -q -e 'devtools::load_all(); cat("LOADED OK\n")'`
 Expected: prints `LOADED OK` with no error.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add DESCRIPTION NAMESPACE mixdra.Rproj tests/testthat.R R/mixdra-package.R
@@ -135,7 +135,7 @@ git commit -m "chore: scaffold mixdra R package"
 - Create: `R/single.R`
 - Test: `tests/testthat/test-single.R`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/testthat/test-single.R`:
 ```r
@@ -157,12 +157,12 @@ test_that("fit_single recovers known parameters from clean data", {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `R -q -e 'devtools::load_all(); testthat::test_file("tests/testthat/test-single.R")'`
 Expected: FAIL — `could not find function "ll3_predict"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `R/single.R`:
 ```r
@@ -203,12 +203,12 @@ fit_single <- function(conc, resp) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `R -q -e 'devtools::load_all(); testthat::test_file("tests/testthat/test-single.R")'`
 Expected: PASS (2 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add R/single.R tests/testthat/test-single.R
@@ -223,7 +223,7 @@ git commit -m "feat: single-chemical log-logistic model and fit"
 - Create: `R/objective.R`
 - Test: `tests/testthat/test-objective.R`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/testthat/test-objective.R`:
 ```r
@@ -252,12 +252,12 @@ test_that("obj_deviance is -2 * sum of per-row binlik contributions", {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `R -q -e 'devtools::load_all(); testthat::test_file("tests/testthat/test-objective.R")'`
 Expected: FAIL — `could not find function "obj_ss"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `R/objective.R`:
 ```r
@@ -297,12 +297,12 @@ obj_deviance <- function(exposed, affected, pi_hat) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `R -q -e 'devtools::load_all(); testthat::test_file("tests/testthat/test-objective.R")'`
 Expected: PASS (3 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add R/objective.R tests/testthat/test-objective.R
@@ -345,7 +345,7 @@ ia_dr_bi_vec  <- Vectorize(ia_dr_bi,  vectorize.args = c("c1", "c2"))
 ia_dl_bi_vec  <- Vectorize(ia_dl_bi,  vectorize.args = c("c1", "c2"))
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/testthat/test-models-binary.R`:
 ```r
@@ -378,12 +378,12 @@ test_that("vectorised wrapper maps over concentration vectors", {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `R -q -e 'devtools::load_all(); testthat::test_file("tests/testthat/test-models-binary.R")'`
 Expected: FAIL — `could not find function "ca_bi"`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `R/models-binary.R` by porting the eight scalar functions named above from
 `MixTox_shiny_v2/functions/model_functions.R` (logic unchanged, lower-case argument names),
@@ -391,12 +391,12 @@ then append the eight `Vectorize` wrappers shown above. Each function must be pr
 short roxygen `#'` block and tagged `@keywords internal` (these are engine internals, not
 user API).
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `R -q -e 'devtools::load_all(); testthat::test_file("tests/testthat/test-models-binary.R")'`
 Expected: PASS (4 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add R/models-binary.R tests/testthat/test-models-binary.R
@@ -414,7 +414,7 @@ git commit -m "feat: port binary mixture model functions (CA/IA + S/A/DR/DL)"
 Maps a `(reference, deviation, n_chem)` selection to its predictor function, free-parameter
 names, and nesting parent. This drives both the fitter (Task 5) and the comparison (Task 6).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/testthat/test-registry.R`:
 ```r
@@ -444,12 +444,12 @@ test_that("binary IA registry resolves to the IA predictor functions", {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `R -q -e 'devtools::load_all(); testthat::test_file("tests/testthat/test-registry.R")'`
 Expected: FAIL — `could not find function "model_spec"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `R/registry.R`:
 ```r
@@ -488,12 +488,12 @@ model_spec <- function(reference, deviation, n_chem) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `R -q -e 'devtools::load_all(); testthat::test_file("tests/testthat/test-registry.R")'`
 Expected: PASS (2 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add R/registry.R tests/testthat/test-registry.R
@@ -512,7 +512,7 @@ Fits one model (e.g. CA + S/A) to a mixture dataset by minimising the appropriat
 Staged seeding: start values come from single-chemical fits (caller-supplied); deviation
 parameters start at 0. Supports continuous and binary data and fixing parameters.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/testthat/test-fit.R`:
 ```r
@@ -558,12 +558,12 @@ test_that("fit_model (binary) minimises deviance and predicts probabilities", {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `R -q -e 'devtools::load_all(); testthat::test_file("tests/testthat/test-fit.R")'`
 Expected: FAIL — `could not find function "fit_model"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `R/fit.R`:
 ```r
@@ -639,12 +639,12 @@ fit_model <- function(df, reference, deviation = "reference",
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `R -q -e 'devtools::load_all(); testthat::test_file("tests/testthat/test-fit.R")'`
 Expected: PASS (3 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add R/fit.R tests/testthat/test-fit.R
@@ -663,7 +663,7 @@ Computes the LR statistic and p-value between a model and its nesting parent, an
 most parsimonious model. Continuous: `chi = n * ln(SS_parent / SS_child)`. Binary:
 `chi = deviance_parent - deviance_child`. df = difference in free parameters.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/testthat/test-compare.R`:
 ```r
@@ -697,12 +697,12 @@ test_that("select_parsimonious keeps the simplest model not significantly beaten
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `R -q -e 'devtools::load_all(); testthat::test_file("tests/testthat/test-compare.R")'`
 Expected: FAIL — `could not find function "lr_test"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `R/compare.R`:
 ```r
@@ -757,12 +757,12 @@ select_parsimonious <- function(fits, n, response, alpha = 0.05) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `R -q -e 'devtools::load_all(); testthat::test_file("tests/testthat/test-compare.R")'`
 Expected: PASS (3 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add R/compare.R tests/testthat/test-compare.R
@@ -781,7 +781,7 @@ Ties the pieces together: given a mixture dataset and a reference, fit single cu
 seeds, fit {reference, SA, DR, DL}, run the comparisons, and assemble the Table-2 result
 object (the future B10:P20 block).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/testthat/test-analyse.R`:
 ```r
@@ -802,12 +802,12 @@ test_that("analyse_mixture returns a fit per deviation and a chosen model", {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `R -q -e 'devtools::load_all(); testthat::test_file("tests/testthat/test-analyse.R")'`
 Expected: FAIL — `could not find function "analyse_mixture"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `R/analyse.R`:
 ```r
@@ -858,12 +858,12 @@ analyse_mixture <- function(df, reference, response = c("continuous", "binary"),
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `R -q -e 'devtools::load_all(); testthat::test_file("tests/testthat/test-analyse.R")'`
 Expected: PASS (1 test).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add R/analyse.R tests/testthat/test-analyse.R
@@ -882,7 +882,7 @@ git commit -m "feat: analyse_mixture driver assembling fits and comparison"
 Proves the engine reproduces the published analysis to the agreed "scientifically equivalent"
 standard: same chosen model and parameters in the right ballpark.
 
-- [ ] **Step 1: Generate the data fixture from the workbook**
+- [x] **Step 1: Generate the data fixture from the workbook**
 
 Create `tests/testthat/fixtures/extract_binary_fixture.R`:
 ```r
@@ -910,7 +910,7 @@ cat("wrote", nrow(bin), "quantal rows\n")
 Run: `R -q -e 'source("tests/testthat/fixtures/extract_binary_fixture.R")'`
 Expected: prints `wrote 145 continuous rows` and `wrote 145 quantal rows`; both CSVs created.
 
-- [ ] **Step 2: Write the validation test**
+- [x] **Step 2: Write the validation test**
 
 `tests/testthat/test-validation-binary.R`:
 ```r
@@ -949,14 +949,14 @@ test_that("engine reproduces the binary workbook CA quantal analysis", {
 })
 ```
 
-- [ ] **Step 3: Run the validation tests**
+- [x] **Step 3: Run the validation tests**
 
 Run: `R -q -e 'devtools::load_all(); testthat::test_file("tests/testthat/test-validation-binary.R")'`
 Expected: PASS (2 tests). If a chosen model or objective is off, tune the fitter (multi-start;
 widen `upper_mult` for the railing EC50₂; try Nelder-Mead fallback) — see Task 9 — until
 scientifically equivalent.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add tests/testthat/fixtures/extract_binary_fixture.R tests/testthat/fixtures/binary_mps_cpf_continuous.csv tests/testthat/fixtures/binary_mps_cpf_quantal.csv tests/testthat/test-validation-binary.R
@@ -976,7 +976,7 @@ If Task 8 already passes cleanly with a single L-BFGS-B start, keep this minimal
 multi-start (perturbed seeds) and a Nelder-Mead fallback to escape local minima and handle the
 non-smooth CA bisection surface.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/testthat/test-fit-robust.R`:
 ```r
@@ -993,12 +993,12 @@ test_that("fit_model with n_starts returns the best of several starts", {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `R -q -e 'devtools::load_all(); testthat::test_file("tests/testthat/test-fit-robust.R")'`
 Expected: FAIL — `unused argument (n_starts = 8)`.
 
-- [ ] **Step 3: Extend the implementation**
+- [x] **Step 3: Extend the implementation**
 
 In `R/fit.R`, add an `n_starts = 1` parameter to `fit_model()`. Wrap the existing optimisation
 in a loop: for start index `i`, use `theta0` for `i == 1` and `theta0 * runif(length(theta0), 0.5, 1.5)`
@@ -1010,17 +1010,17 @@ Also in `R/analyse.R`: add an `n_starts = 5` argument to `analyse_mixture()` and
 each `fit_model(...)` call so the workbook validations benefit from multi-start. The default of
 5 keeps small datasets fast.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `R -q -e 'devtools::load_all(); testthat::test_file("tests/testthat/test-fit-robust.R")'`
 Expected: PASS.
 
-- [ ] **Step 5: Re-run the workbook validations with multi-start**
+- [x] **Step 5: Re-run the workbook validations with multi-start**
 
 Run: `R -q -e 'devtools::load_all(); testthat::test_file("tests/testthat/test-validation-binary.R")'`
 Expected: PASS (2 tests) — confirm Task 8 still holds (now via `analyse_mixture`'s multi-start).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add R/fit.R R/analyse.R tests/testthat/test-fit-robust.R
@@ -1050,7 +1050,7 @@ git commit -m "feat: multi-start and Nelder-Mead fallback wired through analyse_
 Append `Vectorize(..., vectorize.args = c("c1","c2","c3"))` wrappers named
 `ca_tri_vec`, `ia_tri_vec`, `ca_sa_tri_vec`, etc.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/testthat/test-models-ternary.R`:
 ```r
@@ -1083,22 +1083,22 @@ test_that("vectorised ternary wrapper maps over three concentration vectors", {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `R -q -e 'devtools::load_all(); testthat::test_file("tests/testthat/test-models-ternary.R")'`
 Expected: FAIL — `could not find function "ca_tri"`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Port the eight ternary functions and add the vectorised wrappers as described above. Tag each
 `@keywords internal`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `R -q -e 'devtools::load_all(); testthat::test_file("tests/testthat/test-models-ternary.R")'`
 Expected: PASS (4 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add R/models-ternary.R tests/testthat/test-models-ternary.R
@@ -1115,7 +1115,7 @@ git commit -m "feat: port ternary mixture model functions"
 - Modify: `R/analyse.R`
 - Test: `tests/testthat/test-nchem.R`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/testthat/test-nchem.R`:
 ```r
@@ -1144,12 +1144,12 @@ test_that("single-chemical analysis returns just the dose-response fit", {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `R -q -e 'devtools::load_all(); testthat::test_file("tests/testthat/test-nchem.R")'`
 Expected: FAIL — ternary branch errors / `analyse_single` not found.
 
-- [ ] **Step 3: Extend the implementations**
+- [x] **Step 3: Extend the implementations**
 
 In `R/registry.R`: extend `model_spec()` for `n_chem == 3`:
 - base params `c("max","slope1","slope2","slope3","ec50_1","ec50_2","ec50_3")`;
@@ -1182,12 +1182,12 @@ analyse_single <- function(df) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `R -q -e 'devtools::load_all(); testthat::test_file("tests/testthat/test-nchem.R")'`
 Expected: PASS (3 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add R/registry.R R/fit.R R/analyse.R tests/testthat/test-nchem.R
@@ -1205,7 +1205,7 @@ git commit -m "feat: generalise engine to 1 and 3 chemicals"
 Adds 95% CIs (from the numerically-estimated Hessian of the objective) and a tidy result table
 matching the workbook's parameter/comparison block (B10:P20).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/testthat/test-summary.R`:
 ```r
@@ -1231,12 +1231,12 @@ test_that("result_table assembles one column per fitted model", {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `R -q -e 'devtools::load_all(); testthat::test_file("tests/testthat/test-summary.R")'`
 Expected: FAIL — `could not find function "param_ci"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `R/summary.R`:
 ```r
@@ -1298,12 +1298,12 @@ result_table <- function(res) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `R -q -e 'devtools::load_all(); testthat::test_file("tests/testthat/test-summary.R")'`
 Expected: PASS (2 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add R/summary.R tests/testthat/test-summary.R
@@ -1318,24 +1318,24 @@ git commit -m "feat: parameter CIs and Table-2 result assembly"
 - Modify: all `R/*.R` (ensure roxygen blocks present)
 - Generated: `NAMESPACE`, `man/*.Rd`
 
-- [ ] **Step 1: Generate documentation and NAMESPACE**
+- [x] **Step 1: Generate documentation and NAMESPACE**
 
 Run: `R -q -e 'devtools::document()'`
 Expected: writes `man/*.Rd` and an updated `NAMESPACE` exporting the public functions
 (`ll3_predict`, `fit_single`, `obj_ss`, `binlik`, `obj_deviance`, `fit_model`, `lr_test`,
 `select_parsimonious`, `analyse_mixture`, `analyse_single`, `param_ci`, `result_table`).
 
-- [ ] **Step 2: Run the full test suite**
+- [x] **Step 2: Run the full test suite**
 
 Run: `R -q -e 'devtools::test()'`
 Expected: all tests across all files PASS, 0 failures.
 
-- [ ] **Step 3: R CMD check (engine only)**
+- [x] **Step 3: R CMD check (engine only)**
 
 Run: `R -q -e 'devtools::check(args = "--no-manual", error_on = "warning")'`
 Expected: 0 errors, 0 warnings (notes acceptable).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add NAMESPACE man R
