@@ -73,6 +73,45 @@ sheet seen).
 
 ---
 
+## 2a. Ternary fitting is TWO-TIER: overall + per-ratio individual fits
+
+(Added 2026-05-30 from user clarification; see paper *J. Hazard. Mater.*
+ISSN 0304-3894, file `1-s2.0-S0304389425034132-main` — not on disk here.)
+
+**Why:** fitting the ternary model over *all* ternary data at once "averages
+out" the fit — the model has too little flexibility ("fluidity") to follow how
+the interaction changes across mixture ratios, so a single global fit smears the
+ratio-specific behaviour.
+
+**So ternary analysis produces two kinds of fit:**
+1. **Overall fit** — single + binary + **all** ternary data → one global
+   parameter set. (Workbook sheet `…Overall`.)
+2. **Individual fits** — single + binary + **one ternary mixture ratio's** data
+   at a time → a separate parameter set *per ratio*. Singles+binaries are the
+   shared backbone reused in every fit; only the ternary rows are subset to the
+   one ratio. (Workbook ratio sheets: `33% FBSA`, `20CPF 60FBSA 20IMI`,
+   `CPF60 FBSA20 IMI20`, `CPF20 FBSA20 IMI60`.)
+
+**Output requirement:** ternary results must report BOTH the overall fit AND a
+per-ratio table of individual-fit parameters (`max`, `slope1-3`, `ec50_1-3`,
+`a`-values). So `analyse_mixture()` for ternary becomes multi-fit: one overall
+fit + a loop over each distinct ternary ratio. The result object needs an
+overall block + a per-ratio structure.
+
+**Mixture-ratio detection = concentration-based, NOT sheet names** (decided):
+- A ratio is a fixed proportion `C1:C2:C3` (a ray from the origin); a
+  dose-response series at fixed ratio holds proportions constant.
+- For each ternary row (all of C1,C2,C3 > 0), normalise to `Ci/(C1+C2+C3)` and
+  group rows with the same proportion vector → one individual fit.
+- Singles (one chem > 0) and binaries (one chem = 0) are excluded from ratio
+  grouping — they're the shared backbone for every fit.
+- Cluster proportions with a **small tolerance** (robust to measured-conc noise;
+  exact matching also works for clean nominal designs).
+- This is fully general — works for any ratios in any dataset, independent of the
+  example data's specific ratios / sheet labels.
+
+---
+
 ## 3. Workbook findings (from inspection this session)
 
 ### 3a. `FBSA CPF IMI ternary -simplified.xls` (repo root) — THE validation reference
