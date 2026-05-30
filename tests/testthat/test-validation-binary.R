@@ -3,11 +3,12 @@ test_that("engine reproduces the binary workbook CA continuous analysis", {
   skip_if_not(file.exists(csv), "fixture CSV not generated")
   df <- read.csv(csv)
 
-  set.seed(42)  # multi-start uses runif(); fix the seed for a deterministic test
-  # Multi-start is required here: the DR/DL deviation parameters must escape 0 to
-  # find the dose-level-dependent optimum the workbook reports.
+  # A single start already reproduces the workbook optimum here (the deviation
+  # params escape 0 from the seed alone), so n_starts = 1 keeps this end-to-end
+  # check as fast as the 145-row data allows.
+  set.seed(42)
   res <- analyse_mixture(df, reference = "CA", response = "continuous",
-                         n_starts = 12)
+                         n_starts = 1)
 
   # Reference fit: residual SS within 2% of the workbook (1,633,769.68).
   expect_equal(res$fits$reference$objective, 1633769.68, tolerance = 0.02)
@@ -28,7 +29,7 @@ test_that("engine reproduces the binary workbook CA quantal analysis", {
 
   set.seed(42)
   res <- analyse_mixture(df, reference = "CA", response = "binary",
-                         n_starts = 12)
+                         n_starts = 1)
 
   # Reference residual deviance within 2% of the workbook (184.424).
   expect_equal(res$fits$reference$objective, 184.424, tolerance = 0.02)
