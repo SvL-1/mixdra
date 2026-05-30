@@ -62,6 +62,10 @@ fit_model <- function(df, reference, deviation = "reference",
   upper <- stats::setNames(rep(Inf, length(free)), free)
   lower[base] <- pmax(1e-8, theta0[base] * lower_frac)
   upper[base] <- pmax(lower[base] * 1.01, theta0[base] * upper_mult)
+  # For binary data `max` is the control response *probability*, so it cannot
+  # exceed 1; without this cap the optimiser can push it above 1 and the model
+  # returns fitted probabilities > 1 (`ca_bi = max / (1 + ...) <= max`).
+  if (response == "binary" && "max" %in% base) upper[["max"]] <- 1
 
   # One attempt: L-BFGS-B (parscale normalises the very differently-scaled
   # parameters), with a Nelder-Mead fallback if it fails to converge — robust to
