@@ -48,7 +48,9 @@ test_that("ternary Advanced S/A engine reproduces the FBSA workbook", {
   expect_equal(unname(b[["ec50_3"]]), 0.5751, tolerance = 0.03)  # wb 0.57507
   expect_equal(unname(b[["slope1"]]),  4.672, tolerance = 0.3)   # wb 4.6721
   expect_equal(unname(b[["slope3"]]),  3.627, tolerance = 0.3)   # wb 3.6274
-  # slope2 (FBSA) is weakly constrained (steep DR, EC50 pinned); just positive.
+  # FBSA slope is weakly identified (EC50 pinned at 5.58); workbook beta2 spans
+  # ~13-56 across its fits and the engine sits above that range. Assert only that
+  # it stayed strongly positive.
   expect_gt(unname(b[["slope2"]]), 10)
 
   ## --- Pairwise A1/A2/A3 (Stage 2: binaries, base fixed) ---------------------
@@ -68,6 +70,8 @@ test_that("ternary Advanced S/A engine reproduces the FBSA workbook", {
   # residual -- yet remain the same order of magnitude. Engine ~= 1.01e7.
   ss <- res$fits$overall$objective
   expect_true(is.finite(ss))
+  # This upper bound is structurally near-guaranteed: adding interaction terms to
+  # a CA base can only reduce residual SS. The REAL guard is the ±10% band below.
   expect_lt(ss, 11465387)                       # below pure-CA residual
   expect_equal(ss, 1.01e7, tolerance = 0.10)    # within ~10% of engine value
 
@@ -77,5 +81,8 @@ test_that("ternary Advanced S/A engine reproduces the FBSA workbook", {
   # magnitudes are validated by the synthetic recovery test, not here.
   expect_equal(nrow(res$individual), 4)
   expect_true(all(is.finite(res$individual$A4)))
-  expect_gte(sd(res$individual$A4), 0)
+  # Per-ratio A4 are expected to genuinely vary across ratios (the scientific
+  # point: A4 captures ratio-specific ternary interaction strength). Magnitudes
+  # are validated by the synthetic recovery test in test-fit-ternary-asa.R.
+  expect_gt(stats::sd(res$individual$A4), 0)
 })
