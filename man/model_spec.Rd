@@ -9,7 +9,7 @@ model_spec(reference, deviation, n_chem)
 \arguments{
 \item{reference}{"CA" or "IA".}
 
-\item{deviation}{"reference", "SA", "DR", or "DL".}
+\item{deviation}{"reference", "SA", "DR", "DL", or "ASA".}
 
 \item{n_chem}{Number of chemicals (2 for binary, 3 for ternary).}
 }

@@ -2,6 +2,7 @@
 
 export(analyse_mixture)
 export(analyse_single)
+export(analyse_ternary)
 export(binlik)
 export(fit_model)
 export(fit_single)
@@ -16,4 +17,5 @@ export(plot_obs_pred)
 export(plot_surface)
 export(result_table)
 export(select_parsimonious)
+export(ternary_effect_table)
 importFrom(stats,uniroot)

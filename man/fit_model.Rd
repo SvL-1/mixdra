@@ -28,7 +28,8 @@ fit_model(
 \item{response}{"continuous" or "binary".}
 
 \item{start}{Named numeric vector of starting values for the base parameters
-(max, slope*, ec50*). Deviation parameters default to 0.}
+(max, slope*, ec50*). Deviation parameters default to their solver origin:
+\code{a} at 0 and \code{b}/\code{b1}/\code{b2}/\code{b3} at 1; any other deviation parameter at 0.}
 
 \item{fixed}{Character vector of parameter names to hold fixed at \code{start}.}
 

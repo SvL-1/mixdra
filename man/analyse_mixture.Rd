@@ -23,7 +23,9 @@ analyse_mixture(
 
 \item{response}{"continuous" or "binary".}
 
-\item{start}{Optional named starting vector; if NULL, seeded from single fits.}
+\item{start}{Optional named vector of the curve parameters (\code{max}, \verb{slope*},
+\verb{ec50*}) to hold fixed. When \code{NULL} (default) they are estimated from the
+single-compound data via \code{\link[=fit_curve_from_singles]{fit_curve_from_singles()}}.}
 
 \item{alpha}{Significance threshold for model selection.}
 
@@ -46,5 +48,8 @@ LR tests vs each model's parent), \code{chosen} (selected model name),
 \code{reference}, \code{response}.
 }
 \description{
-Analyse a mixture: fit reference + deviations and compare
+Fitting is staged: the curve parameters are fixed from the single-compound
+data, then only the interaction parameters (\code{a}, \code{b}, ...) are fitted to the
+mixture data. Each fit's \code{df} therefore counts only its free interaction
+parameters; likelihood-ratio tests use differences, so they are unaffected.
 }
