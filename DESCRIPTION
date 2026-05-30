@@ -1,0 +1,23 @@
+Package: mixdra
+Title: Mixture Dose-Response Analysis (Jonker et al. 2005 Methodology)
+Version: 0.0.0.9000
+Authors@R:
+    person("Mixdra", "Authors", email = "pieter.vklaveren@gmail.com", role = c("aut", "cre"))
+Description: Fits single-chemical and binary/ternary mixture dose-response
+    models using the concentration addition and independent action reference
+    models with synergism/antagonism, dose-ratio-dependent, and
+    dose-level-dependent deviation patterns, following Jonker et al. (2005)
+    <doi:10.1897/04-431R.1>. Supports continuous and binary (quantal) responses
+    and likelihood-ratio model comparison.
+License: GPL-3
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1
+Depends: R (>= 4.1)
+Imports:
+    numDeriv,
+    stats
+Suggests:
+    readxl,
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
