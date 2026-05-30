@@ -1,7 +1,7 @@
 #' Look up the specification for a mixture model
 #'
 #' @param reference "CA" or "IA".
-#' @param deviation "reference", "SA", "DR", or "DL".
+#' @param deviation "reference", "SA", "DR", "DL", or "ASA".
 #' @param n_chem Number of chemicals (2 for binary, 3 for ternary).
 #' @return A list: `fn` (vectorised predictor), `params` (all free parameter
 #'   names), `extra` (deviation parameters beyond the reference), `parent`
