@@ -8,12 +8,17 @@
 #' @param start Named numeric vector of starting values for the base parameters
 #'   (max, slope*, ec50*). Deviation parameters default to 0.
 #' @param fixed Character vector of parameter names to hold fixed at `start`.
-#' @param lower_frac,upper_mult Box-constraint multipliers applied to positive
-#'   base parameters (deviation params are unconstrained).
+#' @param lower,upper Optional named numeric vectors of manual box constraints,
+#'   one entry per parameter to constrain (others keep their default). Defaults
+#'   encode only domain meaning, not the seed: base curve parameters (`max`,
+#'   `slope*`, `ec50*`) get positivity (`lower = 1e-8`, `upper = Inf`); for
+#'   binary data `max` additionally gets `upper = 1` (it is a probability);
+#'   deviation parameters (`a`, `b`, `b1`, `b2`, `b3`) are left fully
+#'   unconstrained so downstream interaction analysis (e.g. the dose at which an
+#'   interaction switches between synergism and antagonism) is undistorted.
 #' @param n_starts Number of optimisation starts. The first uses `start`; each
-#'   additional start log-uniformly perturbs `start` (clamped to the bounds) to
-#'   escape the local minima of the non-smooth CA bisection surface. The best
-#'   finite objective is kept.
+#'   additional start perturbs `start` to escape the local minima of the
+#'   non-smooth CA bisection surface. The best finite objective is kept.
 #' @return A list with `par` (named fitted parameters), `objective`
 #'   (residual SS or deviance), `pred` (fitted values), `residuals`, `df`
 #'   (number of free parameters), `n`, and `convergence`.
@@ -21,7 +26,7 @@
 fit_model <- function(df, reference, deviation = "reference",
                       response = c("continuous", "binary"),
                       start, fixed = character(0),
-                      lower_frac = 0.1, upper_mult = 10, n_starts = 1) {
+                      lower = NULL, upper = NULL, n_starts = 1) {
   response <- match.arg(response)
   conc_cols <- intersect(c("C1", "C2", "C3"), names(df))
   n_chem <- length(conc_cols)
@@ -57,15 +62,18 @@ fit_model <- function(df, reference, deviation = "reference",
   }
 
   theta0 <- par[free]
-  base <- setdiff(free, spec$extra)   # bounded curve params; deviation params unconstrained
-  lower <- stats::setNames(rep(-Inf, length(free)), free)
-  upper <- stats::setNames(rep(Inf, length(free)), free)
-  lower[base] <- pmax(1e-8, theta0[base] * lower_frac)
-  upper[base] <- pmax(lower[base] * 1.01, theta0[base] * upper_mult)
-  # For binary data `max` is the control response *probability*, so it cannot
-  # exceed 1; without this cap the optimiser can push it above 1 and the model
-  # returns fitted probabilities > 1 (`ca_bi = max / (1 + ...) <= max`).
-  if (response == "binary" && "max" %in% base) upper[["max"]] <- 1
+  base <- setdiff(free, spec$extra)   # curve params; deviation params unconstrained
+
+  # Default bounds encode domain meaning only (not the seed): base curve params
+  # get positivity; deviation params stay unconstrained. The user may override
+  # any individual bound via `lower`/`upper`.
+  lo <- stats::setNames(rep(-Inf, length(free)), free)
+  up <- stats::setNames(rep(Inf, length(free)), free)
+  lo[base] <- 1e-8
+  # Binary `max` is a control probability and cannot exceed 1.
+  if (response == "binary" && "max" %in% base) up[["max"]] <- 1
+  if (!is.null(lower)) lo[names(lower)] <- lower
+  if (!is.null(upper)) up[names(upper)] <- upper
 
   # One attempt: L-BFGS-B (parscale normalises the very differently-scaled
   # parameters), with a Nelder-Mead fallback if it fails to converge — robust to
@@ -79,8 +87,8 @@ fit_model <- function(df, reference, deviation = "reference",
     if (length(spec$extra)) ps[spec$extra] <- pmax(ps[spec$extra], 1)
     res <- tryCatch(
       stats::optim(theta_init, obj_free, method = "L-BFGS-B",
-                   lower = lower[free], upper = upper[free],
-                   control = list(parscale = ps, factr = 1e-9, maxit = 1000)),
+                   lower = lo[free], upper = up[free],
+                   control = list(parscale = ps, factr = 1e-9, maxit = 100)),
       error = function(e) NULL)
     if (is.null(res) || res$convergence != 0) {
       res2 <- tryCatch(
@@ -98,7 +106,7 @@ fit_model <- function(df, reference, deviation = "reference",
     if (i > 1) {
       # Base (positive curve) params: multiplicative jitter, clamped to bounds.
       theta_i[base] <- theta0[base] * exp(stats::runif(length(base), -log(3), log(3)))
-      theta_i[base] <- pmin(pmax(theta_i[base], lower[base]), upper[base])
+      theta_i[base] <- pmin(pmax(theta_i[base], lo[base]), up[base])
       # Deviation params start at 0, so multiplicative jitter leaves them at 0;
       # perturb additively over a broad symmetric range so the optimiser explores
       # interaction (a, b, ...) away from the reference model.
@@ -111,10 +119,12 @@ fit_model <- function(df, reference, deviation = "reference",
         (is.null(best) || res$value < best$value)) best <- res
   }
 
-  par[free] <- best$par
+  # Clamp the optimum into the box: the Nelder-Mead fallback is unbounded, so
+  # this guarantees user-supplied (and default) constraints are always honoured.
+  par[free] <- pmin(pmax(best$par, lo[free]), up[free])
   pred <- predict_with(par)
   obs <- if (response == "continuous") df$Res else df$Affected / df$Exposed
-  list(par = par, objective = best$value, pred = pred,
+  list(par = par, objective = objective_of(par), pred = pred,
        residuals = obs - pred, df = length(free), n = nrow(df),
        convergence = best$convergence)
 }
