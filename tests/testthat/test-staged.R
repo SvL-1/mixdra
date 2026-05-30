@@ -22,4 +22,6 @@ test_that("fit_curve_from_singles recovers curve params from the marginals", {
   expect_equal(unname(base[["max"]]),   800,  tolerance = 1e-2)
   expect_equal(unname(base[["ec501"]]), 0.08, tolerance = 1e-2)
   expect_equal(unname(base[["ec502"]]), 1,    tolerance = 1e-2)
+  expect_equal(unname(base[["slope1"]]), 4,   tolerance = 1e-2)
+  expect_equal(unname(base[["slope2"]]), 1.5, tolerance = 1e-2)
 })

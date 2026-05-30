@@ -62,6 +62,8 @@ fit_curve_from_singles <- function(df, reference, response,
                                    n_starts = 1, time_limit = 30) {
   cols <- intersect(c("C1", "C2", "C3"), names(df))
   singles <- df[rowSums(df[cols] > 0) <= 1, , drop = FALSE]
+  # Seed from the full frame (seed_from_singles already isolates each chemical's
+  # marginal rows internally); fit_model then refines on the single-compound subset.
   seed <- seed_from_singles(df, response)
   fit <- tryCatch(
     fit_model(singles, reference, "reference", response, start = seed,
