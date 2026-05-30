@@ -29,7 +29,12 @@ fit_single <- function(conc, resp) {
   }
   lower <- c(max = 1e-8, slope = 1e-3, ec50 = 1e-8)
   upper <- c(max = Inf,  slope = 50,   ec50 = Inf)
+  # parscale normalises the three very differently-scaled parameters (max ~ 1e2,
+  # slope ~ 1, ec50 ~ 1e-1) so L-BFGS-B's relative tolerance bites uniformly;
+  # without it the optimiser stops well short of the true minimum.
   res <- stats::optim(start, obj, method = "L-BFGS-B",
-                      lower = lower, upper = upper)
+                      lower = lower, upper = upper,
+                      control = list(parscale = pmax(abs(start), 1e-8),
+                                     factr = 1e-9, maxit = 1000))
   list(par = res$par, ssr = res$value, convergence = res$convergence)
 }
