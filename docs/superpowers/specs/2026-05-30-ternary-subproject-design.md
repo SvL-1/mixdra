@@ -157,41 +157,63 @@ datasets) and isoplane/TU-z tables. Use these when building T2.
 
 ---
 
-## 4. ⛔ THE BLOCKER — ternary deviation model mismatch
+## 4. Advanced S/A model + staged fitting workflow (RESOLVED 2026-05-30)
 
-The workbook's ternary deviation model is **"Advanced S/A" with per-interaction
-parameters `a1, a2, a3`** (and a fourth `a4` in the `Model4Isoplane` variant).
-Our engine's ported ternary SA (`R/models-ternary.R::ca_sa_tri` / `ia_sa_tri`)
-uses a **single shared `a`** across all interactions:
-`F4 <- exp(a * z1 * z2)`, `exp(a * z1 * z3)`, `exp(a * z2 * z3)`,
-`exp(a * z1 * z2 * z3)`.
+Sam supplied the exact MixTox workflow; the earlier blocker is resolved. The
+ternary deviation is a **per-term "Advanced S/A"** fitted in **nested stages**.
 
-**Working interpretation (UNCONFIRMED):** in "Advanced S/A" each chemical *pair*
-gets its own interaction magnitude (`a1`=pair 1‑2, `a2`=1‑3, `a3`=2‑3) and `a4`
-is the three‑way (all‑present) term; our model reuses one `a` everywhere.
+### Model
+- **Base CA/IA:** `max`, `slope1-3`, `ec50_1-3`.
+- **Pairwise S/A:** `A1` (pair C1·C2), `A2` (C1·C3), `A3` (C2·C3).
+- **Three-way S/A ("+S/A"):** `A4` (all three chemicals present).
+- The single-`a` ported model (`ca_sa_tri` etc.) is the special case
+  `A1=A2=A3=A4`.
 
-**Consequence:** the engine's current ternary SA **cannot reproduce the
-workbook's deviation fit as-is** — it would need extending to the per-pair model.
-The CA **reference** fit (max, betas, EC50s) *does* match our engine and is
-validatable today.
+**Inferred deviation function (generalises the ported single-`a` form; VERIFY
+against the workbook during validation):**
+```
+F = exp( A1·z1·z2 + A2·z1·z3 + A3·z2·z3 + A4·z1·z2·z3 )
+```
+A binary mixture (one chem = 0) activates only that pair's term; a ternary
+mixture activates all four. `zi = TUi/ΣTU`, `TUi = Ci/EC50i` (constant along a
+fixed-ratio dose series → A4 is one identifiable number per ratio).
 
-### Open questions (need the user's domain knowledge)
-1. Is the per-pair `a1/a2/a3` (+`a4` three-way) interpretation correct? What is
-   the exact "Advanced S/A" formula?
-2. Should ternary be considered "validated" on the **CA reference alone** for
-   now, with the Advanced S/A deviation implemented + validated as a later plan?
-   Or is reproducing the deviation fit essential to T1?
-3. Does our ported single-`a` ternary SA correspond to any model the user
-   actually uses, or is it effectively superseded by Advanced S/A for 3+ chems?
+### Staged fitting (Sam's 10-step workflow)
+1. Fit base CA params to **singles residuals only**.
+2. Copy base params into CA+S/A, held **fixed**.
+3. Fit **A1,A2,A3 to binary residuals only** (base fixed; **start all at 0**).
+   Each binary isolates one pair, so the three are separately identifiable.
+4. Copy (base + A1,A2,A3) into the A4 model ("CA + S/A + S/A"), all fixed.
+5. Branch into copies — the shared starting point for steps 6–8.
+6. **Overall A4:** everything fixed, fit **only A4 to ALL residuals** (incl. all
+   ternary mixtures) → the single overall A4.
+7. **Individual A4:** fit **only A4 to ONE ternary ratio's** data.
+8. Repeat step 7 for every ternary ratio.
+9. Per ratio: read the modelled **CA**, **CA+S/A**, and **S/A** values near the
+   EC50 (or at a clear-response, non-Ymax-dominated, non-~100% point) → the
+   effect-size of that ratio's A4.
+10. Interpretation: comparing per-ratio A4 vs overall A4 exposes **averaging-out**
+    — synergy at one ratio + antagonism at another cancel to overall A4 ≈ 0,
+    which misrepresents the data. **This contrast is the scientific point of the
+    whole ternary subproject.**
 
-### Why on hold
-Per the user (2026-05-30): other things must be implemented first before these
-questions can be answered. T1 is therefore parked. **Decided so far:** data
-source = `FBSA CPF IMI ternary -simplified.xls`; T3 deferred to a separate step.
+### Required outputs
+- Overall fit params (base + A1/A2/A3 + overall A4).
+- **Per-ratio table of individual A4 values** (one per ternary ratio).
+- Per-ratio effect-size readouts: modelled CA / CA+S/A / S/A at the chosen
+  near-EC50 points.
 
-### To resume
-1. Get the Advanced S/A formula / scope decision (§4 Q1–Q2).
-2. If "CA reference only": T1 = workstreams §2 (1–4) restricted to CA reference,
-   no deviation assertions. Small, unblocked.
-3. If "extend engine": add a per-pair Advanced S/A ternary model to
-   `R/models-ternary.R` + `R/registry.R` first, then validate.
+### Engine implications (new work beyond the current joint multi-start fitter)
+- A **staged fitting routine**: fit parameter *subsets* on data *subsets*
+  (singles→base, binaries→A1-3, ternary→A4), holding the rest fixed. Distinct
+  from the engine's current joint fit + LR model selection.
+- **Extended per-term deviation** (A1-A4) in `R/models-ternary.R` + registry.
+- Data partitioning into singles / binaries / per-ternary-ratio (reuse the
+  exact-nominal ratio grouping from §2a) and the per-ratio A4 loop.
+
+### Still-open design questions (for the implementation plan)
+1. Confirm the exact deviation formula above (validation will catch errors, but
+   confirm if known).
+2. How Advanced S/A coexists with the existing registry / SA·DR·DL model
+   selection — new model + staged path, or a separate analysis entry point?
+3. IA variant of the staged workflow + result-object shape.
