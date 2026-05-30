@@ -61,3 +61,42 @@ obs_pred_data <- function(fit, df) {
                                 fit$par[["ec50"]])
   data.frame(observed = obs_response(df), predicted = predicted)
 }
+
+#' Evaluate a fitted binary model over c1/c2 vectors
+#'
+#' Looks up the vectorised predictor for the fit's model
+#' (`model_spec(reference, deviation, 2)$fn`) and supplies the fitted parameters
+#' by name, so deviation parameters (`a`, `b`) are included automatically.
+#' @keywords internal
+predict_grid <- function(fit, c1, c2) {
+  spec <- model_spec(fit$reference, fit$deviation, 2)
+  args <- c(list(c1 = c1, c2 = c2), as.list(fit$par[spec$params]))
+  do.call(spec$fn, args)
+}
+
+#' Build the response surface grid for a binary fit
+#'
+#' Mirrors Skylar's construction so the surface is not transposed:
+#' `expand.grid(C1 = x_vals, C2 = y_vals)` (C1/x varies fastest), then a matrix
+#' with `nrow = length(y_vals)`, `byrow = TRUE`, so `z[i, j]` is the response at
+#' `x_vals[j], y_vals[i]` — exactly what `plotly::add_surface(x, y, z)` expects.
+#' @param fit An enriched binary fit from [fit_model()].
+#' @param df The data frame the fit was built from.
+#' @param n Grid resolution per axis.
+#' @return A list: `x_vals`, `y_vals`, `z` (matrix), `observed` (data frame
+#'   x/y/z), `labels` (list of axis names).
+#' @keywords internal
+surface_grid_data <- function(fit, df, n = 100) {
+  if (!isTRUE(fit$n_chem == 2))
+    stop("surface/isobole require a binary (2-chemical) fit", call. = FALSE)
+  cols <- fit$conc_cols
+  x_vals <- seq(min(df[[cols[1]]]), max(df[[cols[1]]]), length.out = n)
+  y_vals <- seq(min(df[[cols[2]]]), max(df[[cols[2]]]), length.out = n)
+  grid <- expand.grid(C1 = x_vals, C2 = y_vals)   # C1 (x) varies fastest
+  z <- predict_grid(fit, grid$C1, grid$C2)
+  z_mat <- matrix(z, nrow = length(y_vals), ncol = length(x_vals), byrow = TRUE)
+  list(x_vals = x_vals, y_vals = y_vals, z = z_mat,
+       observed = data.frame(x = df[[cols[1]]], y = df[[cols[2]]],
+                             z = obs_response(df)),
+       labels = list(x = cols[1], y = cols[2]))
+}

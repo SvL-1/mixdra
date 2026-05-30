@@ -54,3 +54,27 @@ plot_obs_pred <- function(fit, df) {
   plotly::layout(p, xaxis = list(title = "observed"),
                  yaxis = list(title = "predicted"))
 }
+
+#' Plot the fitted 3-D response surface of a binary mixture
+#'
+#' Observed points (`scatter3d`) overlaid on the fitted response surface, as an
+#' interactive plotly object. Binary fits only.
+#' @param fit An enriched binary fit from [fit_model()].
+#' @param df The data frame the fit was built from.
+#' @param n Grid resolution per axis (default 100).
+#' @return A plotly object.
+#' @export
+plot_surface <- function(fit, df, n = 100) {
+  require_plotly()
+  g <- surface_grid_data(fit, df, n = n)
+  p <- plotly::plot_ly()
+  p <- plotly::add_trace(p, x = g$observed$x, y = g$observed$y, z = g$observed$z,
+                         type = "scatter3d", mode = "markers",
+                         marker = list(size = 3, color = "blue"), name = "observed")
+  p <- plotly::add_surface(p, x = g$x_vals, y = g$y_vals, z = g$z,
+                           opacity = 0.8, showscale = FALSE)
+  plotly::layout(p, scene = list(
+    xaxis = list(title = g$labels$x),
+    yaxis = list(title = g$labels$y),
+    zaxis = list(title = "response")))
+}
