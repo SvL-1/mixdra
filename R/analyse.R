@@ -55,21 +55,27 @@ seed_from_singles <- function(df, response) {
 #' @param response "continuous" or "binary".
 #' @param start Optional named starting vector; if NULL, seeded from single fits.
 #' @param alpha Significance threshold for model selection.
+#' @param lower,upper Optional named numeric vectors of hard parameter bounds,
+#'   forwarded to every [fit_model()] call (the four models share the base
+#'   parameters). See [fit_model()] for the bound semantics.
 #' @param n_starts Number of optimisation starts per model, forwarded to
-#'   [fit_model()]. The default uses multi-start to reliably escape the local
-#'   minima of the CA bisection surface.
+#'   [fit_model()]. Defaults to 1 (single start) for speed during testing;
+#'   raise it (e.g. 20) to multi-start and more reliably escape the local
+#'   minima of the CA bisection surface at the cost of runtime.
 #' @return A list: `fits` (named list of model fits), `comparison` (data frame of
 #'   LR tests vs each model's parent), `chosen` (selected model name),
 #'   `reference`, `response`.
 #' @export
 analyse_mixture <- function(df, reference, response = c("continuous", "binary"),
-                            start = NULL, alpha = 0.05, n_starts = 20) {
+                            start = NULL, alpha = 0.05,
+                            lower = NULL, upper = NULL, n_starts = 1) {
   response <- match.arg(response)
   if (is.null(start)) start <- seed_from_singles(df, response)
 
   devs <- c("reference", "SA", "DR", "DL")
   fits <- lapply(devs, function(d)
-    fit_model(df, reference, d, response, start = start, n_starts = n_starts))
+    fit_model(df, reference, d, response, start = start,
+              lower = lower, upper = upper, n_starts = n_starts))
   names(fits) <- devs
 
   n <- nrow(df)
