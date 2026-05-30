@@ -19,17 +19,34 @@ test_that("ternary_ratio_key groups fixed proportions across dose levels", {
   expect_equal(keys[4], keys[5])
 })
 
-test_that("fit_model holds a fixed deviation parameter without error", {
-  df <- data.frame(C1 = c(0, 1, 2, 0, 0, 1),
-                   C2 = c(0, 0, 0, 1, 2, 1),
-                   Res = c(800, 500, 300, 450, 250, 200))
-  # `a` is a deviation param; fixing it must not corrupt parscale / perturbation.
-  expect_error(
-    fit_model(df, "CA", "SA", "continuous",
-              start = c(max = 800, slope1 = 1, slope2 = 1,
-                        ec501 = 1, ec502 = 1, a = 0),
-              fixed = "a", n_starts = 2),
-    NA)  # NA => assert NO error is thrown
+test_that("fit_model optimises with a fixed deviation parameter (regression)", {
+  # `a` is a deviation param. Fixing it must not corrupt parscale / perturbation:
+  # pre-fix, indexing the free-keyed `ps`/`theta_i` with `spec$extra` (which still
+  # contains the fixed `a`) caused a length mismatch that errored BOTH optimisers,
+  # so fit_model returned the unchanged start with convergence == 99. Post-fix at
+  # least one optimiser runs and moves the free base params off the start.
+  df <- data.frame(C1 = c(0, 0.5, 1, 2, 0, 0, 0, 0.5, 1),
+                   C2 = c(0, 0, 0, 0, 0.5, 1, 2, 0.5, 1),
+                   Res = c(800, 600, 400, 200, 620, 420, 220, 480, 300))
+  set.seed(7)
+  # Deliberately-off start so a genuine optimiser run must move the free params.
+  start <- c(max = 800, slope1 = 1, slope2 = 1, ec501 = 1, ec502 = 1, a = 0)
+  fit <- fit_model(df, "CA", "SA", "continuous", start = start,
+                   fixed = "a", n_starts = 2)
+
+  # (a) fixed param honoured: `a` stays at its fixed start value.
+  expect_equal(unname(fit$par[["a"]]), 0)
+
+  # (b) the fit genuinely ran rather than falling back to the corrupted-state
+  # result. Pre-fix both optimisers errored -> convergence == 99 (all-failed
+  # fallback) with params unchanged.
+  expect_false(identical(fit$convergence, 99L))
+
+  # ...and the free base params actually moved away from the deliberately-off
+  # start (impossible under the pre-fix unchanged-start fallback).
+  moved <- any(abs(fit$par[c("slope1", "slope2", "ec501", "ec502")] -
+                     start[c("slope1", "slope2", "ec501", "ec502")]) > 1e-6)
+  expect_true(moved)
 })
 
 test_that("fit_ternary_asa recovers known base, A1-A3, and per-ratio A4", {
