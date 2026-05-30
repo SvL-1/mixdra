@@ -1,3 +1,18 @@
+#' Assemble the full named starting vector for a model fit
+#'
+#' Base curve parameters default to 0 (always supplied via `start`); interaction
+#' parameters default to their solver origin: `a` at 0 and every `b`-family
+#' parameter (`b`, `b1`, `b2`, `b3`) at 1. Values present in `start` override the
+#' defaults.
+#' @keywords internal
+init_start_par <- function(params, extra, start) {
+  par <- stats::setNames(numeric(length(params)), params)  # all 0
+  bfam <- intersect(extra, c("b", "b1", "b2", "b3"))
+  if (length(bfam)) par[bfam] <- 1
+  par[names(start)] <- start[names(start)]
+  par
+}
+
 #' Fit one mixture model to a dataset
 #'
 #' @param df Data frame with `C1`, `C2` (and `C3` for ternary) plus either
@@ -41,10 +56,9 @@ fit_model <- function(df, reference, deviation = "reference",
   n_chem <- length(conc_cols)
   spec <- model_spec(reference, deviation, n_chem)
 
-  # Assemble the full starting vector. Zero-initialising means any deviation
-  # parameter (a, b, b1, b2, b3) not supplied in `start` defaults to 0.
-  par <- stats::setNames(numeric(length(spec$params)), spec$params)
-  par[names(start)] <- start[names(start)]
+  # Assemble the full starting vector: interaction params default to their solver
+  # origin (a = 0, b-family = 1); curve params come from `start`.
+  par <- init_start_par(spec$params, spec$extra, start)
 
   free <- setdiff(spec$params, fixed)
   conc <- stats::setNames(as.list(df[conc_cols]), paste0("c", seq_along(conc_cols)))
