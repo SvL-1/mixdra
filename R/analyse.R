@@ -109,20 +109,12 @@ analyse_mixture <- function(df, reference, response = c("continuous", "binary"),
   response <- match.arg(response)
 
   # Stage 1: estimate the curve parameters (max, slope*, ec50*) from the
-  # single-compound data and hold them fixed. A user-supplied `start` is taken as
-  # the fixed curve parameters directly.
+  # single-compound data ONLY and hold them fixed. A user-supplied `start` is
+  # taken as the fixed curve parameters directly. The curve params must not be
+  # influenced by the mixture rows -- that is the whole point of staged fitting.
   base <- if (is.null(start)) {
-    seed <- fit_curve_from_singles(df, reference, response, lower, upper,
-                                   n_starts, time_limit)
-    # Refine on the full dataset so that the reference model is at its global
-    # minimum; this prevents the interaction fits from improving on the reference
-    # by absorbing any small residual left by the singles-only stage-1 fit.
-    ref_fit <- tryCatch(
-      fit_model(df, reference, "reference", response, start = seed,
-                lower = lower, upper = upper, n_starts = n_starts,
-                time_limit = time_limit),
-      error = function(e) NULL)
-    if (!is.null(ref_fit) && all(is.finite(ref_fit$par))) ref_fit$par else seed
+    fit_curve_from_singles(df, reference, response, lower, upper,
+                           n_starts, time_limit)
   } else {
     start
   }
