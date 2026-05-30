@@ -21,6 +21,12 @@
 #'   additional start log-uniformly perturbs `start` (clamped to the bounds) to
 #'   escape the local minima of the non-smooth CA bisection surface. The best
 #'   finite objective is kept.
+#' @param time_limit Wall-clock budget in seconds for the whole fit (across all
+#'   starts and the Nelder-Mead fallback). When exceeded, the running optimiser
+#'   is aborted and the best parameters seen so far are returned with
+#'   `convergence = 99` and a warning. `NULL` disables the limit. This is a
+#'   debugging guard against pathological non-convergence, not a substitute for
+#'   sensible starts/bounds.
 #' @return A list with `par` (named fitted parameters), `objective`
 #'   (residual SS or deviance), `pred` (fitted values), `residuals`, `df`
 #'   (number of free parameters), `n`, and `convergence`.
@@ -28,7 +34,8 @@
 fit_model <- function(df, reference, deviation = "reference",
                       response = c("continuous", "binary"),
                       start, fixed = character(0),
-                      lower = NULL, upper = NULL, n_starts = 1) {
+                      lower = NULL, upper = NULL, n_starts = 1,
+                      time_limit = 30) {
   response <- match.arg(response)
   conc_cols <- intersect(c("C1", "C2", "C3"), names(df))
   n_chem <- length(conc_cols)
@@ -105,7 +112,19 @@ fit_model <- function(df, reference, deviation = "reference",
   lower <- lo
   upper <- hi
 
+  # Wall-clock budget. `optim` has no time limit, so we enforce one from inside
+  # the objective: track the best feasible point seen and, once the deadline
+  # passes, abort the running optimiser with an error (caught in `run_from`).
+  # `best_seen` then provides a usable result even when nothing converged.
+  t0 <- Sys.time()
+  timed_out <- FALSE
+  best_seen <- list(value = Inf, par = theta0)
+
   obj_free <- function(theta) {
+    if (!is.null(time_limit) && !timed_out &&
+        as.numeric(difftime(Sys.time(), t0, units = "secs")) > time_limit)
+      timed_out <<- TRUE
+    if (timed_out) stop("mixdra_time_limit")   # abort the active optim run
     # Enforce the box constraints for *every* optimiser. L-BFGS-B respects
     # `lower`/`upper` natively, but the Nelder-Mead fallback does not, so reject
     # infeasible points here to make the bounds bite regardless of method.
@@ -113,7 +132,9 @@ fit_model <- function(df, reference, deviation = "reference",
     p_full <- par
     p_full[free] <- theta
     val <- objective_of(p_full)
-    if (!is.finite(val)) 1e12 else val
+    if (!is.finite(val)) return(1e12)
+    if (val < best_seen$value) best_seen <<- list(value = val, par = theta)
+    val
   }
 
   # One attempt: L-BFGS-B (parscale normalises the very differently-scaled
@@ -159,6 +180,16 @@ fit_model <- function(df, reference, deviation = "reference",
     if (!is.null(res) && is.finite(res$value) &&
         (is.null(best) || res$value < best$value)) best <- res
   }
+
+  # If the deadline cut every start short before any optimiser returned cleanly,
+  # fall back to the best feasible point evaluated so far (convergence = 99).
+  if (is.null(best))
+    best <- list(par = best_seen$par, value = best_seen$value, convergence = 99L)
+  if (timed_out)
+    warning(sprintf(
+      "fit_model (%s/%s): time limit (%gs) reached; returning best-so-far%s.",
+      reference, deviation, time_limit,
+      if (identical(best$convergence, 99L)) " (convergence = 99)" else ""))
 
   # Clamp the optimum into the box (the Nelder-Mead fallback is unbounded), so
   # user-supplied and default constraints are always honoured in the result.
