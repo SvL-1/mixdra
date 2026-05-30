@@ -9,7 +9,9 @@
 #' @keywords internal
 model_spec <- function(reference, deviation, n_chem) {
   reference <- match.arg(reference, c("CA", "IA"))
-  deviation <- match.arg(deviation, c("reference", "SA", "DR", "DL"))
+  deviation <- match.arg(deviation, c("reference", "SA", "DR", "DL", "ASA"))
+  if (deviation == "ASA" && n_chem != 3)
+    stop("model_spec: deviation 'ASA' (Advanced S/A) is ternary-only (n_chem = 3)")
   if (!n_chem %in% c(2, 3))
     stop("model_spec: only n_chem = 2 or 3 are implemented")
 
@@ -31,19 +33,22 @@ model_spec <- function(reference, deviation, n_chem) {
                     reference = character(0),
                     SA = "a",
                     DR = c("a", "b1", "b2", "b3"),
-                    DL = c("a", "b"))
+                    DL = c("a", "b"),
+                    ASA = c("A1", "A2", "A3", "A4"))
   }
 
   parent <- switch(deviation,
                    reference = NULL,
                    SA = "reference",
                    DR = "SA",
-                   DL = "SA")
+                   DL = "SA",
+                   ASA = "SA")
   dev_key <- switch(deviation,
                     reference = suffix,
                     SA = paste0("sa_", suffix),
                     DR = paste0("dr_", suffix),
-                    DL = paste0("dl_", suffix))
+                    DL = paste0("dl_", suffix),
+                    ASA = paste0("asa_", suffix))
   key <- paste0(tolower(reference), "_", dev_key, "_vec")
 
   list(fn = get(key, mode = "function"),
