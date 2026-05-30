@@ -3,7 +3,8 @@
 #' Base curve parameters default to 0 (always supplied via `start`); interaction
 #' parameters default to their solver origin: `a` at 0 and every `b`-family
 #' parameter (`b`, `b1`, `b2`, `b3`) at 1. Values present in `start` override the
-#' defaults.
+#' defaults. Any other deviation parameter (e.g. the Advanced S/A `A*` terms) is
+#' left at 0.
 #' @keywords internal
 init_start_par <- function(params, extra, start) {
   par <- stats::setNames(numeric(length(params)), params)  # all 0
@@ -21,7 +22,8 @@ init_start_par <- function(params, extra, start) {
 #' @param deviation "reference", "SA", "DR", or "DL".
 #' @param response "continuous" or "binary".
 #' @param start Named numeric vector of starting values for the base parameters
-#'   (max, slope*, ec50*). Deviation parameters default to 0.
+#'   (max, slope*, ec50*). Deviation parameters default to their solver origin:
+#'   `a` at 0 and `b`/`b1`/`b2`/`b3` at 1; any other deviation parameter at 0.
 #' @param fixed Character vector of parameter names to hold fixed at `start`.
 #' @param lower,upper Optional named numeric vectors of hard bounds keyed by
 #'   base curve parameter (`max`, `slope*`, `ec50*`). Any parameter not named
@@ -184,8 +186,8 @@ fit_model <- function(df, reference, deviation = "reference",
       # Base (positive curve) params: multiplicative jitter, clamped to bounds.
       theta_i[base] <- theta0[base] * exp(stats::runif(length(base), -log(3), log(3)))
       theta_i[base] <- pmin(pmax(theta_i[base], lower[base]), upper[base])
-      # Deviation params start at 0, so multiplicative jitter leaves them at 0;
-      # perturb additively over a broad symmetric range so the optimiser explores
+      # Deviation params start at their origin (a = 0, b-family = 1); perturb them
+      # additively over a broad symmetric range so the optimiser explores
       # interaction (a, b, ...) away from the reference model.
       ex <- intersect(spec$extra, free)        # only the FREE deviation params
       if (length(ex))
