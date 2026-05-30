@@ -62,20 +62,25 @@ seed_from_singles <- function(df, response) {
 #'   [fit_model()]. Defaults to 1 (single start) for speed during testing;
 #'   raise it (e.g. 20) to multi-start and more reliably escape the local
 #'   minima of the CA bisection surface at the cost of runtime.
+#' @param time_limit Per-model wall-clock budget in seconds, forwarded to
+#'   [fit_model()]. Applies to each of the four fits independently, so a full
+#'   analysis can take up to `4 * time_limit`. `NULL` disables the limit.
 #' @return A list: `fits` (named list of model fits), `comparison` (data frame of
 #'   LR tests vs each model's parent), `chosen` (selected model name),
 #'   `reference`, `response`.
 #' @export
 analyse_mixture <- function(df, reference, response = c("continuous", "binary"),
                             start = NULL, alpha = 0.05,
-                            lower = NULL, upper = NULL, n_starts = 1) {
+                            lower = NULL, upper = NULL, n_starts = 1,
+                            time_limit = 30) {
   response <- match.arg(response)
   if (is.null(start)) start <- seed_from_singles(df, response)
 
   devs <- c("reference", "SA", "DR", "DL")
   fits <- lapply(devs, function(d)
     fit_model(df, reference, d, response, start = start,
-              lower = lower, upper = upper, n_starts = n_starts))
+              lower = lower, upper = upper, n_starts = n_starts,
+              time_limit = time_limit))
   names(fits) <- devs
 
   n <- nrow(df)

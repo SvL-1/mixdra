@@ -12,7 +12,8 @@ analyse_mixture(
   alpha = 0.05,
   lower = NULL,
   upper = NULL,
-  n_starts = 1
+  n_starts = 1,
+  time_limit = 30
 )
 }
 \arguments{
@@ -34,6 +35,10 @@ parameters). See \code{\link[=fit_model]{fit_model()}} for the bound semantics.}
 \code{\link[=fit_model]{fit_model()}}. Defaults to 1 (single start) for speed during testing;
 raise it (e.g. 20) to multi-start and more reliably escape the local
 minima of the CA bisection surface at the cost of runtime.}
+
+\item{time_limit}{Per-model wall-clock budget in seconds, forwarded to
+\code{\link[=fit_model]{fit_model()}}. Applies to each of the four fits independently, so a full
+analysis can take up to \code{4 * time_limit}. \code{NULL} disables the limit.}
 }
 \value{
 A list: \code{fits} (named list of model fits), \code{comparison} (data frame of

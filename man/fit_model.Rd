@@ -13,7 +13,8 @@ fit_model(
   fixed = character(0),
   lower = NULL,
   upper = NULL,
-  n_starts = 1
+  n_starts = 1,
+  time_limit = 30
 )
 }
 \arguments{
@@ -45,6 +46,13 @@ range with a warning.}
 additional start log-uniformly perturbs \code{start} (clamped to the bounds) to
 escape the local minima of the non-smooth CA bisection surface. The best
 finite objective is kept.}
+
+\item{time_limit}{Wall-clock budget in seconds for the whole fit (across all
+starts and the Nelder-Mead fallback). When exceeded, the running optimiser
+is aborted and the best parameters seen so far are returned with
+\code{convergence = 99} and a warning. \code{NULL} disables the limit. This is a
+debugging guard against pathological non-convergence, not a substitute for
+sensible starts/bounds.}
 }
 \value{
 A list with \code{par} (named fitted parameters), \code{objective}
