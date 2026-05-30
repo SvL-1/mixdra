@@ -38,3 +38,14 @@ test_that("fit_model (binary) minimises deviance and predicts probabilities", {
   expect_true(is.finite(fit$objective))
   expect_true(all(fit$pred >= 0 & fit$pred <= 1))
 })
+
+test_that("fit_model with all parameters fixed evaluates without optimising", {
+  df <- make_binary_df()  # truth: max=800, slope1=4, slope2=1.5, ec501=0.08, ec502=1
+  start <- c(max = 800, slope1 = 4, slope2 = 1.5, ec501 = 0.08, ec502 = 1)
+  fit <- fit_model(df, "CA", "reference", "continuous", start = start,
+                   fixed = names(start))
+  expect_equal(fit$df, 0)
+  expect_equal(fit$convergence, 0)
+  expect_equal(unname(fit$par[["max"]]), 800)     # untouched
+  expect_lt(fit$objective, 1e-6)                  # truth params -> ~perfect fit
+})

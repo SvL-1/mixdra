@@ -79,6 +79,20 @@ fit_model <- function(df, reference, deviation = "reference",
     }
   }
 
+  # When every parameter is fixed (the staged reference fit: curve params held at
+  # their single-compound values, no interaction params to free) there is nothing
+  # to optimise -- just evaluate the model. `stats::optim` cannot run on a
+  # zero-length parameter vector, so short-circuit here.
+  if (length(free) == 0) {
+    pred <- predict_with(par)
+    obs <- if (response == "continuous") df$Res else df$Affected / df$Exposed
+    return(list(par = par, objective = objective_of(par), pred = pred,
+                residuals = obs - pred, df = 0L, n = nrow(df),
+                convergence = 0L, reference = reference, deviation = deviation,
+                response = response, conc_cols = conc_cols, n_chem = n_chem,
+                kind = "mixture"))
+  }
+
   theta0 <- par[free]
   base <- setdiff(free, spec$extra)             # positively-bounded curve params
   base_all <- setdiff(spec$params, spec$extra)  # incl. any fixed curve params
