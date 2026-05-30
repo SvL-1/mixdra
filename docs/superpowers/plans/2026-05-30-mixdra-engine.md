@@ -1357,7 +1357,15 @@ res$chosen
 result_table(res)
 ```
 
-**Plan 2** (separate document) will add: the `bslib` Shiny app and stage modules, the
-downloadable Excel/CSV templates and upload/export I/O, the plots (dose-response, observed-vs-
-predicted, 3-D `plotly` surface, isobole/contour), `inst/app/run_app()`, the README, and the
-methodology vignette — all built on this engine.
+**What was "Plan 2" has been split into focused, sequential plans** (each its own spec +
+implementation plan), all built on this engine:
+
+- **Plan 2 — plotting layer (single + binary).** The four plots (dose-response, observed-vs-
+  predicted, 3-D `plotly` surface, 2-D isobole/contour) as exported package functions, all
+  `plotly`, ported from Skylar's validated binary script. Design:
+  `docs/superpowers/specs/2026-05-30-mixdra-binary-plots-design.md`.
+- **Plan 3 — ternary plotting.** EC50 isoplane surface + ΣTU / z-value plots (needs an
+  EC50-isobole solver over the simplex + ΣTU computation; not a simple slice).
+- **Plan 4 — Shiny app.** `bslib` app + stage modules + `inst/app/run_app()`, hosting the plots.
+- **Plan 5 — file I/O.** Downloadable Excel/CSV templates and upload/export.
+- **Plan 6 — docs.** README + methodology vignette.
