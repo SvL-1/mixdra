@@ -86,9 +86,15 @@ fit_ternary_asa <- function(df, reference = "CA", response = "continuous",
   })
   names(individual_fits) <- names(groups)
 
-  individual <- do.call(rbind, lapply(individual_fits, function(x)
-    data.frame(ratio = x$ratio, C1 = x$C1, C2 = x$C2, C3 = x$C3,
-               A4 = x$A4, n = x$n, stringsAsFactors = FALSE)))
+  individual <- if (length(individual_fits) == 0) {
+    data.frame(ratio = character(0), C1 = numeric(0), C2 = numeric(0),
+               C3 = numeric(0), A4 = numeric(0), n = integer(0),
+               stringsAsFactors = FALSE)
+  } else {
+    do.call(rbind, lapply(individual_fits, function(x)
+      data.frame(ratio = x$ratio, C1 = x$C1, C2 = x$C2, C3 = x$C3,
+                 A4 = x$A4, n = x$n, stringsAsFactors = FALSE)))
+  }
   rownames(individual) <- NULL
 
   list(reference = reference, response = response,
@@ -96,4 +102,73 @@ fit_ternary_asa <- function(df, reference = "CA", response = "continuous",
        individual = individual,
        fits = list(base = f1, pairwise = f2, overall = f_overall,
                    individual = individual_fits))
+}
+
+#' Analyse a ternary mixture with the staged Advanced S/A workflow
+#'
+#' Fits base curve params (from singles), pairwise interactions A1/A2/A3 (from
+#' binaries), an overall three-way A4 (from all data), and an individual A4 for
+#' each ternary mixture ratio. Comparing per-ratio A4 against the overall A4
+#' reveals interaction that "averages out" in the pooled fit (e.g. synergy at one
+#' ratio cancelling antagonism at another).
+#' @param df Ternary mixture data: C1, C2, C3 and `Res` (continuous).
+#' @param reference "CA" (IA not yet supported).
+#' @param response "continuous" (binary not yet validated).
+#' @param lower,upper,n_starts,time_limit Forwarded to [fit_model()].
+#' @return A list: `reference`, `response`, `base` (named curve params),
+#'   `pairwise` (A1,A2,A3), `A4_overall`, `individual` (data frame: ratio,
+#'   C1/C2/C3 proportions, A4, n), and `fits` (the underlying [fit_model()]
+#'   results for base/pairwise/overall/individual).
+#' @export
+analyse_ternary <- function(df, reference = "CA",
+                            response = c("continuous", "binary"),
+                            lower = NULL, upper = NULL, n_starts = 1,
+                            time_limit = 30) {
+  response <- match.arg(response)
+  if (!all(c("C1", "C2", "C3") %in% names(df)))
+    stop("analyse_ternary requires C1, C2 and C3 columns")
+  fit_ternary_asa(df, reference = reference, response = response,
+                  lower = lower, upper = upper, n_starts = n_starts,
+                  time_limit = time_limit)
+}
+
+#' Per-ratio A4 effect-size readout
+#'
+#' For each ternary ratio, picks the observed ternary point whose reference (CA)
+#' prediction is closest to 50% of `max` (the near-EC50 point Sam's workflow
+#' targets) and reports the modelled response under three nested models: CA
+#' (reference), CA+S/A (pairwise A1/A2/A3, A4 = 0), and CA+S/A+S/A (with the
+#' ratio's individual A4). `a4_effect = pred_ASA - pred_SA` measures the size of
+#' the effect introduced by that ratio's A4.
+#' @param res An [analyse_ternary()] result.
+#' @param df The data frame passed to [analyse_ternary()].
+#' @return A data frame: ratio, C1, C2, C3 (the chosen point's concentrations),
+#'   pred_CA, pred_SA, pred_ASA, a4_effect.
+#' @export
+ternary_effect_table <- function(res, df) {
+  b <- res$base; p <- res$pairwise
+  pred1 <- function(c1, c2, c3, A1, A2, A3, A4)
+    ca_asa_tri(c1, c2, c3, b[["max"]], b[["slope1"]], b[["slope2"]],
+               b[["slope3"]], b[["ec50_1"]], b[["ec50_2"]], b[["ec50_3"]],
+               A1, A2, A3, A4)
+
+  cls <- classify_rows(df)
+  tern_idx <- which(cls == "ternary")
+  keys <- ternary_ratio_key(df[tern_idx, , drop = FALSE])
+
+  out <- lapply(res$fits$individual, function(x) {
+    rows <- tern_idx[keys == x$ratio]
+    sub <- df[rows, , drop = FALSE]
+    ca <- vapply(seq_len(nrow(sub)), function(i)
+      pred1(sub$C1[i], sub$C2[i], sub$C3[i], 0, 0, 0, 0), numeric(1))
+    j <- which.min(abs(ca - 0.5 * b[["max"]]))  # near-EC50 point
+    c1 <- sub$C1[j]; c2 <- sub$C2[j]; c3 <- sub$C3[j]
+    pCA  <- pred1(c1, c2, c3, 0, 0, 0, 0)
+    pSA  <- pred1(c1, c2, c3, p[["A1"]], p[["A2"]], p[["A3"]], 0)
+    pASA <- pred1(c1, c2, c3, p[["A1"]], p[["A2"]], p[["A3"]], x$A4)
+    data.frame(ratio = x$ratio, C1 = c1, C2 = c2, C3 = c3,
+               pred_CA = pCA, pred_SA = pSA, pred_ASA = pASA,
+               a4_effect = pASA - pSA, stringsAsFactors = FALSE)
+  })
+  res_df <- do.call(rbind, out); rownames(res_df) <- NULL; res_df
 }

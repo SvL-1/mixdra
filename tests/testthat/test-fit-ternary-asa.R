@@ -92,3 +92,29 @@ test_that("fit_ternary_asa recovers known base, A1-A3, and per-ratio A4", {
   expect_gt(ind$A4[ind$ratio == uk[1]], 0.3)   # synergy
   expect_lt(ind$A4[ind$ratio == uk[2]], -0.1)  # antagonism
 })
+
+test_that("analyse_ternary returns overall + per-ratio structure", {
+  truth <- list(max = 800, slope1 = 3, slope2 = 2, slope3 = 2.5,
+                ec50_1 = 1, ec50_2 = 5, ec50_3 = 2, A1 = 0.5, A2 = 0, A3 = 0)
+  doses <- c(0.5, 1, 2, 4)
+  mk <- function(c1, c2, c3) data.frame(C1 = c1, C2 = c2, C3 = c3)
+  df <- do.call(rbind, list(
+    mk(0, 0, 0), mk(doses, 0, 0), mk(0, doses, 0), mk(0, 0, doses),
+    mk(doses, doses * 5, 0), mk(doses, 0, doses * 2), mk(0, doses * 5, doses * 2),
+    mk(doses, doses * 5, doses * 2)))
+  df$Res <- ca_asa_tri_vec(df$C1, df$C2, df$C3, truth$max, truth$slope1,
+                           truth$slope2, truth$slope3, truth$ec50_1,
+                           truth$ec50_2, truth$ec50_3, truth$A1, truth$A2,
+                           truth$A3, 0.7)
+  res <- analyse_ternary(df, reference = "CA", response = "continuous",
+                         n_starts = 3)
+  expect_named(res, c("reference", "response", "base", "pairwise",
+                      "A4_overall", "individual", "fits"))
+  expect_equal(nrow(res$individual), 1)
+  expect_true(is.numeric(res$A4_overall))
+
+  eff <- ternary_effect_table(res, df)
+  expect_true(all(c("ratio", "C1", "C2", "C3", "pred_CA", "pred_SA",
+                    "pred_ASA", "a4_effect") %in% names(eff)))
+  expect_equal(eff$a4_effect, eff$pred_ASA - eff$pred_SA, tolerance = 1e-8)
+})
