@@ -71,7 +71,12 @@ fit_model <- function(df, reference, deviation = "reference",
   # parameters), with a Nelder-Mead fallback if it fails to converge — robust to
   # the non-smooth CA bisection inner solver.
   run_from <- function(theta_init) {
+    # parscale sets the finite-difference step per parameter. Deviation params
+    # (a, b, ...) start at 0; with a 1e-8 floor their FD step is far below the CA
+    # bisection solver's noise floor, so L-BFGS-B sees a zero gradient and never
+    # moves them off 0. Floor them at 1 so their effect is actually detected.
     ps <- pmax(abs(theta_init), 1e-8)
+    if (length(spec$extra)) ps[spec$extra] <- pmax(ps[spec$extra], 1)
     res <- tryCatch(
       stats::optim(theta_init, obj_free, method = "L-BFGS-B",
                    lower = lower[free], upper = upper[free],
@@ -91,8 +96,15 @@ fit_model <- function(df, reference, deviation = "reference",
   for (i in seq_len(n_starts)) {
     theta_i <- theta0
     if (i > 1) {
-      theta_i <- theta0 * exp(stats::runif(length(theta0), -log(3), log(3)))
+      # Base (positive curve) params: multiplicative jitter, clamped to bounds.
+      theta_i[base] <- theta0[base] * exp(stats::runif(length(base), -log(3), log(3)))
       theta_i[base] <- pmin(pmax(theta_i[base], lower[base]), upper[base])
+      # Deviation params start at 0, so multiplicative jitter leaves them at 0;
+      # perturb additively over a broad symmetric range so the optimiser explores
+      # interaction (a, b, ...) away from the reference model.
+      if (length(spec$extra))
+        theta_i[spec$extra] <- theta0[spec$extra] +
+          stats::runif(length(spec$extra), -10, 10)
     }
     res <- run_from(theta_i)
     if (!is.null(res) && is.finite(res$value) &&
