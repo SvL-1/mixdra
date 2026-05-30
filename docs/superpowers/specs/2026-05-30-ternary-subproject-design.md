@@ -98,16 +98,22 @@ per-ratio table of individual-fit parameters (`max`, `slope1-3`, `ec50_1-3`,
 fit + a loop over each distinct ternary ratio. The result object needs an
 overall block + a per-ratio structure.
 
-**Mixture-ratio detection = concentration-based, NOT sheet names** (decided):
+**Mixture-ratio detection = concentration-based, NOT sheet names; EXACT nominal
+grouping, NO tolerance** (decided 2026-05-30):
 - A ratio is a fixed proportion `C1:C2:C3` (a ray from the origin); a
   dose-response series at fixed ratio holds proportions constant.
 - For each ternary row (all of C1,C2,C3 > 0), normalise to `Ci/(C1+C2+C3)` and
   group rows with the same proportion vector → one individual fit.
 - Singles (one chem > 0) and binaries (one chem = 0) are excluded from ratio
   grouping — they're the shared backbone for every fit.
-- Cluster proportions with a **small tolerance** (robust to measured-conc noise;
-  exact matching also works for clean nominal designs).
-- This is fully general — works for any ratios in any dataset, independent of the
+- **Users always supply NOMINAL concentrations.** Grouping is therefore EXACT —
+  NO fuzzy/measurement tolerance, NO `ratio_tol` parameter. (An earlier ±5%
+  tolerance idea was explicitly rejected.)
+- The ONLY rounding is to ~6 significant figures on the normalised proportions,
+  purely to neutralise IEEE floating-point representation differences across dose
+  levels (e.g. scale factor not a power of two) — this is representation hygiene,
+  NOT a physical tolerance.
+- Fully general — works for any nominal ratios in any dataset, independent of the
   example data's specific ratios / sheet labels.
 
 ---
