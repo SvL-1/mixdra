@@ -48,6 +48,30 @@ seed_from_singles <- function(df, response) {
   stats::setNames(c(maxv, slopes, ec50s), pnames)
 }
 
+#' Stage-1 fit: estimate the curve parameters from single-compound data
+#'
+#' Fits the `reference` model to the control + single-compound rows only (rows
+#' where at most one chemical is present). On those rows every mixture model
+#' reduces exactly to the independent log-logistic curves, so this identifies the
+#' shared `max` and per-chemical `slope`/`ec50` without any interaction
+#' parameter. Falls back to the [seed_from_singles()] heuristic if the subset
+#' cannot be fit (e.g. a chemical with too sparse a marginal series).
+#' @keywords internal
+fit_curve_from_singles <- function(df, reference, response,
+                                   lower = NULL, upper = NULL,
+                                   n_starts = 1, time_limit = 30) {
+  cols <- intersect(c("C1", "C2", "C3"), names(df))
+  singles <- df[rowSums(df[cols] > 0) <= 1, , drop = FALSE]
+  seed <- seed_from_singles(df, response)
+  fit <- tryCatch(
+    fit_model(singles, reference, "reference", response, start = seed,
+              lower = lower, upper = upper, n_starts = n_starts,
+              time_limit = time_limit),
+    error = function(e) NULL)
+  if (is.null(fit) || !all(is.finite(fit$par[names(seed)]))) return(seed)
+  fit$par[names(seed)]
+}
+
 #' Analyse a mixture: fit reference + deviations and compare
 #'
 #' @param df Mixture data frame (see [fit_model()]).
