@@ -8,17 +8,19 @@
 #' @param start Named numeric vector of starting values for the base parameters
 #'   (max, slope*, ec50*). Deviation parameters default to 0.
 #' @param fixed Character vector of parameter names to hold fixed at `start`.
-#' @param lower,upper Optional named numeric vectors of manual box constraints,
-#'   one entry per parameter to constrain (others keep their default). Defaults
-#'   encode only domain meaning, not the seed: base curve parameters (`max`,
-#'   `slope*`, `ec50*`) get positivity (`lower = 1e-8`, `upper = Inf`); for
-#'   binary data `max` additionally gets `upper = 1` (it is a probability);
-#'   deviation parameters (`a`, `b`, `b1`, `b2`, `b3`) are left fully
-#'   unconstrained so downstream interaction analysis (e.g. the dose at which an
-#'   interaction switches between synergism and antagonism) is undistorted.
+#' @param lower,upper Optional named numeric vectors of hard bounds keyed by
+#'   base curve parameter (`max`, `slope*`, `ec50*`). Any parameter not named
+#'   falls back to the default: base params get positivity (`lower = 1e-8`,
+#'   `upper = Inf`); binary `max` additionally defaults to `upper = 1` (a value
+#'   above 1 is capped, with a warning, since it is a probability). Deviation
+#'   parameters (`a`, `b`, `b1/b2/b3`) are always left unconstrained and may not
+#'   be named here, because downstream interaction analysis relies on their
+#'   unconstrained values. A start value outside its bounds is clamped into
+#'   range with a warning.
 #' @param n_starts Number of optimisation starts. The first uses `start`; each
-#'   additional start perturbs `start` to escape the local minima of the
-#'   non-smooth CA bisection surface. The best finite objective is kept.
+#'   additional start log-uniformly perturbs `start` (clamped to the bounds) to
+#'   escape the local minima of the non-smooth CA bisection surface. The best
+#'   finite objective is kept.
 #' @return A list with `par` (named fitted parameters), `objective`
 #'   (residual SS or deviance), `pred` (fitted values), `residuals`, `df`
 #'   (number of free parameters), `n`, and `convergence`.
@@ -54,26 +56,65 @@ fit_model <- function(df, reference, deviation = "reference",
     }
   }
 
+  theta0 <- par[free]
+  base <- setdiff(free, spec$extra)             # positively-bounded curve params
+  base_all <- setdiff(spec$params, spec$extra)  # incl. any fixed curve params
+
+  # Only base curve parameters may be bounded. Deviation params (a, b, ...) are
+  # left unconstrained because downstream analysis (e.g. the concentration at
+  # which an interaction switches synergistic <-> antagonistic) relies on their
+  # unconstrained values.
+  bad <- setdiff(c(names(lower), names(upper)), base_all)
+  if (length(bad))
+    stop("`lower`/`upper` may only name a base parameter (",
+         paste(base_all, collapse = ", "), "); got: ",
+         paste(unique(bad), collapse = ", "))
+
+  # Defaults: base params get positivity; deviation params stay +/-Inf.
+  lo <- stats::setNames(rep(-Inf, length(free)), free)
+  hi <- stats::setNames(rep(Inf, length(free)), free)
+  lo[base] <- 1e-8
+  # For binary data `max` is the control response *probability*, so it cannot
+  # exceed 1; without this cap the optimiser can push it above 1 and the model
+  # returns fitted probabilities > 1 (`ca_bi = max / (1 + ...) <= max`).
+  bin_max <- response == "binary" && "max" %in% base
+  if (bin_max) hi[["max"]] <- 1
+
+  # Apply user-supplied bounds (base, free params only; names validated above).
+  for (p in intersect(names(lower), base)) lo[[p]] <- lower[[p]]
+  for (p in intersect(names(upper), base)) hi[[p]] <- upper[[p]]
+  if (bin_max && hi[["max"]] > 1) {
+    warning("binary `max` upper bound capped at 1 (requested ", upper[["max"]], ")")
+    hi[["max"]] <- 1
+  }
+
+  if (length(base) && any(lo[base] >= hi[base]))
+    stop("each parameter's lower bound must be below its upper bound; check: ",
+         paste(base[lo[base] >= hi[base]], collapse = ", "))
+
+  # Keep the optimiser's starting point feasible.
+  if (length(base)) {
+    clamped <- pmin(pmax(theta0[base], lo[base]), hi[base])
+    if (any(clamped != theta0[base])) {
+      off <- base[clamped != theta0[base]]
+      warning("start value(s) outside bounds, clamped: ",
+              paste(off, collapse = ", "))
+      theta0[base] <- clamped
+    }
+  }
+  lower <- lo
+  upper <- hi
+
   obj_free <- function(theta) {
+    # Enforce the box constraints for *every* optimiser. L-BFGS-B respects
+    # `lower`/`upper` natively, but the Nelder-Mead fallback does not, so reject
+    # infeasible points here to make the bounds bite regardless of method.
+    if (any(theta < lower[free]) || any(theta > upper[free])) return(1e12)
     p_full <- par
     p_full[free] <- theta
     val <- objective_of(p_full)
     if (!is.finite(val)) 1e12 else val
   }
-
-  theta0 <- par[free]
-  base <- setdiff(free, spec$extra)   # curve params; deviation params unconstrained
-
-  # Default bounds encode domain meaning only (not the seed): base curve params
-  # get positivity; deviation params stay unconstrained. The user may override
-  # any individual bound via `lower`/`upper`.
-  lo <- stats::setNames(rep(-Inf, length(free)), free)
-  up <- stats::setNames(rep(Inf, length(free)), free)
-  lo[base] <- 1e-8
-  # Binary `max` is a control probability and cannot exceed 1.
-  if (response == "binary" && "max" %in% base) up[["max"]] <- 1
-  if (!is.null(lower)) lo[names(lower)] <- lower
-  if (!is.null(upper)) up[names(upper)] <- upper
 
   # One attempt: L-BFGS-B (parscale normalises the very differently-scaled
   # parameters), with a Nelder-Mead fallback if it fails to converge — robust to
@@ -87,8 +128,8 @@ fit_model <- function(df, reference, deviation = "reference",
     if (length(spec$extra)) ps[spec$extra] <- pmax(ps[spec$extra], 1)
     res <- tryCatch(
       stats::optim(theta_init, obj_free, method = "L-BFGS-B",
-                   lower = lo[free], upper = up[free],
-                   control = list(parscale = ps, factr = 1e-9, maxit = 100)),
+                   lower = lower[free], upper = upper[free],
+                   control = list(parscale = ps, factr = 1e-9, maxit = 200)),
       error = function(e) NULL)
     if (is.null(res) || res$convergence != 0) {
       res2 <- tryCatch(
@@ -106,7 +147,7 @@ fit_model <- function(df, reference, deviation = "reference",
     if (i > 1) {
       # Base (positive curve) params: multiplicative jitter, clamped to bounds.
       theta_i[base] <- theta0[base] * exp(stats::runif(length(base), -log(3), log(3)))
-      theta_i[base] <- pmin(pmax(theta_i[base], lo[base]), up[base])
+      theta_i[base] <- pmin(pmax(theta_i[base], lower[base]), upper[base])
       # Deviation params start at 0, so multiplicative jitter leaves them at 0;
       # perturb additively over a broad symmetric range so the optimiser explores
       # interaction (a, b, ...) away from the reference model.
@@ -119,9 +160,9 @@ fit_model <- function(df, reference, deviation = "reference",
         (is.null(best) || res$value < best$value)) best <- res
   }
 
-  # Clamp the optimum into the box: the Nelder-Mead fallback is unbounded, so
-  # this guarantees user-supplied (and default) constraints are always honoured.
-  par[free] <- pmin(pmax(best$par, lo[free]), up[free])
+  # Clamp the optimum into the box (the Nelder-Mead fallback is unbounded), so
+  # user-supplied and default constraints are always honoured in the result.
+  par[free] <- pmin(pmax(best$par, lower[free]), upper[free])
   pred <- predict_with(par)
   obs <- if (response == "continuous") df$Res else df$Affected / df$Exposed
   list(par = par, objective = objective_of(par), pred = pred,
