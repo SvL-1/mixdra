@@ -79,6 +79,19 @@ fit_model <- function(df, reference, deviation = "reference",
     }
   }
 
+  # Only base curve parameters may be bounded. Deviation params (a, b, ...) are
+  # left unconstrained because downstream analysis (e.g. the concentration at
+  # which an interaction switches synergistic <-> antagonistic) relies on their
+  # unconstrained values. Validate here -- before the all-fixed fast path -- so an
+  # illegal bound name is rejected consistently regardless of how many params are
+  # free (otherwise the staged reference fit would silently ignore it).
+  base_all <- setdiff(spec$params, spec$extra)  # all curve params, incl. fixed
+  bad <- setdiff(c(names(lower), names(upper)), base_all)
+  if (length(bad))
+    stop("`lower`/`upper` may only name a base parameter (",
+         paste(base_all, collapse = ", "), "); got: ",
+         paste(unique(bad), collapse = ", "))
+
   # When every parameter is fixed (the staged reference fit: curve params held at
   # their single-compound values, no interaction params to free) there is nothing
   # to optimise -- just evaluate the model. `stats::optim` cannot run on a
@@ -95,17 +108,6 @@ fit_model <- function(df, reference, deviation = "reference",
 
   theta0 <- par[free]
   base <- setdiff(free, spec$extra)             # positively-bounded curve params
-  base_all <- setdiff(spec$params, spec$extra)  # incl. any fixed curve params
-
-  # Only base curve parameters may be bounded. Deviation params (a, b, ...) are
-  # left unconstrained because downstream analysis (e.g. the concentration at
-  # which an interaction switches synergistic <-> antagonistic) relies on their
-  # unconstrained values.
-  bad <- setdiff(c(names(lower), names(upper)), base_all)
-  if (length(bad))
-    stop("`lower`/`upper` may only name a base parameter (",
-         paste(base_all, collapse = ", "), "); got: ",
-         paste(unique(bad), collapse = ", "))
 
   # Defaults: base params get positivity; deviation params stay +/-Inf.
   lo <- stats::setNames(rep(-Inf, length(free)), free)

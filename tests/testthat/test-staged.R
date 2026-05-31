@@ -26,6 +26,17 @@ test_that("fit_curve_from_singles recovers curve params from the marginals", {
   expect_equal(unname(base[["slope2"]]), 1.5, tolerance = 1e-2)
 })
 
+test_that("fit_curve_from_singles never errors and stays finite on sparse marginals", {
+  # Only two non-zero concentration levels per chemical (plus control) -- a thin
+  # marginal series. Stage 1 must still return a finite, correctly-named base
+  # vector (from the fit, or the seed_from_singles fallback), and never error.
+  d <- expand.grid(C1 = c(0, 0.05, 0.2), C2 = c(0, 0.5, 5))
+  d$Res <- ca_bi_vec(d$C1, d$C2, 800, 4, 1.5, 0.08, 1)
+  base <- fit_curve_from_singles(d, "CA", "continuous", n_starts = 1)
+  expect_setequal(names(base), c("max", "slope1", "slope2", "ec501", "ec502"))
+  expect_true(all(is.finite(base)))
+})
+
 test_that("analyse_mixture holds the curve params fixed across all four fits", {
   d <- make_staged_binary_df()
   res <- analyse_mixture(d, "CA", "continuous", n_starts = 1)

@@ -95,6 +95,17 @@ test_that("deviation parameters stay unconstrained (free to go negative)", {
   expect_true(is.finite(unname(fit$par["a"])))
 })
 
+test_that("an illegal bound name errors even when all params are fixed", {
+  # The all-fixed fast path must still validate bound names; otherwise the staged
+  # reference fit would silently ignore an illegal bound that the other fits reject.
+  df <- bounds_cont_df()
+  start <- c(max = 800, slope1 = 4, slope2 = 1.5, ec501 = 0.08, ec502 = 1)
+  expect_error(
+    fit_model(df, "CA", "reference", "continuous", start = start,
+              fixed = names(start), upper = c(a = 1)),
+    "base parameter")
+})
+
 test_that("analyse_mixture forwards bounds to every fit", {
   df <- bounds_cont_df()
   start <- c(max = 800, slope1 = 4, slope2 = 1.5, ec501 = 0.04, ec502 = 1)
