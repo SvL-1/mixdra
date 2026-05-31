@@ -8,3 +8,6 @@ node_modules/
 
 # Research PDFs — not committed
 papers/
+
+# Brainstorming visual-companion mockups — local only
+.superpowers/
