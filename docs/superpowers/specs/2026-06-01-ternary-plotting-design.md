@@ -141,25 +141,37 @@ Pure, unit-tested.
 
 ---
 
-## 4. Validation against `Isoplains_Mixtox.xlsx`
+## 4. Validation — self-consistency against the model predictor
 
-Mirrors T1's fixture→assert pattern.
+> **AS-BUILT amendment (2026-06-01).** This section originally specified
+> validation against `Isoplains_Mixtox.xlsx`. During implementation (Task 8) we
+> found that the Excel tool (`Model4Isoplane.xlsm`) constructs its isoplane by a
+> different, **interior-approximate** method: it agrees with the exact model only
+> near the simplex edges (~0.5%) and diverges in the interior (up to ~9%), and
+> the gap persists even with the exact workbook parameters — so it is **not a
+> comparable reference**. Meanwhile our `ec50_isoplane`/`sigma_tu_curve` are
+> **provably exact** for the fitted CA Advanced-S/A model: at `Y = max/2` the
+> `((max - Y)/Y)^(1/slope)` factor equals 1 for *every* slope, so
+> `sigma_tu = F4(z)` and `C_i = EC50_i * z_i * F4` hold exactly regardless of
+> heterogeneous Hill slopes (verified: closed-form points fed back through
+> `ca_asa_tri` return `max/2` to machine precision). Per the project owner's
+> decision, the Excel comparison was **dropped** and the Excel fixtures removed.
 
-- **`tests/testthat/fixtures/extract_isoplane_fixture.R`** (NEW, tracked,
-  alongside `extract_ternary_fixture.R` per the existing convention) — reads the
-  `FBSA_CPF_IMI`, `TU-zValues`, and `TER_EC50` sheets (filtered to the FBSA/CPF/IMI mixture we already validated in
-  T1), writes small CSV fixtures into `tests/testthat/fixtures/`. This step also
-  **pins the z-path / axis convention** left open in §3.1 by revealing the
-  sheet's actual columns.
-- **`test-validation-isoplane.R`** (NEW) — runs `analyse_ternary()` on the
-  existing ternary fixture, then asserts `ec50_isoplane` / `sigma_tu_curve` /
-  `ec50_markers` match the Excel values within tolerance. Because our base +
-  A1-A3 already match the workbook to 4-5 sig figs (T1), any mismatch here
-  isolates a computation/convention bug, not a fit difference.
-- **Caveat to verify during extraction:** the Excel tool's chosen model is
-  `CA_SA`; confirm its A-parameters equal ours before asserting. If the Excel
-  used a jointly-refit base (as the main ternary sheet did), assert against the
-  matching column — exactly as T1 anchored to the `Overall` sheet.
+**The validation gate is self-consistency against the model's own predictor.**
+`test-validation-isoplane.R` fits `analyse_ternary()` on the real 419-row ternary
+fixture (`set.seed(42)`, `n_starts = 10`, `ec50_2` pinned at 5.58), then asserts
+that every point produced by the isoplane API lands on the fitted model's true
+EC50 surface — i.e. feeding each point's `(C1, C2, C3)` back through
+`ca_asa_tri` returns `max/2` (tolerance `1e-4` relative). Four blocks:
+`ec50_isoplane(res, "SA")` (A4 = 0), `ec50_isoplane(res, "ASA")`
+(A4 = `A4_overall`), `ec50_markers(res, df)` (each ratio's individual A4), and
+both `sigma_tu_curve(res, "SA")` / `(res, "ASA")` (concentrations reconstructed
+from `z` + `sigma_tu`). This is exact, non-circular (`ca_asa_tri` is an
+independent bisection solver), and isolates any formula/convention bug.
+
+The z-path convention for `sigma_tu_curve` (vary `z_x`, hold the other two at
+equal z) was confirmed during planning against the `TU-zValues` sheet (edge
+agreement) and is now locked in code; the Excel sheet is no longer read.
 
 ---
 
@@ -171,9 +183,10 @@ Mirrors T1's fixture→assert pattern.
 - **`test-plot-data-ternary.R`** (NEW) — unit tests for the builders.
 - **`test-plot-ternary.R`** (NEW) — smoke tests: renderers return plotly objects
   with the expected number of traces; guarded to skip if plotly is absent.
-- **`test-validation-isoplane.R`** (NEW) — the §4 validation; slow (it calls
-  `analyse_ternary`). Use `n_starts = 1` + the cached fixture; run in background
-  and Read a marker line, per the project's R-here gotchas.
+- **`test-validation-isoplane.R`** (NEW) — the §4 self-consistency validation;
+  slow (it calls `analyse_ternary` on the 419-row fixture, ~2 min, `n_starts =
+  10`). Run in background and Read a marker line, per the project's R-here
+  gotchas.
 
 ---
 
@@ -183,8 +196,6 @@ Mirrors T1's fixture→assert pattern.
 R/ternary-isoplane.R          NEW  exported: ec50_isoplane, sigma_tu_curve, ec50_markers
 R/plot-data-ternary.R         NEW  builders (pure)
 R/plot.R                      EDIT add plot_isoplane, plot_sigma_tu
-tests/testthat/fixtures/extract_isoplane_fixture.R  NEW  tracked extraction tool
-tests/testthat/fixtures/isoplane_*.csv      NEW
 tests/testthat/test-ternary-isoplane.R      NEW
 tests/testthat/test-plot-data-ternary.R     NEW
 tests/testthat/test-plot-ternary.R          NEW
@@ -205,12 +216,12 @@ NAMESPACE / man/              EDIT via roxygen (document())
 
 ---
 
-## 8. Open items for the implementation plan
+## 8. Open items — RESOLVED (2026-06-01)
 
-1. Confirm the `TU-zValues` / `TER_EC50` sheet columns and the exact z-path
-   definition during fixture extraction (Task 1), then lock `sigma_tu_curve` to
-   it.
-2. Confirm the Excel isoplane's A-parameters match our fit before choosing the
-   assertion columns (§4 caveat).
-3. Triangular `z`-grid resolution default (`n = 30`) — adjust if the isoplane
-   cloud is too sparse/dense for a usable 3D plot.
+1. ~~Confirm the `TU-zValues` z-path definition.~~ **Resolved:** vary `z_x`, hold
+   the other two at equal z; locked in `sigma_tu_curve`.
+2. ~~Confirm the Excel isoplane's A-parameters match our fit.~~ **Mooted:** the
+   Excel reference was dropped (see §4 as-built amendment); validation is now
+   self-consistency against the model predictor.
+3. Triangular `z`-grid resolution default (`n = 30`) — kept; adjust later if the
+   isoplane cloud is too sparse/dense for a usable 3D plot.

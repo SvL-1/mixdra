@@ -57,6 +57,19 @@ NAMESPACE, man/*.Rd                                 EDIT via roxygen2 document()
 
 ---
 
+> **AS-BUILT amendment (2026-06-01).** Tasks 1 and 8 changed during execution.
+> The Excel reference `Isoplains_Mixtox.xlsx` was found to compute its isoplane by
+> a different, interior-approximate method (~9% interior divergence), while our
+> `ec50_isoplane` is provably exact for the fitted model. Per the project owner's
+> decision, **the Excel validation was dropped**: Task 1's extracted Excel
+> fixtures (`extract_isoplane_fixture.R`, `isoplane_*.csv`) were removed, and
+> Task 8 now validates by **self-consistency** — every isoplane / marker / curve
+> point, fed back through the `ca_asa_tri` predictor, must return `max/2`
+> (tolerance `1e-4`). The Task 1 and Task 8 steps below are kept as the original
+> script for the historical record; see the spec §4 as-built amendment for the
+> final shape. The z-path convention work in Task 1 (still valid) is now done
+> directly from the verified `TU-zValues` layout rather than at runtime.
+
 ## Task 1: Extract isoplane fixtures from `Isoplains_Mixtox.xlsx`
 
 **Files:**
