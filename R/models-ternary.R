@@ -1032,7 +1032,13 @@ ia_dr_tri <- function(c1, c2, c3, max, slope1, slope2, slope3, ec50_1, ec50_2, e
   .fn(c1, c2, c3, max, slope1, slope2, slope3, ec50_1, ec50_2, ec50_3, a, b1, b2, b3)
 }
 
-#' ia_dl_tri: ternary (3-chemical) mixture predictor (ported verbatim from IA_DL)
+#' ia_dl_tri: ternary (3-chemical) mixture predictor (ported from IA_DL)
+#'
+#' NOT verbatim: the original port used the deviation term `(a + b*P50)` for the
+#' C1+C3, C2+C3 and full-triple subsets, which contradicts Jonker et al. (2005)
+#' Eq. 13 (`G = a*(1 - b_DL*P)*prod(z)`) and the C1+C2 subset / binary `ia_dl_bi`.
+#' Those six occurrences were corrected to `(a*(1 - b*P50))`. Pinned by
+#' tests/testthat/test-mixture-predict.R against the unified `mix_response()`.
 #'
 #' @param c1,c2,c3 Concentrations.
 #' @param max,slope1,slope2,slope3,ec50_1,ec50_2,ec50_3,a,b Model parameters.
@@ -1102,14 +1108,14 @@ ia_dl_tri <- function(c1, c2, c3, max, slope1, slope2, slope3, ec50_1, ec50_2, e
         F1 <- 1/(1 + (C1/Ec50_1)^Slope1)
         F3 <- 1/(1 + (C3/Ec50_3)^Slope3)
         P50 <- 1 - (F1 * F3)
-        F4 <- (a + (b * P50)) * z1 * z3
+        F4 <- (a * (1 - (b * P50))) * z1 * z3
         if (Slope1 > 0 & Slope3 > 0) {
             Trans <- qnorm(F1 * F3)
             P <- pnorm(Trans + F4)
         }
         if (Slope1 < 0 & Slope3 < 0) {
             P50 <- (F1 + F3 - F1 * F3)
-            F4 <- (a + (b * P50)) * z1 * z3
+            F4 <- (a * (1 - (b * P50))) * z1 * z3
             Trans <- qnorm(F1 + F3 - F1 * F3)
             P <- pnorm(Trans - F4)
         }
@@ -1123,14 +1129,14 @@ ia_dl_tri <- function(c1, c2, c3, max, slope1, slope2, slope3, ec50_1, ec50_2, e
         F2 <- 1/(1 + (C2/Ec50_2)^Slope2)
         F3 <- 1/(1 + (C3/Ec50_3)^Slope3)
         P50 <- 1 - (F2 * F3)
-        F4 <- (a + (b * P50)) * z2 * z3
+        F4 <- (a * (1 - (b * P50))) * z2 * z3
         if (Slope2 > 0 & Slope3 > 0) {
             Trans <- qnorm(F2 * F3)
             P <- pnorm(Trans + F4)
         }
         if (Slope2 < 0 & Slope3 < 0) {
             P50 <- (F2 + F3 - F2 * F3)
-            F4 <- (a + (b * P50)) * z2 * z3
+            F4 <- (a * (1 - (b * P50))) * z2 * z3
             Trans <- qnorm(F2 + F3 - F2 * F3)
             P <- pnorm(Trans - F4)
         }
@@ -1147,7 +1153,7 @@ ia_dl_tri <- function(c1, c2, c3, max, slope1, slope2, slope3, ec50_1, ec50_2, e
         F2 <- 1/(1 + (C2/Ec50_2)^Slope2)
         F3 <- 1/(1 + (C3/Ec50_3)^Slope3)
         P50 <- 1 - (F1 * F2 * F3)
-        F4 <- (a + (b * P50)) * z1 * z2 * z3
+        F4 <- (a * (1 - (b * P50))) * z1 * z2 * z3
         if (Slope1 > 0 & Slope2 > 0 & Slope3 > 0) {
             Trans <- qnorm(F1 * F2 * F3)
             P <- pnorm(Trans + F4)
@@ -1155,7 +1161,7 @@ ia_dl_tri <- function(c1, c2, c3, max, slope1, slope2, slope3, ec50_1, ec50_2, e
         if (Slope1 < 0 & Slope2 < 0 & Slope3 < 0) {
             P50 <- (F1 + F2 + F3 - (F1 * F2) - (F1 * F3) - (F2 * 
                 F3) + (F1 * F2 * F3))
-            F4 <- (a + (b * P50)) * z1 * z2 * z3
+            F4 <- (a * (1 - (b * P50))) * z1 * z2 * z3
             Trans <- qnorm(F1 + F2 + F3 - (F1 * F2) - (F1 * F3) - 
                 (F2 * F3) + (F1 * F2 * F3))
             P <- pnorm(Trans - F4)
