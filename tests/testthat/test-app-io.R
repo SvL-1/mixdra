@@ -101,3 +101,15 @@ test_that("marginal_df extracts a chemical's single series, renaming its conc to
   expect_equal(m2$Res, c(100, 70, 50))
   expect_false("C2" %in% names(m2))
 })
+
+test_that("assemble_curve_params averages max and keeps per-chemical slope/ec50", {
+  f1 <- list(par = c(max = 700, slope = 2, ec50 = 1))
+  f2 <- list(par = c(max = 600, slope = 1, ec50 = 5))
+  p <- assemble_curve_params(f1, f2)
+  expect_equal(names(p), c("max", "slope1", "slope2", "ec501", "ec502"))
+  expect_equal(unname(p[["max"]]),    650)   # mean(700, 600)
+  expect_equal(unname(p[["slope1"]]), 2)
+  expect_equal(unname(p[["slope2"]]), 1)
+  expect_equal(unname(p[["ec501"]]),  1)
+  expect_equal(unname(p[["ec502"]]),  5)
+})

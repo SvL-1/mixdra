@@ -130,6 +130,23 @@ marginal_df <- function(df, chem) {
   out
 }
 
+#' Frozen curve-parameter vector from two single-chemical fits
+#'
+#' Builds the named vector `analyse_mixture(start = …)` holds fixed: a shared
+#' `max` (the average of the two per-chemical fits, matching the engine's
+#' [seed_from_singles()] behaviour) plus per-chemical `slope1/slope2` and
+#' `ec501/ec502`. Names match the binary registry's base parameters.
+#' @param fit1,fit2 Single-fit results (each a list with `par = c(max, slope, ec50)`).
+#' @return A named numeric vector: `max`, `slope1`, `slope2`, `ec501`, `ec502`.
+#' @keywords internal
+assemble_curve_params <- function(fit1, fit2) {
+  c(max    = mean(c(fit1$par[["max"]], fit2$par[["max"]])),
+    slope1 = fit1$par[["slope"]],
+    slope2 = fit2$par[["slope"]],
+    ec501  = fit1$par[["ec50"]],
+    ec502  = fit2$par[["ec50"]])
+}
+
 #' Assemble lower/upper bound vectors from Advanced-panel inputs
 #'
 #' Reads `lo_<param>` / `hi_<param>` values for `params`; blank/NA entries are
