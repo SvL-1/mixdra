@@ -73,3 +73,18 @@ test_that("sigma_tu_curve: C1 at z = 0 is the equal-split FBSA/IMI binary point"
   # other two equal at z = 0.5 each => F4 = exp(A3 * 0.5 * 0.5)
   expect_equal(c1_0, exp(res$pairwise[["A3"]] * 0.25), tolerance = 1e-12)
 })
+
+test_that("sigma_tu_curve SA ignores A4, ASA uses A4_overall; model column written correctly", {
+  res <- mock_res(A1 = 0.7, A2 = -0.3, A3 = -1.8, A4 = 5)
+  sa  <- sigma_tu_curve(res, "SA",  n = 11)
+  asa <- sigma_tu_curve(res, "ASA", n = 11)
+  # model column is populated correctly
+  expect_true(all(sa$model  == "SA"))
+  expect_true(all(asa$model == "ASA"))
+  # interior points (focal z strictly between 0 and 1, so the other two are > 0)
+  # => z1*z2*z3 > 0 => three-way term active => SA != ASA
+  interior <- sa$z > 0 & sa$z < 1
+  expect_false(isTRUE(all.equal(sa$sigma_tu[interior], asa$sigma_tu[interior])))
+  # endpoints (z == 0 or z == 1): at least one of the other z's is 0 => term vanishes
+  expect_equal(sa$sigma_tu[!interior], asa$sigma_tu[!interior], tolerance = 1e-12)
+})
