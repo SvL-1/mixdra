@@ -39,3 +39,10 @@ test_that("eval_single returns the fit shape without optimising", {
   expect_equal(ev$ssr, 0)
   expect_true(is.na(ev$convergence))
 })
+
+test_that("analyse_single forwards bounds to fit_single", {
+  d <- data.frame(C1 = c(0, 0.1, 0.3, 1, 3, 10),
+                  Res = ll3_predict(c(0, 0.1, 0.3, 1, 3, 10), 100, 2, 0.5))
+  fit <- analyse_single(d, upper = c(slope = 1.5))
+  expect_lte(fit$par[["slope"]], 1.5 + 1e-6)
+})

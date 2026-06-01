@@ -145,9 +145,11 @@ analyse_mixture <- function(df, reference, response = c("continuous", "binary"),
 
 #' Analyse a single chemical (dose-response curve only)
 #' @param df Data frame with `C1` and `Res` (or `Exposed`/`Affected`).
+#' @param lower,upper,start Optional named numeric vectors forwarded to
+#'   [fit_single()] (`max`/`slope`/`ec50`).
 #' @return The [fit_single()] result.
 #' @export
-analyse_single <- function(df) {
+analyse_single <- function(df, lower = NULL, upper = NULL, start = NULL) {
   resp <- if ("Res" %in% names(df)) df$Res else df$Affected / df$Exposed
-  fit_single(df$C1, resp)
+  fit_single(df$C1, resp, lower = lower, upper = upper, start = start)
 }
