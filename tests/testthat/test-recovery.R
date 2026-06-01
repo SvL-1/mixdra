@@ -8,6 +8,11 @@
 # fits): CA reference (continuous), IA reference (binary), CA SA/DR (continuous),
 # CA DL (binary), and CA ternary reference. IA deviations, binary SA/DR, and
 # ternary deviations are intentionally not covered here; ternary ASA is on hold.
+#
+# NOTE: the three deviation tests carry skip_on_cran() (slow 10-start fits), so a
+# bare testthat::test_file() run treats the session as CRAN and SKIPS them. Run
+# via devtools::test() (sets NOT_CRAN) or set NOT_CRAN=true to execute the full
+# oracle -- otherwise only the fast reference round-trips run.
 
 # Mute ONLY the benign base-R "one-dimensional optimization is unreliable"
 # warning that stats::optim (Nelder-Mead) emits for single-free-parameter
