@@ -54,3 +54,31 @@ test_that("single_server surfaces validation errors and withholds a fit", {
 test_that("single_ui builds a Shiny UI fragment", {
   expect_true(inherits(single_ui("single"), c("shiny.tag", "shiny.tag.list", "bslib_fragment")))
 })
+
+test_that("binary_server fits the four models and exposes the chosen model", {
+  skip_on_cran()
+  meta <- shiny::reactiveValues()
+  shiny::testServer(binary_server, args = list(meta = meta), {
+    # Use the validated continuous binary fixture (C1, C2, Res).
+    csv <- testthat::test_path("fixtures", "binary_mps_cpf_continuous.csv")
+    skip_if_not(file.exists(csv), "binary fixture missing")
+    session$setInputs(response = "continuous", reference = "CA",
+                      thorough = FALSE,
+                      n_starts = 1, alpha = 0.05, time_limit = 30,
+                      lo_max = NA, hi_max = NA, lo_slope1 = NA, hi_slope1 = NA,
+                      lo_slope2 = NA, hi_slope2 = NA, lo_ec501 = NA, hi_ec501 = NA,
+                      lo_ec502 = NA, hi_ec502 = NA,
+                      file = list(datapath = csv, name = "binary.csv"))
+    expect_length(errs(), 0)
+    session$setInputs(fit = 1)
+    res <- res_r()
+    expect_setequal(names(res$fits), c("reference", "SA", "DR", "DL"))
+    expect_true(res$chosen %in% c("reference", "SA", "DR", "DL"))
+    # the displayed fit defaults to the chosen model (deviation tag matches)
+    expect_equal(shown_fit()$deviation, res$chosen)
+  })
+})
+
+test_that("binary_ui builds a Shiny UI fragment", {
+  expect_true(inherits(binary_ui("binary"), c("shiny.tag", "shiny.tag.list", "bslib_fragment")))
+})
