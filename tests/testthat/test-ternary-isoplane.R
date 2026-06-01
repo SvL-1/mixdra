@@ -50,3 +50,26 @@ test_that("ec50_isoplane SA ignores A4, ASA uses A4_overall", {
   expect_false(isTRUE(all.equal(sa$sigma_tu[interior], asa$sigma_tu[interior])))
   expect_equal(sa$sigma_tu[!interior], asa$sigma_tu[!interior], tolerance = 1e-12)
 })
+
+test_that("sigma_tu_curve: no interaction gives sigma_tu == 1 everywhere", {
+  res <- mock_res()                       # all A = 0
+  d <- sigma_tu_curve(res, "SA", n = 11)
+  expect_setequal(unique(d$chem), c("C1", "C2", "C3"))
+  expect_equal(d$sigma_tu, rep(1, nrow(d)), tolerance = 1e-12)
+})
+
+test_that("sigma_tu_curve: each chemical's vertex (z = 1) has sigma_tu == 1", {
+  res <- mock_res(A1 = 0.7, A2 = -0.3, A3 = -1.8, A4 = 2)
+  d <- sigma_tu_curve(res, "ASA", n = 11)
+  tip <- d[d$z == 1, ]
+  expect_equal(nrow(tip), 3)              # one per chemical
+  expect_equal(tip$sigma_tu, rep(1, 3), tolerance = 1e-12)
+})
+
+test_that("sigma_tu_curve: C1 at z = 0 is the equal-split FBSA/IMI binary point", {
+  res <- mock_res(A1 = 0.7, A2 = -0.3, A3 = -1.8, A4 = 2)
+  d <- sigma_tu_curve(res, "SA", n = 11)
+  c1_0 <- d[d$chem == "C1" & d$z == 0, "sigma_tu"]
+  # other two equal at z = 0.5 each => F4 = exp(A3 * 0.5 * 0.5)
+  expect_equal(c1_0, exp(res$pairwise[["A3"]] * 0.25), tolerance = 1e-12)
+})

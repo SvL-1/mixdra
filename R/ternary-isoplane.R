@@ -49,3 +49,30 @@ ec50_isoplane <- function(res, model = c("SA", "ASA"), n = 30) {
              C3 = b[["ec50_3"]] * g$z3 * F4,
              sigma_tu = F4, model = model, stringsAsFactors = FALSE)
 }
+
+#' Sigma-TU vs z curves for a ternary Advanced-S/A fit
+#'
+#' For each chemical *x*, varies its TU-fraction `z_x` from 0 to 1 while holding
+#' the other two chemicals at equal z (`(1 - z_x)/2` each), and reports `ΣTU =
+#' F4(z)` along that path. This is the curve underlying the z-plot: deviation of
+#' `sigma_tu` from 1 is the interaction (`< 1` synergy, `> 1` antagonism).
+#' @param res An [analyse_ternary()] result.
+#' @param model `"SA"` (pairwise only) or `"ASA"` (adds `res$A4_overall`).
+#' @param n Number of z points per chemical (default 21, i.e. steps of 0.05).
+#' @return A data frame: `chem` ("C1"/"C2"/"C3"), `z`, `sigma_tu`, `model`.
+#' @export
+sigma_tu_curve <- function(res, model = c("SA", "ASA"), n = 21) {
+  model <- match.arg(model)
+  A1 <- res$pairwise[["A1"]]; A2 <- res$pairwise[["A2"]]; A3 <- res$pairwise[["A3"]]
+  A4 <- if (model == "ASA") res$A4_overall else 0
+  zx <- seq(0, 1, length.out = n)
+  other <- (1 - zx) / 2
+  chems <- c("C1", "C2", "C3")
+  do.call(rbind, lapply(seq_along(chems), function(ix) {
+    z <- matrix(other, nrow = n, ncol = 3)
+    z[, ix] <- zx
+    data.frame(chem = chems[ix], z = zx,
+               sigma_tu = .f4(z[, 1], z[, 2], z[, 3], A1, A2, A3, A4),
+               model = model, stringsAsFactors = FALSE)
+  }))
+}
