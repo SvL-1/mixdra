@@ -1,7 +1,7 @@
 # Synthetic Recovery Data — Design
 
 **Date:** 2026-06-01
-**Status:** Approved (pending spec review)
+**Status:** Implemented as-built (2026-06-01) — see the As-Built note at the end.
 **Branch:** mixdra-engine
 
 ## Purpose
@@ -205,3 +205,33 @@ hold, so its round-trip cannot be validated yet.
 4. **Fractional `Affected`.** The exact quantal representation yields non-integer
    `Affected`, which is mathematically fine for `binlik` but cosmetically unusual
    if such a frame is printed or plotted as raw counts.
+
+## As-Built (2026-06-01)
+
+Implemented on branch `mixdra-engine` (commits `c3b77bb`..`7797b15`); full suite
+green (**377 pass / 0 fail / 0 skip** via `devtools::test()`). The architecture,
+API, noise model, and tests match this spec. Differences and additions, all
+test-backed:
+
+- **Shared eval factored as a primitive.** `mixture_predict` is layered over an
+  internal `.mixture_eval(fn, conc, par)` primitive; `fit_model`'s `predict_with`
+  closure delegates to the same primitive (keeping its cached `spec`/`conc`, so
+  the optimiser hot loop has no extra `model_spec` lookup). Single source of
+  truth, as intended.
+- **Input hardening beyond the spec.** `mixture_design` errors if `par` lacks an
+  EC50 (`anyNA`); `simulate_mixture` rejects unknown `par` names and
+  `simulate_single` requires an exact `{max, slope, ec50}` name set (the spec's
+  "error on missing/extra names", applied at the public boundary).
+- **Seeded calls restore the global RNG.** `simulate_mixture`/`simulate_single`
+  save and `on.exit`-restore `.Random.seed`, so a seeded call does not disturb
+  the caller's RNG stream (zero new dependencies — base R only).
+- **`group_size = Inf` exact path** uses `Exposed = 100`, `Affected = 100*mu`
+  (fractional), as in caveat 4.
+- **Test scope.** Recovery covers a representative grid slice (CA reference +
+  IA reference + CA SA/DR + CA DL + CA ternary reference), not the full
+  cross-product — documented in the test header. The 3 deviation tests carry
+  `skip_on_cran()` (slow 10-start fits): they run under `devtools::test()`
+  (which sets `NOT_CRAN`) but skip under a bare `testthat::test_file()`.
+
+**Deferred exactly as scoped:** the noise-sweep harness/report, a public
+vignette, and ternary ASA recovery (Advanced S/A on hold).

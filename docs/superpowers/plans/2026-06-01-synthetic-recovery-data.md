@@ -8,6 +8,8 @@
 
 **Tech Stack:** R package (`mixdra`), `stats::optim`, `testthat`, `roxygen2`/`devtools`. No compiled code (Rtools absent).
 
+> **STATUS: ✅ COMPLETE (2026-06-01).** All 6 tasks implemented on branch `mixdra-engine` (commits `c3b77bb`..`7797b15`). Full suite green: **377 pass / 0 fail / 0 skip** via `devtools::test()`. Each task passed two-stage review (spec compliance + code quality) plus a final holistic review. As-built additions beyond this plan, all test-backed: `mixture_design` guards a missing EC50 (`anyNA`) and has a ray-formula test; `mixture_predict` is also tested on a binary deviation path and for param-order independence; `simulate_mixture`/`simulate_single` save+restore the global RNG around a seeded call and reject unknown `par`/`curve` names; the 3 slow deviation recovery tests carry `skip_on_cran()` (so they run under `devtools::test()`, which sets `NOT_CRAN`, but skip under a bare `testthat::test_file()`). Deferred exactly per the spec: the noise-sweep harness, a public vignette, and ternary ASA recovery (Advanced S/A on hold).
+
 ---
 
 ## Running R and tests here (read first)
@@ -66,7 +68,7 @@ Pull the `do.call(spec$fn, ...)` assembly out of `fit_model` into a primitive `.
 - Modify: `R/fit.R:66-72`
 - Test: `tests/testthat/test-predict-mixture.R`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/testthat/test-predict-mixture.R`:
 
@@ -97,7 +99,7 @@ test_that("mixture_predict errors on a missing parameter", {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```powershell
 Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::load_all('.', quiet=TRUE); testthat::test_file('tests/testthat/test-predict-mixture.R', stop_on_failure=TRUE)" 2>&1 | Tee-Object test-out.txt
@@ -105,7 +107,7 @@ Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::load
 
 Read `test-out.txt`. Expected: FAIL — `could not find function "mixture_predict"`.
 
-- [ ] **Step 3: Create the shared helper**
+- [x] **Step 3: Create the shared helper**
 
 Create `R/predict-mixture.R`:
 
@@ -155,7 +157,7 @@ mixture_predict <- function(df, par, reference, deviation = "reference") {
 }
 ```
 
-- [ ] **Step 4: Re-route `fit_model` through the primitive**
+- [x] **Step 4: Re-route `fit_model` through the primitive**
 
 In `R/fit.R`, replace the current block (lines ~66-72):
 
@@ -179,7 +181,7 @@ with:
 
 (`spec` and `conc` are already computed just above; the hot optimiser loop keeps using the cached `spec`/`conc`, so there is no per-evaluation `model_spec` lookup and no performance change.)
 
-- [ ] **Step 5: Run the new test to verify it passes**
+- [x] **Step 5: Run the new test to verify it passes**
 
 ```powershell
 Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::load_all('.', quiet=TRUE); testthat::test_file('tests/testthat/test-predict-mixture.R', stop_on_failure=TRUE)" 2>&1 | Tee-Object test-out.txt
@@ -187,7 +189,7 @@ Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::load
 
 Read `test-out.txt`. Expected: PASS (3 tests).
 
-- [ ] **Step 6: Run the existing fit/analyse tests to confirm no regression**
+- [x] **Step 6: Run the existing fit/analyse tests to confirm no regression**
 
 ```powershell
 Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::load_all('.', quiet=TRUE); testthat::test_file('tests/testthat/test-fit.R', stop_on_failure=TRUE); testthat::test_file('tests/testthat/test-analyse.R', stop_on_failure=TRUE)" 2>&1 | Tee-Object test-out.txt
@@ -195,7 +197,7 @@ Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::load
 
 Read `test-out.txt`. Expected: PASS, no failures (the refactor is behaviour-preserving).
 
-- [ ] **Step 7: Regenerate docs**
+- [x] **Step 7: Regenerate docs**
 
 ```powershell
 Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::document()" 2>&1 | Tee-Object doc-out.txt
@@ -203,7 +205,7 @@ Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::docu
 
 Read `doc-out.txt`. Expected: man pages written for `mixture_predict` (and `.mixture_eval` is internal — no export line in NAMESPACE).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```powershell
 git add R/predict-mixture.R R/fit.R tests/testthat/test-predict-mixture.R man NAMESPACE
@@ -220,7 +222,7 @@ Add the exported `mixture_design()` that builds a control row, per-chemical sing
 - Modify: `R/simulate.R` (create the file with this function)
 - Test: `tests/testthat/test-simulate.R`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/testthat/test-simulate.R`:
 
@@ -256,7 +258,7 @@ test_that("mixture_design rejects par without 2 or 3 slopes", {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```powershell
 Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::load_all('.', quiet=TRUE); testthat::test_file('tests/testthat/test-simulate.R', stop_on_failure=TRUE)" 2>&1 | Tee-Object test-out.txt
@@ -264,7 +266,7 @@ Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::load
 
 Read `test-out.txt`. Expected: FAIL — `could not find function "mixture_design"`.
 
-- [ ] **Step 3: Implement `mixture_design`**
+- [x] **Step 3: Implement `mixture_design`**
 
 Create `R/simulate.R`:
 
@@ -328,7 +330,7 @@ mixture_design <- function(par, reference = "CA", deviation = "reference",
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```powershell
 Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::load_all('.', quiet=TRUE); testthat::test_file('tests/testthat/test-simulate.R', stop_on_failure=TRUE)" 2>&1 | Tee-Object test-out.txt
@@ -336,7 +338,7 @@ Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::load
 
 Read `test-out.txt`. Expected: PASS (3 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add R/simulate.R tests/testthat/test-simulate.R
@@ -353,7 +355,7 @@ Add the internal `.apply_noise()` (relative-CV Gaussian for continuous; binomial
 - Modify: `R/simulate.R`
 - Test: `tests/testthat/test-simulate.R`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `tests/testthat/test-simulate.R`:
 
@@ -400,7 +402,7 @@ test_that("simulate_mixture binary binomial sampling honours group_size", {
 })
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```powershell
 Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::load_all('.', quiet=TRUE); testthat::test_file('tests/testthat/test-simulate.R', stop_on_failure=TRUE)" 2>&1 | Tee-Object test-out.txt
@@ -408,7 +410,7 @@ Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::load
 
 Read `test-out.txt`. Expected: FAIL — `could not find function "simulate_mixture"`.
 
-- [ ] **Step 3: Implement `.apply_noise` and `simulate_mixture`**
+- [x] **Step 3: Implement `.apply_noise` and `simulate_mixture`**
 
 Append to `R/simulate.R`:
 
@@ -477,7 +479,7 @@ simulate_mixture <- function(par, reference = "CA", deviation = "reference",
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```powershell
 Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::load_all('.', quiet=TRUE); testthat::test_file('tests/testthat/test-simulate.R', stop_on_failure=TRUE)" 2>&1 | Tee-Object test-out.txt
@@ -485,7 +487,7 @@ Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::load
 
 Read `test-out.txt`. Expected: PASS (8 tests total in the file).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add R/simulate.R tests/testthat/test-simulate.R
@@ -502,7 +504,7 @@ Add the 1-chemical convenience generator returning the `analyse_single`/`fit_sin
 - Modify: `R/simulate.R`
 - Test: `tests/testthat/test-simulate.R`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `tests/testthat/test-simulate.R`:
 
@@ -533,7 +535,7 @@ test_that("simulate_single recovers the curve via fit_single", {
 })
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```powershell
 Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::load_all('.', quiet=TRUE); testthat::test_file('tests/testthat/test-simulate.R', stop_on_failure=TRUE)" 2>&1 | Tee-Object test-out.txt
@@ -541,7 +543,7 @@ Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::load
 
 Read `test-out.txt`. Expected: FAIL — `could not find function "simulate_single"`.
 
-- [ ] **Step 3: Implement `simulate_single`**
+- [x] **Step 3: Implement `simulate_single`**
 
 Append to `R/simulate.R`:
 
@@ -576,7 +578,7 @@ simulate_single <- function(curve, conc = NULL,
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```powershell
 Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::load_all('.', quiet=TRUE); testthat::test_file('tests/testthat/test-simulate.R', stop_on_failure=TRUE)" 2>&1 | Tee-Object test-out.txt
@@ -584,7 +586,7 @@ Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::load
 
 Read `test-out.txt`. Expected: PASS (11 tests total).
 
-- [ ] **Step 5: Regenerate docs**
+- [x] **Step 5: Regenerate docs**
 
 ```powershell
 Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::document()" 2>&1 | Tee-Object doc-out.txt
@@ -592,7 +594,7 @@ Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::docu
 
 Read `doc-out.txt`. Expected: man pages + NAMESPACE updated to export `mixture_design`, `simulate_mixture`, `simulate_single`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add R/simulate.R tests/testthat/test-simulate.R man NAMESPACE
@@ -608,7 +610,7 @@ Generate noise-free data from known parameters and assert the engine recovers th
 **Files:**
 - Test: `tests/testthat/test-recovery.R`
 
-- [ ] **Step 1: Write the reference-level recovery tests**
+- [x] **Step 1: Write the reference-level recovery tests**
 
 Create `tests/testthat/test-recovery.R`:
 
@@ -643,7 +645,7 @@ test_that("recovery: binary IA reference round-trips", {
 })
 ```
 
-- [ ] **Step 2: Run to verify these pass**
+- [x] **Step 2: Run to verify these pass**
 
 ```powershell
 Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::load_all('.', quiet=TRUE); testthat::test_file('tests/testthat/test-recovery.R', stop_on_failure=TRUE)" 2>&1 | Tee-Object test-out.txt
@@ -651,7 +653,7 @@ Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::load
 
 Read `test-out.txt`. Expected: PASS (2 tests). (No new code — these exercise the Task 1-4 functions end-to-end.)
 
-- [ ] **Step 3: Add the deviation recovery + selection tests**
+- [x] **Step 3: Add the deviation recovery + selection tests**
 
 Append to `tests/testthat/test-recovery.R`:
 
@@ -698,7 +700,7 @@ test_that("recovery: binary CA DL recovers a, b and is selected", {
 })
 ```
 
-- [ ] **Step 4: Run the deviation recovery tests**
+- [x] **Step 4: Run the deviation recovery tests**
 
 ```powershell
 Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::load_all('.', quiet=TRUE); testthat::test_file('tests/testthat/test-recovery.R', stop_on_failure=TRUE)" 2>&1 | Tee-Object test-out.txt
@@ -706,7 +708,7 @@ Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::load
 
 Read `test-out.txt`. Expected: PASS (5 tests). These multi-start fits are slower (tens of seconds) but operate on the small synthetic grid (~36 rows). If a deviation fit fails to reach its injected `a`/`b` (objective not near 0, or wrong `chosen`), the optimiser missed the minimum — raise `n_starts` (e.g. 20) for that test before loosening tolerances; tolerances reflect optimiser precision, not model error.
 
-- [ ] **Step 5: Add the ternary reference recovery test**
+- [x] **Step 5: Add the ternary reference recovery test**
 
 Append to `tests/testthat/test-recovery.R`:
 
@@ -726,7 +728,7 @@ test_that("recovery: continuous CA ternary reference round-trips", {
 })
 ```
 
-- [ ] **Step 6: Run the ternary test**
+- [x] **Step 6: Run the ternary test**
 
 ```powershell
 Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::load_all('.', quiet=TRUE); testthat::test_file('tests/testthat/test-recovery.R', stop_on_failure=TRUE)" 2>&1 | Tee-Object test-out.txt
@@ -734,7 +736,7 @@ Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::load
 
 Read `test-out.txt`. Expected: PASS (6 tests). Ternary fitting may emit non-fatal Nelder-Mead warnings — warnings are fine; only failures matter.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add tests/testthat/test-recovery.R
@@ -749,7 +751,7 @@ Confirm the whole suite is green with the new code and the `fit_model` refactor.
 
 **Files:** none (verification only)
 
-- [ ] **Step 1: Run the full test suite**
+- [x] **Step 1: Run the full test suite**
 
 ```powershell
 Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::test()" 2>&1 | Tee-Object test-out.txt
@@ -757,7 +759,7 @@ Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::test
 
 Read `test-out.txt`. Expected: all files pass; 0 failures. Non-fatal Nelder-Mead warnings from ternary fitting are expected and acceptable (the pre-existing suite reported ~49 such warnings). The new `test-predict-mixture.R`, `test-simulate.R`, and `test-recovery.R` all pass.
 
-- [ ] **Step 2: Confirm docs are current**
+- [x] **Step 2: Confirm docs are current**
 
 ```powershell
 Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); devtools::document()" 2>&1 | Tee-Object doc-out.txt
@@ -770,7 +772,7 @@ git add man NAMESPACE
 git commit -m "docs: regenerate man pages for generator API"
 ```
 
-- [ ] **Step 3: Clean up scratch files**
+- [x] **Step 3: Clean up scratch files**
 
 ```powershell
 Remove-Item test-out.txt, doc-out.txt -ErrorAction SilentlyContinue
