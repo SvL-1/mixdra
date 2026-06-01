@@ -79,6 +79,17 @@ test_that("binary_server stages the fit: split, freeze gate, average max, overri
     session$setInputs(model = "DR")
     expect_equal(shown_fit()$deviation, "DR")
 
+    # the per-model explanation follows the picker. With DR shown, it is the
+    # DR block; the DL block label is absent.
+    expect_match(output$interaction_help$html, "Dose-ratio dependent", fixed = TRUE)
+    expect_false(grepl("Dose-level dependent", output$interaction_help$html, fixed = TRUE))
+    # switching the picker to DL switches the block; with reference CA the DL
+    # formula is the &Sigma;TU variant (distinct from the intro's TU/&Sigma;TU).
+    session$setInputs(model = "DL")
+    expect_equal(shown_fit()$deviation, "DL")
+    expect_match(output$interaction_help$html, "Dose-level dependent", fixed = TRUE)
+    expect_match(output$interaction_help$html, "b&middot;&Sigma;TU)", fixed = TRUE)
+
     # editing a single curve after freezing invalidates the freeze
     session$setInputs(`chem1-val_max` = 720, `chem1-simulate` = 2)
     expect_false(isTRUE(frozen()))

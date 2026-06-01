@@ -270,6 +270,12 @@ binary_server <- function(id, meta) {
       res_r()$fits[[m]]
     })
 
+    # Per-model explanation: tracks the header reference and the displayed model.
+    output$interaction_help <- shiny::renderUI({
+      shiny::req(frozen(), res_r())
+      interaction_help(input$reference, shown_fit()$deviation)
+    })
+
     output$surface <- plotly::renderPlotly({
       shiny::req(frozen(), res_r()); plot_surface(shown_fit(), engine_df())
     })
