@@ -1,0 +1,79 @@
+test_that("upload_schema returns the fixed columns per stage and response", {
+  expect_equal(upload_schema("single", "continuous"), c("Conc", "Res"))
+  expect_equal(upload_schema("single", "quantal"), c("Conc", "Affected", "Exposed"))
+  expect_equal(upload_schema("binary", "continuous"), c("C1", "C2", "Res"))
+  expect_equal(upload_schema("binary", "quantal"), c("C1", "C2", "Affected", "Exposed"))
+})
+
+test_that("template_df has exactly the schema columns and at least one example row", {
+  d <- template_df("binary", "continuous")
+  expect_equal(names(d), c("C1", "C2", "Res"))
+  expect_gt(nrow(d), 0)
+  expect_true(all(vapply(d, is.numeric, logical(1))))
+  # binary template includes single-chemical rows (one chem at 0) for seeding
+  expect_true(any(d$C2 == 0 & d$C1 > 0))
+  expect_true(any(d$C1 == 0 & d$C2 > 0))
+})
+
+test_that("validate_upload returns no errors for a valid file", {
+  good <- data.frame(C1 = c(0, 1, 0, 2), C2 = c(0, 0, 1, 2), Res = c(100, 50, 60, 20))
+  expect_length(validate_upload(good, "binary", "continuous"), 0)
+})
+
+test_that("validate_upload reports missing columns", {
+  bad <- data.frame(C1 = c(0, 1), Res = c(100, 50))   # no C2
+  errs <- validate_upload(bad, "binary", "continuous")
+  expect_match(paste(errs, collapse = " "), "C2")
+})
+
+test_that("validate_upload rejects non-numeric, negative conc, and Affected > Exposed", {
+  expect_match(paste(validate_upload(
+    data.frame(C1 = c("a", "b"), C2 = c(0, 1), Res = c(1, 2)),
+    "binary", "continuous"), collapse = " "), "[Nn]on-numeric")
+  expect_match(paste(validate_upload(
+    data.frame(C1 = c(-1, 1), C2 = c(0, 1), Res = c(1, 2)),
+    "binary", "continuous"), collapse = " "), ">= 0|negative|0")
+  expect_match(paste(validate_upload(
+    data.frame(C1 = c(0, 1), C2 = c(0, 1), Affected = c(2, 12), Exposed = c(10, 10)),
+    "binary", "quantal"), collapse = " "), "Affected")
+})
+
+test_that("validate_upload needs >= 4 distinct concentrations for a single fit", {
+  short <- data.frame(Conc = c(0, 1, 2), Res = c(100, 50, 10))
+  expect_match(paste(validate_upload(short, "single", "continuous"), collapse = " "),
+               "distinct")
+})
+
+test_that("read_upload reads a CSV file into a data frame", {
+  path <- tempfile(fileext = ".csv")
+  utils::write.csv(data.frame(Conc = c(0, 1), Res = c(100, 50)), path, row.names = FALSE)
+  d <- read_upload(path)
+  expect_equal(names(d), c("Conc", "Res"))
+  expect_equal(nrow(d), 2)
+})
+
+test_that("to_engine_df renames Conc to C1 for single only", {
+  s <- to_engine_df(data.frame(Conc = c(0, 1), Res = c(1, 2)), "single")
+  expect_true("C1" %in% names(s))
+  expect_false("Conc" %in% names(s))
+  b <- to_engine_df(data.frame(C1 = 0, C2 = 1, Res = 3), "binary")
+  expect_equal(names(b), c("C1", "C2", "Res"))
+})
+
+test_that("collect_bounds keeps only supplied bounds, named by parameter", {
+  vals <- list(lo_max = NA, hi_max = 1, lo_slope1 = NA, hi_slope1 = NA,
+               lo_slope2 = NA, hi_slope2 = NA, lo_ec501 = 0.01, hi_ec501 = NA,
+               lo_ec502 = NA, hi_ec502 = NA)
+  b <- collect_bounds(vals)
+  expect_equal(b$upper, c(max = 1))
+  expect_equal(b$lower, c(ec501 = 0.01))
+})
+
+test_that("collect_bounds returns NULL bounds when nothing supplied", {
+  vals <- setNames(as.list(rep(NA, 10)),
+                   c(paste0("lo_", c("max","slope1","slope2","ec501","ec502")),
+                     paste0("hi_", c("max","slope1","slope2","ec501","ec502"))))
+  b <- collect_bounds(vals)
+  expect_null(b$lower)
+  expect_null(b$upper)
+})
