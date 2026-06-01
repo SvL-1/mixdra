@@ -79,13 +79,16 @@ sigma_tu_curve <- function(res, model = c("SA", "ASA"), n = 21) {
 
 #' EC50 marker points for each tested ternary ratio
 #'
-#' For every ratio in `res$individual`, converts its concentration proportions to
-#' TU-fractions `z` and evaluates the EC50 isoplane point using that ratio's own
-#' individual `A4`. Plotting these against the overall isoplane/curve is the
-#' visual form of the per-ratio-vs-overall A4 "averaging-out" comparison.
+#' For every ratio in `res$individual`, converts its concentration proportions
+#' `p` to TU-fractions via `z_i = (p_i / EC50_i) / sum_j(p_j / EC50_j)` (EC50
+#' values come from `res$base`) and evaluates the EC50 isoplane point using that
+#' ratio's own individual `A4` (from `res$individual`). Plotting these against
+#' the overall isoplane/curve is the visual form of the per-ratio-vs-overall A4
+#' "averaging-out" comparison.
 #' @param res An [analyse_ternary()] result.
 #' @param df Unused (kept for signature symmetry with the renderers); the marker
-#'   geometry comes entirely from `res$individual` and `res$base`.
+#'   geometry comes entirely from `res$individual` (per-ratio fits, including
+#'   `A4`) and `res$base` (individual EC50 values).
 #' @return A data frame: `ratio, z1, z2, z3, C1, C2, C3, sigma_tu`.
 #' @export
 ec50_markers <- function(res, df = NULL) {
