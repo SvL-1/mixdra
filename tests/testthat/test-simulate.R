@@ -71,7 +71,6 @@ test_that("simulate_mixture binary at group_size=Inf gives exact proportions", {
 
 test_that("simulate_mixture continuous noise scales with cv", {
   par <- c(max = 800, slope1 = 4, slope2 = 1.5, ec501 = 0.08, ec502 = 1)
-  d0 <- simulate_mixture(par, "CA", "reference", "continuous", cv = 0)
   d1 <- simulate_mixture(par, "CA", "reference", "continuous",
                          cv = 0.1, reps = 200, seed = 1)
   mu1 <- mixture_predict(d1[c("C1", "C2")], par, "CA", "reference")
@@ -93,4 +92,32 @@ test_that("simulate_mixture binary binomial sampling honours group_size", {
   expect_true(all(d$Exposed == 50))
   expect_true(all(d$Affected == round(d$Affected)))      # integer counts
   expect_true(all(d$Affected >= 0 & d$Affected <= 50))
+})
+
+test_that("simulate_mixture reps multiplies the row count", {
+  par <- c(max = 800, slope1 = 4, slope2 = 1.5, ec501 = 0.08, ec502 = 1)
+  d1 <- simulate_mixture(par, "CA", "reference", "continuous", reps = 1)
+  d3 <- simulate_mixture(par, "CA", "reference", "continuous", reps = 3)
+  expect_equal(nrow(d3), 3L * nrow(d1))
+})
+
+test_that("simulate_mixture is reproducible for a fixed seed and restores RNG", {
+  par <- c(max = 800, slope1 = 4, slope2 = 1.5, ec501 = 0.08, ec502 = 1)
+  a <- simulate_mixture(par, "CA", "reference", "continuous", cv = 0.1, seed = 42)
+  b <- simulate_mixture(par, "CA", "reference", "continuous", cv = 0.1, seed = 42)
+  expect_equal(a$Res, b$Res)                 # same seed -> identical draws
+  # global RNG stream is not disturbed by a seeded call
+  set.seed(99); before <- runif(1)
+  set.seed(99); invisible(simulate_mixture(par, "CA", "reference",
+                                           "continuous", cv = 0.1, seed = 42))
+  after <- runif(1)
+  expect_equal(before, after)
+})
+
+test_that("simulate_mixture rejects unknown par names", {
+  par <- c(max = 800, slope1 = 4, slope2 = 1.5, ec501 = 0.08, ec502 = 1, junk = 1)
+  expect_error(
+    simulate_mixture(par, "CA", "reference", "continuous"),
+    "unknown parameter"
+  )
 })

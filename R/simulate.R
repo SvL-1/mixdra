@@ -102,7 +102,10 @@ mixture_design <- function(par, reference = "CA", deviation = "reference",
 #' @param group_size Binomial group size for binary responses; `Inf` (default)
 #'   yields exact proportions.
 #' @param reps Replicate each design row this many times before adding noise.
-#' @param seed Optional RNG seed for reproducible noisy draws.
+#'   With `cv = 0` (continuous) or `group_size = Inf` (binary) the replicates are
+#'   exact duplicate rows.
+#' @param seed Optional RNG seed for reproducible noisy draws. Restores the global
+#'   RNG state on exit, so a seeded call does not disturb the caller's stream.
 #' @return A data frame the engine consumes unchanged: `C1`..`Cn` plus `Res`
 #'   (continuous) or `Exposed`/`Affected` (binary).
 #' @export
@@ -111,9 +114,21 @@ simulate_mixture <- function(par, reference = "CA", deviation = "reference",
                              design = NULL, cv = 0, group_size = Inf,
                              reps = 1, seed = NULL) {
   response <- match.arg(response)
+  n_chem <- sum(grepl("^slope[0-9]+$", names(par)))
+  spec <- model_spec(reference, deviation, n_chem)
+  extra <- setdiff(names(par), spec$params)
+  if (length(extra))
+    stop("simulate_mixture: `par` has unknown parameter(s) for ", reference, "/",
+         deviation, ": ", paste(extra, collapse = ", "))
   if (response == "binary" && "max" %in% names(par) && par[["max"]] > 1)
     stop("simulate_mixture: binary `max` is a probability and must be <= 1")
-  if (!is.null(seed)) set.seed(seed)
+  if (!is.null(seed)) {
+    old <- if (exists(".Random.seed", envir = .GlobalEnv))
+      get(".Random.seed", envir = .GlobalEnv) else NULL
+    on.exit(if (!is.null(old)) assign(".Random.seed", old, envir = .GlobalEnv),
+            add = TRUE)
+    set.seed(seed)
+  }
   if (is.null(design)) design <- mixture_design(par, reference, deviation)
   if (reps > 1) design <- design[rep(seq_len(nrow(design)), reps), , drop = FALSE]
   rownames(design) <- NULL
