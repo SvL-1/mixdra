@@ -2,6 +2,75 @@
 # mixture rows), fit CA/IA reference + SA/DR/DL deviations via analyse_mixture(),
 # compare them, and visualise the chosen (or any) fit.
 
+#' Per-model explanation of the interaction fit (pure, for the Binary tab)
+#'
+#' Returns the formula and `a`/`b` meaning for one reference x deviation
+#' combination. Plain HTML (no MathJax), matching the offline-safe style of
+#' [single_model_equation()]. No reactivity or fit object -- unit-testable.
+#'
+#' The interaction factor `F` adjusts the chosen reference baseline on the
+#' toxic-unit shares `z = TU / SigmaTU` (`TU = C / EC50`; `prod z` is the
+#' product across chemicals).
+#'
+#' @param reference Reference model: `"CA"` or `"IA"`.
+#' @param deviation Deviation key: `"reference"`, `"SA"`, `"DR"`, or `"DL"`.
+#' @return A [shiny::tagList()] of formula + parameter meanings.
+#' @keywords internal
+interaction_help <- function(reference, deviation) {
+  ref <- if (identical(reference, "IA")) "IA" else "CA"
+
+  intro <- shiny::tags$p(shiny::tags$small(shiny::HTML(paste0(
+    "The interaction factor F adjusts the ", ref,
+    " baseline on the toxic-unit shares ",
+    "(z = TU / &Sigma;TU, TU = C / EC50; &prod;z = product across chemicals)."))))
+
+  sign_note <- shiny::tags$p(shiny::tags$small(
+    shiny::tags$b("Sign of a: "),
+    "a > 0 → antagonism (mixture less toxic than the reference predicts); ",
+    "a < 0 → synergism (more toxic)."))
+
+  body <- switch(
+    deviation,
+    reference = shiny::tags$p(shiny::HTML(paste0(
+      "<b>No interaction term.</b> The mixture follows the ", ref,
+      " reference exactly."))),
+    SA = shiny::tagList(
+      shiny::tags$p(shiny::tags$b("Similar action (S/A): "),
+                    shiny::tags$code(shiny::HTML("F = a&middot;&prod;z"))),
+      shiny::tags$p(shiny::tags$small(
+        shiny::tags$code("a"),
+        " sets the overall strength and direction of the interaction."))),
+    DR = shiny::tagList(
+      shiny::tags$p(shiny::tags$b("Dose-ratio dependent (DR): "),
+                    shiny::tags$code(shiny::HTML(
+                      "F = (a + &Sigma;b<sub>i</sub>&middot;z<sub>i</sub>)&middot;&prod;z"))),
+      shiny::tags$p(shiny::tags$small(
+        shiny::tags$code("a"), " = overall interaction; ", shiny::tags$code("b"),
+        " = how it shifts with the mixture ratio (which chemical dominates). ",
+        "For a binary mixture there is one free b (Jonker Eq. 8)."))),
+    DL = {
+      dl_form <- if (ref == "IA")
+        "F = a&middot;(1 &minus; b&middot;P)&middot;&prod;z"
+      else
+        "F = a&middot;(1 &minus; b&middot;&Sigma;TU)&middot;&prod;z"
+      dl_b <- if (ref == "IA")
+        "how it shifts with the dose level (P = the IA-predicted effect at the mixture point)."
+      else
+        "how it shifts with the dose level (ΣTU = the summed toxic units at the mixture point)."
+      shiny::tagList(
+        shiny::tags$p(shiny::tags$b("Dose-level dependent (DL): "),
+                      shiny::tags$code(shiny::HTML(dl_form))),
+        shiny::tags$p(shiny::tags$small(
+          shiny::tags$code("a"), " = overall interaction; ",
+          shiny::tags$code("b"), " = ", dl_b)))
+    },
+    shiny::tags$p()  # unknown deviation -> empty
+  )
+
+  shiny::tagList(intro, body,
+                 if (!identical(deviation, "reference")) sign_note)
+}
+
 #' Binary Mixture stage UI
 #' @param id Module id.
 #' @keywords internal
