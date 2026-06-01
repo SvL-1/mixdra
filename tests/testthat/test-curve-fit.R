@@ -20,6 +20,18 @@ test_that("curve_fit_server Autofit fits and exposes the fit via the returned re
   })
 })
 
+test_that("curve_fit_server Autofit blocks when a lower bound exceeds its upper", {
+  meta <- shiny::reactiveValues()
+  df <- .curve_df()
+  shiny::testServer(curve_fit_server,
+                    args = list(fit_df = shiny::reactive(df), meta = meta), {
+    session$setInputs(val_max = NA, val_slope = NA, val_ec50 = NA,
+                      lo_max = NA, hi_max = NA, lo_slope = 5, hi_slope = 1,
+                      lo_ec50 = NA, hi_ec50 = NA, autofit = 1)
+    expect_null(current_fit())
+  })
+})
+
 test_that("curve_fit_server Simulate evaluates the typed parameter values", {
   meta <- shiny::reactiveValues()
   df <- .curve_df()

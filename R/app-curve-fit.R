@@ -71,10 +71,12 @@ curve_fit_ui <- function(id) {
 #' Curve-fit panel server
 #' @param id Module id.
 #' @param fit_df A reactive returning the fit data frame (`C1` + response columns).
+#'   The reactive must self-gate (suspend via `req()` / return no rows) when the
+#'   data is invalid; the panel fits whatever non-empty frame it is given.
 #' @param meta Shared reactiveValues for experiment metadata (axis labels).
 #' @param chem_field Optional meta field for the x-axis label (e.g. "chem1"); NULL
 #'   uses a generic "Concentration" label.
-#' @return A reactive returning the current fit (a [fit_single()]/[eval_single()]
+#' @return A reactive returning the current fit (a [analyse_single()]/[eval_single()]
 #'   result), or NULL before any fit.
 #' @keywords internal
 curve_fit_server <- function(id, fit_df, meta, chem_field = NULL) {
@@ -90,7 +92,7 @@ curve_fit_server <- function(id, fit_df, meta, chem_field = NULL) {
 
     shiny::observeEvent(input$autofit, {
       df <- fit_df()
-      shiny::req(df)
+      shiny::req(!is.null(df), nrow(df) > 0)
       b <- collect_bounds(shiny::reactiveValuesToList(input), c("max", "slope", "ec50"))
       if (!is.null(b$lower) && !is.null(b$upper)) {
         common <- intersect(names(b$lower), names(b$upper))
@@ -117,7 +119,7 @@ curve_fit_server <- function(id, fit_df, meta, chem_field = NULL) {
 
     shiny::observeEvent(input$simulate, {
       df <- fit_df()
-      shiny::req(df)
+      shiny::req(!is.null(df), nrow(df) > 0)
       vals <- current_values()
       if (any(is.na(vals))) {
         shiny::showNotification("Enter max, slope and EC50 to simulate.", type = "warning")
