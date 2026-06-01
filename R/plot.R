@@ -109,3 +109,57 @@ plot_isobole <- function(fit, df, levels = c(0.1, 0.25, 0.5, 0.75, 0.9),
   }
   plotly::layout(p, xaxis = list(title = labs$x), yaxis = list(title = labs$y))
 }
+
+#' Plot the EC50 isoplane of a ternary mixture
+#'
+#' 3-D scatter of the CA+S/A and CA+S/A+S/A EC50 isoplane point-clouds with the
+#' per-ratio EC50 markers overlaid, as an interactive plotly object. Mirrors the
+#' MixTox isoplane figures, sourced from the fitted model.
+#' @param res An [analyse_ternary()] result.
+#' @param df The data frame the fit was built from (passed to [ec50_markers()]).
+#' @param n Isoplane grid resolution per simplex edge (default 30).
+#' @return A plotly object.
+#' @export
+plot_isoplane <- function(res, df = NULL, n = 30) {
+  require_plotly()
+  d <- isoplane_plot_data(res, df, n = n)
+  cols <- c("CA+S/A" = "orange", "CA+S/A+S/A" = "blue", "EC50" = "red")
+  sizes <- c("CA+S/A" = 3, "CA+S/A+S/A" = 3, "EC50" = 7)
+  p <- plotly::plot_ly()
+  for (s in c("CA+S/A", "CA+S/A+S/A", "EC50")) {
+    seg <- d[d$series == s, ]
+    p <- plotly::add_trace(p, x = seg$C1, y = seg$C2, z = seg$C3,
+                           type = "scatter3d", mode = "markers", name = s,
+                           marker = list(size = sizes[[s]], color = cols[[s]]))
+  }
+  plotly::layout(p, scene = list(xaxis = list(title = "C1"),
+                                 yaxis = list(title = "C2"),
+                                 zaxis = list(title = "C3")))
+}
+
+#' Plot Sigma-TU vs z for a ternary mixture
+#'
+#' Per-chemical ΣTU-vs-z curves under CA+S/A (solid) and CA+S/A+S/A (dashed),
+#' with the additivity reference line at ΣTU = 1, as an interactive plotly
+#' object. Deviation from 1 is the interaction (< 1 synergy, > 1 antagonism).
+#' @param res An [analyse_ternary()] result.
+#' @param n Number of z points per chemical (default 21).
+#' @return A plotly object.
+#' @export
+plot_sigma_tu <- function(res, n = 21) {
+  require_plotly()
+  d <- sigma_tu_plot_data(res, n = n)
+  p <- plotly::plot_ly()
+  for (ch in c("C1", "C2", "C3")) {
+    for (s in c("CA+S/A", "CA+S/A+S/A")) {
+      seg <- d[d$chem == ch & d$series == s, ]
+      p <- plotly::add_lines(p, x = seg$z, y = seg$sigma_tu,
+                             name = paste(ch, s),
+                             line = list(dash = if (s == "CA+S/A") "solid" else "dash"))
+    }
+  }
+  p <- plotly::add_lines(p, x = c(0, 1), y = c(1, 1), name = "ΣTU = 1",
+                         line = list(color = "black", width = 1))
+  plotly::layout(p, xaxis = list(title = "z (chemical TU fraction)"),
+                 yaxis = list(title = "ΣTU"))
+}
