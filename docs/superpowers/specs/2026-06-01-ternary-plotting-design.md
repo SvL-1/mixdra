@@ -152,9 +152,12 @@ Pure, unit-tested.
 > comparable reference**. Meanwhile our `ec50_isoplane`/`sigma_tu_curve` are
 > **provably exact** for the fitted CA Advanced-S/A model: at `Y = max/2` the
 > `((max - Y)/Y)^(1/slope)` factor equals 1 for *every* slope, so
-> `sigma_tu = F4(z)` and `C_i = EC50_i * z_i * F4` hold exactly regardless of
-> heterogeneous Hill slopes (verified: closed-form points fed back through
-> `ca_asa_tri` return `max/2` to machine precision). Per the project owner's
+> `sigma_tu = F4(z)` and `C_i = EC50_i * z_i * F4` hold exactly regardless of the
+> *magnitude* heterogeneity of the Hill slopes (the identity is at `Y = max/2`;
+> it assumes the engine's positive/decreasing-slope regime, the only case
+> `ca_asa_tri` is defined for — mixed-sign slopes are out of scope). Verified:
+> closed-form points fed back through `ca_asa_tri` return `max/2` to machine
+> precision. Per the project owner's
 > decision, the Excel comparison was **dropped** and the Excel fixtures removed.
 
 **The validation gate is self-consistency against the model's own predictor.**
