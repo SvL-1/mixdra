@@ -150,8 +150,9 @@ assemble_curve_params <- function(fit1, fit2) {
 #' Assemble lower/upper bound vectors from Advanced-panel inputs
 #'
 #' Reads `lo_<param>` / `hi_<param>` values for `params`; blank/NA entries are
-#' dropped. To FIX a parameter, set its lower and upper to the same value. The
-#' default `params` is the binary base set; the single tab passes its own.
+#' dropped. To FIX a parameter, set its lower and upper to the same value.
+#' Callers pass the parameter set they need (the curve-fit panel passes
+#' `max`/`slope`/`ec50`); the default is the binary base set.
 #' @param values Named list (e.g. a Shiny `input`) holding `lo_*`/`hi_*` numbers.
 #' @param params Character vector of parameter names to read.
 #' @return A list with `lower` and `upper` named numeric vectors (or NULL).

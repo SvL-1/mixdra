@@ -199,14 +199,14 @@ binary_server <- function(id, meta) {
     })
 
     output$surface <- plotly::renderPlotly({
-      shiny::req(frozen()); plot_surface(shown_fit(), engine_df())
+      shiny::req(frozen(), res_r()); plot_surface(shown_fit(), engine_df())
     })
     output$isobole <- plotly::renderPlotly({
-      shiny::req(frozen())
+      shiny::req(frozen(), res_r())
       plot_isobole(shown_fit(), engine_df(), reference_fit = res_r()$fits$reference)
     })
     output$op <- plotly::renderPlotly({
-      shiny::req(frozen()); plot_obs_pred(shown_fit(), engine_df())
+      shiny::req(frozen(), res_r()); plot_obs_pred(shown_fit(), engine_df())
     })
 
     output$results <- DT::renderDT({
