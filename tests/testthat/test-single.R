@@ -14,3 +14,28 @@ test_that("fit_single recovers known parameters from clean data", {
   expect_equal(unname(fit$par["ec50"]),  0.5, tolerance = 1e-3)
   expect_lt(fit$ssr, 1e-6)
 })
+
+test_that("fit_single honours a partial upper bound", {
+  conc <- c(0, 0.1, 0.3, 1, 3, 10)
+  resp <- ll3_predict(conc, 100, 2, 0.5)   # true slope 2
+  fit <- fit_single(conc, resp, upper = c(slope = 1.5))
+  expect_lte(fit$par[["slope"]], 1.5 + 1e-6)
+})
+
+test_that("fit_single clamps an out-of-bounds start instead of erroring", {
+  conc <- c(0, 0.1, 0.3, 1, 3, 10)
+  resp <- ll3_predict(conc, 100, 2, 0.5)
+  expect_error(
+    fit_single(conc, resp, lower = c(ec50 = 1), start = c(ec50 = 0.001)),
+    NA)
+})
+
+test_that("eval_single returns the fit shape without optimising", {
+  conc <- c(0, 0.5, 1, 2, 4)
+  resp <- ll3_predict(conc, 10, 2, 1)
+  ev <- eval_single(conc, resp, 10, 2, 1)
+  expect_equal(ev$kind, "single")
+  expect_equal(unname(ev$par[c("max", "slope", "ec50")]), c(10, 2, 1))
+  expect_equal(ev$ssr, 0)
+  expect_true(is.na(ev$convergence))
+})

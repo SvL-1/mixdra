@@ -12,30 +12,59 @@ ll3_predict <- function(conc, max, slope, ec50) {
 
 #' Fit a three-parameter log-logistic curve to single-chemical data
 #'
-#' Minimises the residual sum of squares.
+#' Minimises the residual sum of squares. `lower`, `upper`, and `start` are
+#' optional **named, partial** overrides of the built-in defaults
+#' (`lower = max 1e-8 / slope 1e-3 / ec50 1e-8`, `upper = max Inf / slope 50 /
+#' ec50 Inf`, and a data-driven start). The effective start is clamped into
+#' `[lower, upper]` so the optimiser never receives an out-of-bounds seed.
 #' @param conc Numeric vector of concentrations.
 #' @param resp Numeric vector of responses (same length as `conc`).
-#' @return A list with `par` (named: max, slope, ec50), `ssr`, and `convergence`.
+#' @param lower,upper,start Optional named numeric vectors (`max`/`slope`/`ec50`)
+#'   overriding the corresponding defaults.
+#' @return A list with `par` (named: max, slope, ec50), `ssr`, `convergence`, and
+#'   `kind = "single"`.
 #' @export
-fit_single <- function(conc, resp) {
+fit_single <- function(conc, resp, lower = NULL, upper = NULL, start = NULL) {
   stopifnot(length(conc) == length(resp), length(conc) > 3)
   pos <- conc[conc > 0]
-  start <- c(max = max(resp, na.rm = TRUE),
-             slope = 1,
-             ec50 = stats::median(pos))
+  def_start <- c(max = max(resp, na.rm = TRUE), slope = 1, ec50 = stats::median(pos))
+  def_lower <- c(max = 1e-8, slope = 1e-3, ec50 = 1e-8)
+  def_upper <- c(max = Inf,  slope = 50,   ec50 = Inf)
+
+  lo <- def_lower; if (!is.null(lower)) lo[names(lower)] <- lower
+  hi <- def_upper; if (!is.null(upper)) hi[names(upper)] <- upper
+  st <- def_start; if (!is.null(start)) st[names(start)] <- start
+  st <- pmin(pmax(st, lo), hi)   # keep the seed inside the box
+
   obj <- function(p) {
     pred <- ll3_predict(conc, p[["max"]], p[["slope"]], p[["ec50"]])
     sum((resp - pred)^2)
   }
-  lower <- c(max = 1e-8, slope = 1e-3, ec50 = 1e-8)
-  upper <- c(max = Inf,  slope = 50,   ec50 = Inf)
   # parscale normalises the three very differently-scaled parameters (max ~ 1e2,
   # slope ~ 1, ec50 ~ 1e-1) so L-BFGS-B's relative tolerance bites uniformly;
   # without it the optimiser stops well short of the true minimum.
-  res <- stats::optim(start, obj, method = "L-BFGS-B",
-                      lower = lower, upper = upper,
-                      control = list(parscale = pmax(abs(start), 1e-8),
+  res <- stats::optim(st, obj, method = "L-BFGS-B",
+                      lower = lo, upper = hi,
+                      control = list(parscale = pmax(abs(st), 1e-8),
                                      factr = 1e-9, maxit = 1000))
   list(par = res$par, ssr = res$value, convergence = res$convergence,
        kind = "single")
+}
+
+#' Evaluate the log-logistic curve at given parameters (no optimisation)
+#'
+#' Forward evaluation used by the Shiny app's "Simulate" action: computes the
+#' predicted response and residual sum of squares for caller-supplied parameters,
+#' returning the same shape as [fit_single()] so the plotting layer consumes it
+#' unchanged.
+#' @param conc,resp Concentration and observed-response vectors (same length).
+#' @param max,slope,ec50 Curve parameters to evaluate.
+#' @return A list with `par` (named max/slope/ec50), `ssr`, `convergence = NA`,
+#'   and `kind = "single"`.
+#' @keywords internal
+eval_single <- function(conc, resp, max, slope, ec50) {
+  pred <- ll3_predict(conc, max, slope, ec50)
+  list(par = c(max = max, slope = slope, ec50 = ec50),
+       ssr = sum((resp - pred)^2),
+       convergence = NA_integer_, kind = "single")
 }
