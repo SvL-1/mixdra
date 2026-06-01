@@ -156,7 +156,9 @@ simulate_single <- function(curve, conc = NULL,
                             response = c("continuous", "binary"),
                             cv = 0, group_size = Inf, seed = NULL) {
   response <- match.arg(response)
-  stopifnot(all(c("max", "slope", "ec50") %in% names(curve)))
+  if (!setequal(names(curve), c("max", "slope", "ec50")))
+    stop("simulate_single: `curve` must be named exactly max, slope, ec50; got: ",
+         paste(names(curve), collapse = ", "))
   if (response == "binary" && curve[["max"]] > 1)
     stop("simulate_single: binary `max` is a probability and must be <= 1")
   if (!is.null(seed)) {

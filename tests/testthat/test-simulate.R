@@ -146,3 +146,35 @@ test_that("simulate_single recovers the curve via fit_single", {
   expect_equal(unname(fit$par["slope"]), 2, tolerance = 1e-3)
   expect_equal(unname(fit$par["max"]), 100, tolerance = 1e-3)
 })
+
+
+test_that("simulate_single is reproducible for a fixed seed and restores RNG", {
+  curve <- c(max = 100, slope = 2, ec50 = 0.5)
+  a <- simulate_single(curve, response = "continuous", cv = 0.1, seed = 42)
+  b <- simulate_single(curve, response = "continuous", cv = 0.1, seed = 42)
+  expect_equal(a$Res, b$Res)                       # same seed -> identical draws
+  set.seed(99); before <- runif(1)
+  set.seed(99); invisible(simulate_single(curve, response = "continuous",
+                                          cv = 0.1, seed = 42))
+  after <- runif(1)
+  expect_equal(before, after)                      # global RNG undisturbed
+})
+
+test_that("simulate_single honours a custom conc vector", {
+  curve <- c(max = 100, slope = 2, ec50 = 0.5)
+  conc <- c(0, 0.1, 0.5, 2)
+  d <- simulate_single(curve, conc = conc, response = "continuous")
+  expect_equal(d$C1, conc)
+  expect_equal(d$Res, ll3_predict(conc, 100, 2, 0.5))
+})
+
+test_that("simulate_single rejects binary max > 1", {
+  curve <- c(max = 5, slope = 2, ec50 = 0.5)
+  expect_error(simulate_single(curve, response = "binary"), "must be <= 1")
+})
+
+test_that("simulate_single rejects unknown curve names", {
+  curve <- c(max = 100, slope = 2, ec50 = 0.5, junk = 1)
+  expect_error(simulate_single(curve, response = "continuous"),
+               "named exactly max, slope, ec50")
+})
