@@ -1,7 +1,11 @@
 # Ternary plotting (T2) — design
 
 **Date:** 2026-06-01
-**Status:** ✅ Approved — ready for implementation plan
+**Status:** ✅ IMPLEMENTED & VERIFIED (2026-06-01) on branch `mixdra-engine`.
+Full suite green (pass=312/fail=0 incl. concurrent work). §4 reflects the as-built
+validation (self-consistency; the Excel reference was dropped). Not yet synced to
+`main` (shared-branch coordination). Plan:
+`docs/superpowers/plans/2026-06-01-ternary-plotting.md`.
 **Subproject:** ternary T2 (the old "Plan 3"). Builds on the validated ternary
 engine (T1, `docs/superpowers/specs/2026-05-30-ternary-subproject-design.md`)
 and the single+binary plotting layer

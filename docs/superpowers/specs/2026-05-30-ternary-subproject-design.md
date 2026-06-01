@@ -1,10 +1,13 @@
-# Ternary subproject — design & blocker (ON HOLD)
+# Ternary subproject — design (T1 + T2 DONE)
 
-**Date:** 2026-05-30
-**Status:** ⛔ ON HOLD — T1 cannot be finalised until a model-spec question is
-answered, which itself depends on other (upstream) implementation work the user
-wants to do first. This document records the decomposition, the T1 plan sketch,
-the workbook findings, and the blocker so we can resume cleanly.
+**Date:** 2026-05-30 (updated 2026-06-01)
+**Status:** ✅ T1 (engine validation) and T2 (plotting) are both IMPLEMENTED and
+VERIFIED on branch `mixdra-engine`. T3 (app + I/O integration) remains deferred.
+The original "ON HOLD" blocker (an Advanced-S/A model-spec question) was resolved
+2026-05-30 (see §4) and T1 was completed (§5); T2 followed (see the dedicated T2
+spec `docs/superpowers/specs/2026-06-01-ternary-plotting-design.md` and plan
+`docs/superpowers/plans/2026-06-01-ternary-plotting.md`). This document is kept as
+the umbrella decomposition + T1 record.
 
 Builds on the finished engine (`docs/superpowers/plans/2026-05-30-mixdra-engine.md`)
 and the Plan-2-split decomposition (single+binary plotting etc.). Single + binary
@@ -23,14 +26,22 @@ own spec + implementation plan.
   `test-validation-ternary.R`, fix any ternary-specific engine bugs. This is the
   gate — nothing downstream is trustworthy until ternary fits reproduce the
   workbook.
-- **Plan T2 — Ternary plotting** (the old "Plan 3"). EC50 isoplane surface over
-  the simplex + ΣTU / z-value plots. Needs new machinery (an EC50-isobole solver
-  over the simplex). Reference material: `Isoplane_MPs_FBSA_IMI.R`,
-  `Isoplains_Mixtox.xlsx`, `Model4Isoplane.xlsm`.
+- **Plan T2 — Ternary plotting** (the old "Plan 3"). ✅ **DONE (2026-06-01).**
+  EC50 isoplane surface over the simplex + ΣTU / z-value plots, as exported
+  computation functions (`ec50_isoplane`, `sigma_tu_curve`, `ec50_markers`) +
+  plotly renderers (`plot_isoplane`, `plot_sigma_tu`). The "EC50-isobole solver"
+  turned out to be a **closed form**: at Y=max/2 the model's
+  `((max-Y)/Y)^(1/slope)` factor is 1 for every slope, so on the isoplane
+  `ΣTU = F4(z)` and `C_i = EC50_i·z_i·F4` exactly. Validated by self-consistency
+  against the `ca_asa_tri` predictor; the Excel reference material
+  (`Isoplains_Mixtox.xlsx`, `Model4Isoplane.xlsm`) was found to use a different,
+  interior-approximate construction and was NOT used as the gate. Full design +
+  plan: `docs/superpowers/specs/2026-06-01-ternary-plotting-design.md`,
+  `docs/superpowers/plans/2026-06-01-ternary-plotting.md`.
 - **Plan T3 — Ternary app + I/O integration.** *DEFERRED — left for a separate
   step at the user's request; not scoped here.*
 
-T2/T3 stay as stubs until T1 is green.
+T3 stays a stub; T1 and T2 are green.
 
 ---
 

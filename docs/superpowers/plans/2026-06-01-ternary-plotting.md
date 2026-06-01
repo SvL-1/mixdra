@@ -1,5 +1,13 @@
 # Ternary Plotting (T2) Implementation Plan
 
+> **✅ STATUS: COMPLETED 2026-06-01** on branch `mixdra-engine` via
+> subagent-driven execution (each task spec- + quality-reviewed, plus a final
+> holistic review that caught and fixed an empty-`individual` crash). Full suite
+> green (pass=312 / fail=0). See the AS-BUILT amendment below: Tasks 1 & 8
+> changed — the Excel validation was dropped in favour of self-consistency
+> against the model predictor. The `- [ ]` checkboxes below are left unflipped as
+> the original task script. Not yet synced to `main` (shared-branch coordination).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Compute the EC50 isoplane and ΣTU/z curves from a fitted ternary Advanced-S/A model and render them as interactive plotly plots, validated against the precomputed `Isoplains_Mixtox.xlsx` reference.
