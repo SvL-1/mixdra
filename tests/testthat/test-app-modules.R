@@ -82,3 +82,17 @@ test_that("binary_server fits the four models and exposes the chosen model", {
 test_that("binary_ui builds a Shiny UI fragment", {
   expect_true(inherits(binary_ui("binary"), c("shiny.tag", "shiny.tag.list", "bslib_fragment")))
 })
+
+test_that("model_help_single explains the log-logistic model and its parameters", {
+  tag <- model_help_single()
+  expect_true(inherits(tag, c("shiny.tag", "shiny.tag.list")))
+  html <- as.character(tag)
+  expect_match(html, "log-logistic")
+  expect_match(html, "EC50")
+  expect_match(html, "slope")
+  expect_match(html, "SSR")
+})
+
+test_that("single_ui embeds the model help panel", {
+  expect_match(as.character(single_ui("single")), "About this model")
+})

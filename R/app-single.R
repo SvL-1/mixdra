@@ -15,6 +15,41 @@ axis_label <- function(meta, chem_field = NULL) {
   if (!is.null(unit) && nzchar(unit)) paste0(base, " (", unit, ")") else base
 }
 
+#' Static "About this model" help markup for the Single Chemical tab
+#'
+#' Explains the fitted three-parameter log-logistic curve and what each reported
+#' value means. Pure markup, independent of any fit, so it is unit-testable on
+#' its own. Rendered as plain HTML (no MathJax) so it works offline.
+#' @return A `shiny` tag list.
+#' @keywords internal
+model_help_single <- function() {
+  shiny::tagList(
+    shiny::tags$p(
+      "The Single Chemical tab fits a three-parameter ",
+      shiny::tags$b("log-logistic"), " dose-response curve:"
+    ),
+    shiny::tags$p(shiny::tags$code(
+      "Y = max / (1 + (C / EC50)", shiny::tags$sup("slope"), ")"
+    )),
+    shiny::tags$p(shiny::tags$small(
+      "The response falls from ", shiny::tags$code("max"), " at zero dose."
+    )),
+    shiny::tags$dl(
+      shiny::tags$dt("max"),
+      shiny::tags$dd("Control / baseline response at C = 0 (the upper plateau)."),
+      shiny::tags$dt("slope"),
+      shiny::tags$dd("Steepness of the decline (> 0 means the response decreases with dose)."),
+      shiny::tags$dt("EC50"),
+      shiny::tags$dd("Concentration that halves the response.")
+    ),
+    shiny::tags$p(shiny::tags$small(
+      shiny::tags$b("SSR"), " = residual sum of squares (goodness of fit); ",
+      shiny::tags$b("n"), " = number of data points. ",
+      "These describe the fit, not the curve."
+    ))
+  )
+}
+
 #' Single Chemical stage UI
 #' @param id Module id.
 #' @keywords internal
@@ -35,6 +70,10 @@ single_ui <- function(id) {
                   plotly::plotlyOutput(ns("dr"))),
       bslib::card(bslib::card_header("Observed vs predicted"),
                   plotly::plotlyOutput(ns("op")))
+    ),
+    bslib::accordion(
+      open = FALSE,
+      bslib::accordion_panel("About this model", model_help_single())
     ),
     bslib::card(bslib::card_header("Parameters"), DT::DTOutput(ns("params")))
   )
