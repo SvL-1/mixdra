@@ -121,3 +121,28 @@ test_that("simulate_mixture rejects unknown par names", {
     "unknown parameter"
   )
 })
+
+test_that("simulate_single continuous at cv=0 matches ll3_predict", {
+  curve <- c(max = 100, slope = 2, ec50 = 0.5)
+  d <- simulate_single(curve, response = "continuous")
+  expect_named(d, c("C1", "Res"))
+  mu <- ll3_predict(d$C1, 100, 2, 0.5)
+  expect_equal(d$Res, mu)
+  expect_true(any(d$C1 == 0))                 # includes a control point
+})
+
+test_that("simulate_single binary exact gives proportions equal to the curve", {
+  curve <- c(max = 0.9, slope = 2, ec50 = 0.5)
+  d <- simulate_single(curve, response = "binary")
+  expect_named(d, c("C1", "Exposed", "Affected"))
+  expect_equal(d$Affected / d$Exposed, ll3_predict(d$C1, 0.9, 2, 0.5))
+})
+
+test_that("simulate_single recovers the curve via fit_single", {
+  curve <- c(max = 100, slope = 2, ec50 = 0.5)
+  d <- simulate_single(curve, response = "continuous")
+  fit <- fit_single(d$C1, d$Res)
+  expect_equal(unname(fit$par["ec50"]), 0.5, tolerance = 1e-3)
+  expect_equal(unname(fit$par["slope"]), 2, tolerance = 1e-3)
+  expect_equal(unname(fit$par["max"]), 100, tolerance = 1e-3)
+})

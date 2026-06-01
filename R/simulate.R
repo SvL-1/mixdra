@@ -136,3 +136,38 @@ simulate_mixture <- function(par, reference = "CA", deviation = "reference",
   mu <- mixture_predict(design, par, reference, deviation)
   cbind(design, as.data.frame(.apply_noise(unname(mu), response, cv, group_size)))
 }
+
+#' Simulate a single-chemical dose-response dataset from a known curve
+#'
+#' One-chemical convenience wrapper for [fit_single()]/[analyse_single()]
+#' verification. Builds a geometric concentration ladder around `ec50` (plus a
+#' control), predicts via [ll3_predict()], and applies the shared noise layer.
+#' @param curve Named numeric vector `c(max, slope, ec50)`.
+#' @param conc Optional concentration vector; defaults to
+#'   `c(0, ec50 * 2^(-3:3))`.
+#' @param response "continuous" or "binary".
+#' @param cv Relative Gaussian noise (continuous; 0 = none).
+#' @param group_size Binomial group size (binary); `Inf` (default) = exact.
+#' @param seed Optional RNG seed; restores the global RNG state afterwards.
+#' @return A data frame with `C1` plus `Res` (continuous) or `Exposed`/`Affected`
+#'   (binary).
+#' @export
+simulate_single <- function(curve, conc = NULL,
+                            response = c("continuous", "binary"),
+                            cv = 0, group_size = Inf, seed = NULL) {
+  response <- match.arg(response)
+  stopifnot(all(c("max", "slope", "ec50") %in% names(curve)))
+  if (response == "binary" && curve[["max"]] > 1)
+    stop("simulate_single: binary `max` is a probability and must be <= 1")
+  if (!is.null(seed)) {
+    old <- if (exists(".Random.seed", envir = .GlobalEnv))
+      get(".Random.seed", envir = .GlobalEnv) else NULL
+    on.exit(if (!is.null(old)) assign(".Random.seed", old, envir = .GlobalEnv),
+            add = TRUE)
+    set.seed(seed)
+  }
+  if (is.null(conc)) conc <- c(0, curve[["ec50"]] * 2^(-3:3))
+  mu <- ll3_predict(conc, curve[["max"]], curve[["slope"]], curve[["ec50"]])
+  cbind(data.frame(C1 = conc),
+        as.data.frame(.apply_noise(mu, response, cv, group_size)))
+}
