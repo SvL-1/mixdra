@@ -12,6 +12,22 @@
 
 ---
 
+## ✅ STATUS: COMPLETED (2026-05-31, branch `mixdra-engine`, pushed to origin)
+
+All 5 tasks implemented via subagent-driven execution (each with spec + code-quality review); full suite green (205 pass / 0 fail). Checkboxes below were not ticked during execution but every task is done and committed.
+
+**Commits:** `52cbe3b` (a=0/b=1 starts) · `1aeb5ac` (all-fixed fast path) · `63c5370` (`fit_curve_from_singles`) · `a5e97ab`+`7596d8d` (staged `analyse_mixture`) · `7c02629` (re-baseline) · `1f3378d` (bounds-validation fix + extra tests). Doc-fix `6ec0258`.
+
+**Deviations from this plan (as-built):**
+- **Task 4 tests:** the planned "chooses reference on noiseless data" assertion was replaced with parameter assertions (`a≈0`) plus a known-interaction recovery test — on noiseless data the reference/SA objectives are ~1e-15 and the LR *selection* is numerically degenerate. Same change applied to `test-analyse.R` and the ternary test in Task 5.
+- **Task 5 validation re-baseline:** the real quantal binary result **flipped `reference`→`DR`** (continuous still `DL`, weaker S/A). This was investigated and confirmed correct (see the spec's "Outcome" section), not edited away.
+- **Post-review additions (`1f3378d`):** bound-name validation moved *above* the all-fixed fast path (it was being skipped); added a sparse-marginal fallback test and an all-fixed-bounds test.
+- **Man pages:** `@keywords internal` functions DO get `.Rd` files (the plan's Step-4 assumption that they wouldn't was wrong); `init_start_par.Rd` / `fit_curve_from_singles.Rd` exist and are correct (unexported in NAMESPACE).
+
+See the spec's **Outcome / as-built** section for the scientific result and the deferred follow-ups.
+
+---
+
 ## Conventions for every task
 
 - **Test command** (PowerShell or bash, runs one file):

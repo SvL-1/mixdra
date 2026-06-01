@@ -134,3 +134,59 @@ Update existing expectations:
 - No `fit = 'staged'|'joint'` strategy flag on `analyse_mixture()`.
 - No change to ternary model selection (SA-only vs DR/DL).
 - No new public API surface.
+
+## Outcome / as-built (2026-05-31)
+
+Implemented on branch `mixdra-engine` (pushed). Full suite green: 205 pass / 0 fail.
+
+**Scientific result — staged fitting changes real-data conclusions, and that is correct.**
+On the binary MPs+CPF workbook data:
+
+| | joint (old / workbook) | staged (now) |
+|---|---|---|
+| continuous reference SS | 1,633,770 | 2,224,216 |
+| continuous chosen | DL | DL (unchanged) |
+| continuous CA-vs-S/A χ² (p) | ~13.2 (3e-4) | 5.0 (0.025) |
+| quantal reference deviance | 184.4 | 231.4 |
+| quantal chosen | reference | **DR** |
+
+The quantal case flips `reference`→`DR` (robust across seeds; S/A p≈4e-8, DR-vs-S/A
+p≈3e-5). **Why it's correct, not a bug:** the Excel/MixTox workbook (and the old
+joint code that reproduced it) lets the *mixture* data reshape the single-compound
+curves, so interaction is absorbed into bent curves and hidden. Staged fitting
+fixes the curves from the single-compound data only, so a genuine dose-ratio
+interaction surfaces as `b` instead. Investigated and ruled out the marginal-fit
+method as the cause: deviance-fit vs least-squares-fit marginals are essentially
+identical (e.g. ec50₁ 4.635 vs 4.650); the divergence is purely that no
+singles-only curve can reach the workbook's 184 mixture deviance (any such curve
+gives ~231) — only a mixture-informed curve can, confirming the workbook is not
+staged. The MixTox Shiny source confirms it fits curve params on treatment/mixture
+data and never fits `a`/`b` at all (placeholders).
+
+**Test design under staged fitting.** On noiseless synthetic data the
+reference/SA objectives are ~1e-15, which makes the likelihood-ratio *model
+selection* numerically degenerate (it spuriously picks a deviation with a≈±1e-8).
+So the noiseless tests (`test-staged`, `test-nchem` ternary, `test-analyse`)
+assert *parameter values* (`a≈0`, base params fixed-identical across fits, df
+counts) rather than `chosen`. Model selection is exercised on the real-data
+validation fixtures and on a small-noise known-interaction test (a=5 recovered).
+
+**Post-review hardening (commit `1f3378d`).** Bound-name validation was being
+skipped on the all-fixed fast path (so the staged reference fit silently ignored
+an illegal bound the other fits reject); moved the check above the fast path.
+Added a sparse-marginal fallback test and an all-fixed-bounds-error test.
+
+**Man-page note.** `@keywords internal` functions still get `.Rd` files (just no
+NAMESPACE export); `init_start_par.Rd` and `fit_curve_from_singles.Rd` exist and
+are correct.
+
+**Deferred follow-ups (not in scope here; surfaced to the user):**
+- `param_ci()` is not staged-aware — it Hessians over the fixed base params, so it
+  returns `NA` CIs for the staged reference fit. Pre-existing; needs a doc note or
+  a staged-aware variant.
+- A user-supplied *partial* `start` to `analyse_mixture()` (the fixed base) is not
+  validated for completeness; a partial vector would silently leave some curve
+  params free. The default path (`start = NULL`) is always safe.
+- The generic `analyse_mixture()` still offers DR/DL for 3-chem input. The real
+  ternary workflow uses the separate `analyse_ternary()` (Advanced S/A only), so
+  this is a cosmetic cleanup left to the ternary subproject.
