@@ -85,8 +85,20 @@ test_that("binary_server stages the fit: split, freeze gate, average max, overri
   })
 })
 
-test_that("binary_ui builds a Shiny UI fragment", {
-  expect_true(inherits(binary_ui("binary"), c("shiny.tag", "shiny.tag.list", "bslib_fragment")))
+test_that("binary_ui builds and exposes the relocated fit options + intro", {
+  html <- as.character(binary_ui("binary"))
+  # the four controls now live in the Stage 1 Fit-options group (ids unchanged)
+  expect_match(html, "binary-alpha", fixed = TRUE)
+  expect_match(html, "binary-n_starts", fixed = TRUE)
+  expect_match(html, "binary-thorough", fixed = TRUE)
+  expect_match(html, "binary-time_limit", fixed = TRUE)
+  # the group label and the always-visible intro sentence are present
+  expect_match(html, "Fit options", fixed = TRUE)
+  expect_match(html, "fits only the interaction terms", fixed = TRUE)
+  # the old sidebar "Advanced" accordion is gone
+  expect_false(grepl("Advanced", html, fixed = TRUE))
+  # Stage 2 hosts the per-model explanation output
+  expect_match(html, "binary-interaction_help", fixed = TRUE)
 })
 
 test_that("single_ui shows the model equation and Autofit/Simulate buttons", {

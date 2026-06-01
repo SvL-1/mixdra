@@ -86,17 +86,6 @@ binary_ui <- function(id) {
                             "Independent action (IA)" = "IA")),
       shiny::downloadButton(ns("template"), "Download template"),
       shiny::fileInput(ns("file"), "Upload CSV", accept = ".csv"),
-      shiny::checkboxInput(ns("thorough"), "Thorough fit (multi-start, slower)", FALSE),
-      shiny::uiOutput(ns("thorough_note")),
-      bslib::accordion(
-        open = FALSE,
-        bslib::accordion_panel(
-          "Advanced",
-          shiny::numericInput(ns("n_starts"), "n_starts", value = 1, min = 1),
-          shiny::numericInput(ns("alpha"), "alpha", value = 0.05, min = 0, max = 1, step = 0.01),
-          shiny::numericInput(ns("time_limit"), "time_limit (s/model)", value = 30, min = 1)
-        )
-      ),
       shiny::uiOutput(ns("errors"))
     ),
 
@@ -112,6 +101,19 @@ binary_ui <- function(id) {
         shiny::div(shiny::h5(shiny::textOutput(ns("chem2_title"))),
                    curve_fit_ui(ns("chem2")))
       ),
+      shiny::p(class = "text-muted",
+               "Freezing locks both curves above and fits only the interaction terms ",
+               "(a, b) to the mixture rows, then compares four models ",
+               "(no interaction → S/A → dose-ratio → dose-level) ",
+               "and flags the most parsimonious."),
+      shiny::tags$b("Fit options"),
+      bslib::layout_columns(
+        shiny::numericInput(ns("alpha"), "alpha", value = 0.05, min = 0, max = 1, step = 0.01),
+        shiny::numericInput(ns("n_starts"), "n_starts", value = 1, min = 1),
+        shiny::numericInput(ns("time_limit"), "time_limit (s/model)", value = 30, min = 1)
+      ),
+      shiny::checkboxInput(ns("thorough"), "Thorough fit (multi-start, slower)", FALSE),
+      shiny::uiOutput(ns("thorough_note")),
       shiny::actionButton(ns("freeze"), "Freeze curves → fit interactions",
                           class = "btn-primary"),
       shiny::uiOutput(ns("freeze_note"))
@@ -125,6 +127,7 @@ binary_ui <- function(id) {
         shiny::selectInput(ns("model"), "Model to display", choices = NULL),
         shiny::helpText("The most parsimonious model is pre-selected; ",
                         "override above to inspect another."),
+        shiny::uiOutput(ns("interaction_help")),
         DT::DTOutput(ns("comparison"))
       )
     ),
