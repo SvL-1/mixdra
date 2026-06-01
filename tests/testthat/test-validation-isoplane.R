@@ -22,6 +22,8 @@ test_that("isoplane / markers / sigma-TU land on the fitted model's max/2 surfac
   res <- analyse_ternary(df, "CA", "continuous", n_starts = 10, time_limit = 120,
                          lower = c(ec50_2 = 5.579), upper = c(ec50_2 = 5.581))
   b <- res$base
+  expect_gt(b[["max"]], 0)
+  expect_true(is.finite(res$A4_overall))
   half <- b[["max"]] / 2
   ec <- c(b[["ec50_1"]], b[["ec50_2"]], b[["ec50_3"]])
   pred <- function(C1, C2, C3, A4)
@@ -43,6 +45,7 @@ test_that("isoplane / markers / sigma-TU land on the fitted model's max/2 surfac
 
   ## EC50 markers: each ratio's marker (its individual A4) predicts max/2
   mk <- ec50_markers(res, df)
+  expect_true(all(mk$ratio %in% res$individual$ratio))
   a4 <- res$individual$A4[match(mk$ratio, res$individual$ratio)]
   ymk <- vapply(seq_len(nrow(mk)), function(i)
     pred(mk$C1[i], mk$C2[i], mk$C3[i], a4[i]), numeric(1))
@@ -59,4 +62,14 @@ test_that("isoplane / markers / sigma-TU land on the fitted model's max/2 surfac
     pred(C[1], C[2], C[3], 0)
   }, numeric(1))
   expect_equal(ycur, rep(half, nrow(cur)), tolerance = 1e-4)
+
+  ## sigma_tu_curve (ASA, A4 nonzero): same reconstruction, fed the ASA A4
+  cur_asa <- sigma_tu_curve(res, "ASA", n = 11)
+  ycur_asa <- vapply(seq_len(nrow(cur_asa)), function(i) {
+    zc <- rep((1 - cur_asa$z[i]) / 2, 3)
+    zc[chem_idx[[cur_asa$chem[i]]]] <- cur_asa$z[i]
+    C <- ec * zc * cur_asa$sigma_tu[i]
+    pred(C[1], C[2], C[3], res$A4_overall)
+  }, numeric(1))
+  expect_equal(ycur_asa, rep(half, nrow(cur_asa)), tolerance = 1e-4)
 })
