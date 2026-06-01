@@ -2,16 +2,6 @@
 # mixture rows), fit CA/IA reference + SA/DR/DL deviations via analyse_mixture(),
 # compare them, and visualise the chosen (or any) fit.
 
-#' One lower/upper bound numeric-input pair for a parameter
-#' @keywords internal
-bound_row <- function(ns, param, label, hi_default = NA) {
-  shiny::fluidRow(
-    shiny::column(4, shiny::tags$small(label)),
-    shiny::column(4, shiny::numericInput(ns(paste0("lo_", param)), NULL, value = NA)),
-    shiny::column(4, shiny::numericInput(ns(paste0("hi_", param)), NULL, value = hi_default))
-  )
-}
-
 #' Binary Mixture stage UI
 #' @param id Module id.
 #' @keywords internal
@@ -35,40 +25,61 @@ binary_ui <- function(id) {
           "Advanced",
           shiny::numericInput(ns("n_starts"), "n_starts", value = 1, min = 1),
           shiny::numericInput(ns("alpha"), "alpha", value = 0.05, min = 0, max = 1, step = 0.01),
-          shiny::numericInput(ns("time_limit"), "time_limit (s/model)", value = 30, min = 1),
-          shiny::helpText("Parameter bounds (blank = default). Set lower = upper to fix."),
-          shiny::tags$div(shiny::tags$small(shiny::tags$b("param / lower / upper"))),
-          bound_row(ns, "max", "max", hi_default = 1),
-          bound_row(ns, "slope1", "slope1"),
-          bound_row(ns, "slope2", "slope2"),
-          bound_row(ns, "ec501", "ec501"),
-          bound_row(ns, "ec502", "ec502")
+          shiny::numericInput(ns("time_limit"), "time_limit (s/model)", value = 30, min = 1)
         )
       ),
-      shiny::uiOutput(ns("errors")),
-      shiny::actionButton(ns("fit"), "Fit", class = "btn-primary")
+      shiny::uiOutput(ns("errors"))
     ),
-    shiny::selectInput(ns("model"), "Model to display", choices = NULL),
-    bslib::layout_columns(
-      bslib::card(bslib::card_header("Dose-response (Chemical 1)"),
-                  plotly::plotlyOutput(ns("dr1"))),
-      bslib::card(bslib::card_header("Dose-response (Chemical 2)"),
-                  plotly::plotlyOutput(ns("dr2")))
+
+    # Stage 1 -- two single-chemical curve panels + the freeze checkpoint.
+    bslib::card(
+      bslib::card_header("Stage 1 · Single curves"),
+      shiny::p("Review and adjust each chemical's dose-response curve, then freeze ",
+               "to fit the interaction. The mixture model uses one shared ",
+               shiny::tags$code("max"), " (the average of the two fits)."),
+      bslib::layout_columns(
+        shiny::div(shiny::h5(shiny::textOutput(ns("chem1_title"))),
+                   curve_fit_ui(ns("chem1"))),
+        shiny::div(shiny::h5(shiny::textOutput(ns("chem2_title"))),
+                   curve_fit_ui(ns("chem2")))
+      ),
+      shiny::actionButton(ns("freeze"), "Freeze curves → fit interactions",
+                          class = "btn-primary"),
+      shiny::uiOutput(ns("freeze_note"))
     ),
-    bslib::layout_columns(
-      bslib::card(bslib::card_header("3-D response surface"),
-                  plotly::plotlyOutput(ns("surface"))),
-      bslib::card(bslib::card_header("2-D isobole (vs reference)"),
-                  plotly::plotlyOutput(ns("isobole")))
+
+    # Stage 2 -- interaction-model comparison + model picker (revealed once frozen).
+    shiny::conditionalPanel(
+      condition = "output.frozen", ns = ns,
+      bslib::card(
+        bslib::card_header("Stage 2 · Interaction models"),
+        shiny::selectInput(ns("model"), "Model to display", choices = NULL),
+        shiny::helpText("The most parsimonious model is pre-selected; ",
+                        "override above to inspect another."),
+        DT::DTOutput(ns("comparison"))
+      )
     ),
-    bslib::card(bslib::card_header("Observed vs predicted"),
-                plotly::plotlyOutput(ns("op"))),
-    bslib::layout_columns(
-      bslib::card(bslib::card_header("Results table"), DT::DTOutput(ns("results"))),
-      bslib::card(bslib::card_header("Model comparison"), DT::DTOutput(ns("comparison")))
-    ),
-    bslib::card(bslib::card_header("Confidence intervals (displayed model)"),
-                DT::DTOutput(ns("cis")))
+
+    # Stage 3 -- diagnostics for the displayed model (revealed once frozen).
+    shiny::conditionalPanel(
+      condition = "output.frozen", ns = ns,
+      bslib::card(
+        bslib::card_header("Stage 3 · Diagnostics"),
+        bslib::layout_columns(
+          bslib::card(bslib::card_header("3-D response surface"),
+                      plotly::plotlyOutput(ns("surface"))),
+          bslib::card(bslib::card_header("2-D isobole (vs reference)"),
+                      plotly::plotlyOutput(ns("isobole")))
+        ),
+        bslib::card(bslib::card_header("Observed vs predicted"),
+                    plotly::plotlyOutput(ns("op"))),
+        bslib::layout_columns(
+          bslib::card(bslib::card_header("Results table"), DT::DTOutput(ns("results"))),
+          bslib::card(bslib::card_header("Confidence intervals (displayed model)"),
+                      DT::DTOutput(ns("cis")))
+        )
+      )
+    )
   )
 }
 
