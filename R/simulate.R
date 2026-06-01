@@ -26,6 +26,9 @@ mixture_design <- function(par, reference = "CA", deviation = "reference",
   spec <- model_spec(reference, deviation, n_chem)
   ec_names <- grep("^ec50", spec$params, value = TRUE)   # length n_chem, in order
   ec50 <- as.numeric(par[ec_names])
+  if (anyNA(ec50))
+    stop("mixture_design: `par` must supply every EC50 (",
+         paste(ec_names, collapse = ", "), ")")
   cols <- paste0("C", seq_len(n_chem))
 
   zero_row <- function() stats::setNames(as.list(rep(0, n_chem)), cols)

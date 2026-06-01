@@ -27,3 +27,29 @@ test_that("mixture_design rejects par without 2 or 3 slopes", {
   expect_error(mixture_design(c(max = 1, slope1 = 1, ec501 = 1)),
                "2 or 3 slope")
 })
+
+test_that("mixture_design ray concentrations equal dose * w * ec50", {
+  par <- c(max = 800, slope1 = 4, slope2 = 1.5, ec501 = 0.08, ec502 = 1)
+  d <- mixture_design(par, "CA", "reference")
+  ec50 <- c(0.08, 1)
+  # The 1:1 ray: equal toxic-unit fractions w = c(0.5, 0.5). For every such row
+  # the toxic-unit ratio C1/ec501 must equal C2/ec502, and the top dose point
+  # corresponds to dose = 2^3 in toxic units (split across the two chemicals).
+  mix <- d[d$C1 > 0 & d$C2 > 0, ]
+  tu1 <- mix$C1 / ec50[1]
+  tu2 <- mix$C2 / ec50[2]
+  # rows from the 1:1 ray have equal toxic units in each chemical
+  on_11 <- abs(tu1 - tu2) < 1e-9
+  expect_gt(sum(on_11), 0L)
+  # on the 1:1 ray, total toxic units span 2^-3 .. 2^3 (dose series)
+  total_tu <- (tu1 + tu2)[on_11]
+  expect_equal(min(total_tu), 2^-3, tolerance = 1e-9)
+  expect_equal(max(total_tu), 2^3, tolerance = 1e-9)
+})
+
+test_that("mixture_design errors when an EC50 is missing from par", {
+  expect_error(
+    mixture_design(c(max = 800, slope1 = 4, slope2 = 1.5, ec501 = 0.08)),
+    "must supply every EC50"
+  )
+})
