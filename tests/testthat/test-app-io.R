@@ -85,3 +85,19 @@ test_that("collect_bounds reads a custom parameter set (single tab)", {
   expect_equal(b$upper, c(slope = 1.5))
   expect_equal(b$lower, c(ec50 = 0.01))
 })
+
+test_that("marginal_df extracts a chemical's single series, renaming its conc to C1", {
+  df <- data.frame(C1 = c(0, 1, 2, 0, 0, 3),
+                   C2 = c(0, 0, 0, 1, 2, 4),
+                   Res = c(100, 60, 40, 70, 50, 10))
+
+  m1 <- marginal_df(df, 1)               # rows where C2 == 0
+  expect_equal(m1$C1, c(0, 1, 2))
+  expect_equal(m1$Res, c(100, 60, 40))
+  expect_false("C2" %in% names(m1))
+
+  m2 <- marginal_df(df, 2)               # rows where C1 == 0; C2 renamed to C1
+  expect_equal(m2$C1, c(0, 1, 2))
+  expect_equal(m2$Res, c(100, 70, 50))
+  expect_false("C2" %in% names(m2))
+})

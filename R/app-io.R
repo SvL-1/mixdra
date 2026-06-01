@@ -110,6 +110,26 @@ to_engine_df <- function(df, stage) {
   df
 }
 
+#' One chemical's single-compound series from a binary frame
+#'
+#' Keeps the rows where the *other* chemical's concentration is 0 (so the shared
+#' control row is included), drops the other concentration column, and renames
+#' this chemical's concentration column to `C1`. The result has the shape a
+#' single-chemical fitter expects (`C1` + response columns).
+#' @param df Binary engine data frame (`C1`, `C2`, response columns).
+#' @param chem 1 or 2 — which chemical's marginal series to extract.
+#' @return A data frame with `C1` and the response columns.
+#' @keywords internal
+marginal_df <- function(df, chem) {
+  this  <- paste0("C", chem)
+  other <- paste0("C", if (chem == 1) 2 else 1)
+  out <- df[df[[other]] == 0, , drop = FALSE]
+  out[[other]] <- NULL
+  names(out)[names(out) == this] <- "C1"
+  rownames(out) <- NULL
+  out
+}
+
 #' Assemble lower/upper bound vectors from Advanced-panel inputs
 #'
 #' Reads `lo_<param>` / `hi_<param>` values for `params`; blank/NA entries are
