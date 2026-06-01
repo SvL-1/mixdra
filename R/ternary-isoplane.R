@@ -76,3 +76,35 @@ sigma_tu_curve <- function(res, model = c("SA", "ASA"), n = 21) {
                model = model, stringsAsFactors = FALSE)
   }))
 }
+
+#' EC50 marker points for each tested ternary ratio
+#'
+#' For every ratio in `res$individual`, converts its concentration proportions to
+#' TU-fractions `z` and evaluates the EC50 isoplane point using that ratio's own
+#' individual `A4`. Plotting these against the overall isoplane/curve is the
+#' visual form of the per-ratio-vs-overall A4 "averaging-out" comparison.
+#' @param res An [analyse_ternary()] result.
+#' @param df Unused (kept for signature symmetry with the renderers); the marker
+#'   geometry comes entirely from `res$individual` and `res$base`.
+#' @return A data frame: `ratio, z1, z2, z3, C1, C2, C3, sigma_tu`.
+#' @export
+ec50_markers <- function(res, df = NULL) {
+  b <- res$base
+  ec <- c(b[["ec50_1"]], b[["ec50_2"]], b[["ec50_3"]])
+  A1 <- res$pairwise[["A1"]]; A2 <- res$pairwise[["A2"]]; A3 <- res$pairwise[["A3"]]
+  ind <- res$individual
+  if (nrow(ind) == 0)
+    return(data.frame(ratio = character(0), z1 = numeric(0), z2 = numeric(0),
+                      z3 = numeric(0), C1 = numeric(0), C2 = numeric(0),
+                      C3 = numeric(0), sigma_tu = numeric(0),
+                      stringsAsFactors = FALSE))
+  do.call(rbind, lapply(seq_len(nrow(ind)), function(i) {
+    p <- c(ind$C1[i], ind$C2[i], ind$C3[i])    # concentration proportions
+    tu <- p / ec
+    z <- tu / sum(tu)
+    F4 <- .f4(z[1], z[2], z[3], A1, A2, A3, ind$A4[i])
+    data.frame(ratio = ind$ratio[i], z1 = z[1], z2 = z[2], z3 = z[3],
+               C1 = ec[1] * z[1] * F4, C2 = ec[2] * z[2] * F4,
+               C3 = ec[3] * z[3] * F4, sigma_tu = F4, stringsAsFactors = FALSE)
+  }))
+}

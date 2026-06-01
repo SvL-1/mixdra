@@ -1,7 +1,8 @@
 # A minimal analyse_ternary-shaped result for unit testing the pure isoplane API
 # (no fitting needed — the functions only read these fields).
 mock_res <- function(A1 = 0, A2 = 0, A3 = 0, A4 = 0,
-                     ec50 = c(2, 5, 0.5), max = 100) {
+                     ec50 = c(2, 5, 0.5), max = 100,
+                     A4_ind = c(0.5, -0.3)) {
   list(
     reference = "CA", response = "continuous",
     base = c(max = max, slope1 = 3, slope2 = 3, slope3 = 3,
@@ -10,7 +11,7 @@ mock_res <- function(A1 = 0, A2 = 0, A3 = 0, A4 = 0,
     A4_overall = A4,
     individual = data.frame(
       ratio = c("a", "b"), C1 = c(1/3, 0.6), C2 = c(1/3, 0.2),
-      C3 = c(1/3, 0.2), A4 = c(0.5, -0.3), n = c(5L, 5L),
+      C3 = c(1/3, 0.2), A4 = A4_ind, n = c(5L, 5L),
       stringsAsFactors = FALSE))
 }
 
@@ -87,4 +88,24 @@ test_that("sigma_tu_curve SA ignores A4, ASA uses A4_overall; model column writt
   expect_false(isTRUE(all.equal(sa$sigma_tu[interior], asa$sigma_tu[interior])))
   # endpoints (z == 0 or z == 1): at least one of the other z's is 0 => term vanishes
   expect_equal(sa$sigma_tu[!interior], asa$sigma_tu[!interior], tolerance = 1e-12)
+})
+
+test_that("ec50_markers returns one row per individual ratio", {
+  res <- mock_res(A1 = 0.7, A2 = -0.3, A3 = -1.8)
+  m <- ec50_markers(res, df = NULL)
+  expect_equal(nrow(m), nrow(res$individual))
+  expect_equal(m$ratio, res$individual$ratio)
+  expect_true(all(is.finite(m$sigma_tu)))
+  expect_true(all(c("z1", "z2", "z3", "C1", "C2", "C3", "sigma_tu") %in% names(m)))
+})
+
+test_that("ec50_markers TU-fraction conversion: equal proportions are NOT equal z", {
+  # ratio "a" has equal concentration proportions (1/3 each) but unequal EC50s,
+  # so its z (TU fractions) must be unequal and weighted by 1/EC50_i.
+  res <- mock_res(A1 = 0, A2 = 0, A3 = 0, ec50 = c(2, 5, 0.5), A4_ind = c(0, 0))
+  m <- ec50_markers(res, df = NULL)
+  ra <- m[m$ratio == "a", ]
+  ec <- c(2, 5, 0.5); z_expected <- (1 / ec) / sum(1 / ec)
+  expect_equal(c(ra$z1, ra$z2, ra$z3), z_expected, tolerance = 1e-12)
+  expect_equal(ra$sigma_tu, 1, tolerance = 1e-12)   # all A = 0 here
 })
