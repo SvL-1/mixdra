@@ -77,3 +77,11 @@ test_that("collect_bounds returns NULL bounds when nothing supplied", {
   expect_null(b$lower)
   expect_null(b$upper)
 })
+
+test_that("collect_bounds reads a custom parameter set (single tab)", {
+  vals <- list(lo_max = NA, hi_max = NA, lo_slope = NA, hi_slope = 1.5,
+               lo_ec50 = 0.01, hi_ec50 = NA)
+  b <- collect_bounds(vals, c("max", "slope", "ec50"))
+  expect_equal(b$upper, c(slope = 1.5))
+  expect_equal(b$lower, c(ec50 = 0.01))
+})

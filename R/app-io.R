@@ -112,14 +112,15 @@ to_engine_df <- function(df, stage) {
 
 #' Assemble lower/upper bound vectors from Advanced-panel inputs
 #'
-#' Reads `lo_<param>` / `hi_<param>` values for the five binary base parameters;
-#' blank/NA entries are dropped. To FIX a parameter, set its lower and upper to
-#' the same value (the engine has no `fixed` argument via `analyse_mixture`).
+#' Reads `lo_<param>` / `hi_<param>` values for `params`; blank/NA entries are
+#' dropped. To FIX a parameter, set its lower and upper to the same value. The
+#' default `params` is the binary base set; the single tab passes its own.
 #' @param values Named list (e.g. a Shiny `input`) holding `lo_*`/`hi_*` numbers.
+#' @param params Character vector of parameter names to read.
 #' @return A list with `lower` and `upper` named numeric vectors (or NULL).
 #' @keywords internal
-collect_bounds <- function(values) {
-  params <- c("max", "slope1", "slope2", "ec501", "ec502")
+collect_bounds <- function(values,
+                           params = c("max", "slope1", "slope2", "ec501", "ec502")) {
   pick <- function(prefix) {
     v <- vapply(params, function(p) {
       x <- values[[paste0(prefix, p)]]
