@@ -24,3 +24,12 @@ test_that("plot_sigma_tu returns a plotly object with the reference line", {
   # 3 chems x 2 models = 6 line traces + 1 reference line = 7
   expect_equal(length(plotly::plotly_build(p)$x$data), 7)
 })
+
+test_that("plot_isoplane works with empty individual (skips the EC50 trace)", {
+  skip_if_not_installed("plotly")
+  res <- mock_res()
+  res$individual <- res$individual[0, ]
+  p <- plot_isoplane(res, df = NULL, n = 8)
+  expect_s3_class(p, "plotly")
+  expect_equal(length(plotly::plotly_build(p)$x$data), 2)  # SA + ASA, no markers
+})

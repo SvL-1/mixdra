@@ -19,13 +19,18 @@ isoplane_plot_data <- function(res, df = NULL, n = 30) {
   sa  <- ec50_isoplane(res, "SA", n)
   asa <- ec50_isoplane(res, "ASA", n)
   mk  <- ec50_markers(res, df)
+  ec50 <- if (nrow(mk) > 0)
+    data.frame(C1 = mk$C1, C2 = mk$C2, C3 = mk$C3, series = "EC50",
+               stringsAsFactors = FALSE)
+  else
+    data.frame(C1 = numeric(0), C2 = numeric(0), C3 = numeric(0),
+               series = character(0), stringsAsFactors = FALSE)
   out <- rbind(
     data.frame(C1 = sa$C1,  C2 = sa$C2,  C3 = sa$C3,  series = "CA+S/A",
                stringsAsFactors = FALSE),
     data.frame(C1 = asa$C1, C2 = asa$C2, C3 = asa$C3, series = "CA+S/A+S/A",
                stringsAsFactors = FALSE),
-    data.frame(C1 = mk$C1,  C2 = mk$C2,  C3 = mk$C3,  series = "EC50",
-               stringsAsFactors = FALSE))
+    ec50)
   rownames(out) <- NULL
   out
 }

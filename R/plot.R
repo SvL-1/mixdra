@@ -128,6 +128,7 @@ plot_isoplane <- function(res, df = NULL, n = 30) {
   p <- plotly::plot_ly()
   for (s in c("CA+S/A", "CA+S/A+S/A", "EC50")) {
     seg <- d[d$series == s, ]
+    if (nrow(seg) == 0) next
     p <- plotly::add_trace(p, x = seg$C1, y = seg$C2, z = seg$C3,
                            type = "scatter3d", mode = "markers", name = s,
                            marker = list(size = sizes[[s]], color = cols[[s]]))

@@ -29,3 +29,12 @@ test_that("sigma_tu_plot_data stacks SA and ASA per-chemical curves", {
   expect_equal(sum(d$series == "CA+S/A"),     3 * 11)
   expect_equal(sum(d$series == "CA+S/A+S/A"), 3 * 11)
 })
+
+test_that("isoplane_plot_data handles empty individual (no ternary ratios)", {
+  res <- mock_res()
+  res$individual <- res$individual[0, ]   # 0-row, same columns
+  d <- isoplane_plot_data(res, df = NULL, n = 6)
+  # no EC50 rows, but both isoplane series present and no error
+  expect_setequal(unique(d$series), c("CA+S/A", "CA+S/A+S/A"))
+  expect_equal(sum(d$series == "EC50"), 0)
+})
