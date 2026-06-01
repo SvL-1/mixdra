@@ -59,6 +59,8 @@ curve_fit_ui <- function(id) {
       param_row(ns, "slope", "slope", "Steepness of the decline (> 0 = decreasing).",
                 hi_default = 50),
       param_row(ns, "ec50", "EC50", "Concentration that halves the response."),
+      shiny::tags$small(shiny::HTML(
+        "SSR = &Sigma; (y &minus; &#375;)&sup2; &nbsp;&nbsp;(&#375; = model prediction)")),
       shiny::uiOutput(ns("diagnostics")),
       shiny::div(
         shiny::actionButton(ns("autofit"), "Autofit parameters", class = "btn-primary"),

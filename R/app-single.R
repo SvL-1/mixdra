@@ -27,6 +27,10 @@ single_ui <- function(id) {
       width = 360,
       shiny::radioButtons(ns("response"), "Response type",
                           c("Continuous" = "continuous", "Quantal" = "quantal")),
+      shiny::helpText(
+        "Continuous = a measured amount (column ", shiny::tags$code("Res"),
+        "). Quantal = counts (", shiny::tags$code("Affected"), " out of ",
+        shiny::tags$code("Exposed"), "); the curve is fit to the proportion."),
       shiny::downloadButton(ns("template"), "Download template"),
       shiny::fileInput(ns("file"), "Upload CSV", accept = ".csv"),
       shiny::uiOutput(ns("errors"))

@@ -48,4 +48,5 @@ test_that("curve_fit_ui shows the model equation and Autofit/Simulate buttons", 
   expect_match(html, "Y = max / (1 + (C / EC50)", fixed = TRUE)
   expect_match(html, "Autofit parameters", fixed = TRUE)
   expect_match(html, "Simulate", fixed = TRUE)
+  expect_match(html, "model prediction", fixed = TRUE)
 })
