@@ -1,5 +1,15 @@
 # Ternary Advanced S/A (staged A4 fitting) Implementation Plan
 
+> **✅ STATUS: COMPLETED 2026-06-01** on branch `mixdra-engine`. All 8 tasks
+> implemented via subagent-driven development, each spec- and quality-reviewed;
+> final holistic review = ready to merge. The candidate deviation formula is
+> **verified against the workbook** (8 base+pairwise quantities match to 4–5 sig
+> figs). Feature tests green: 42 fast + 23 validation. Full outcome (delivered
+> files/API, validation table, A4 nuance, the unrelated 8 stale engine-test
+> failures from Sam's concurrent seeding refactor) is in the spec:
+> `docs/superpowers/specs/2026-05-30-ternary-subproject-design.md` §5.
+> The `- [ ]` checkboxes below are left unflipped as the original task script.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a ternary "Advanced S/A" deviation model (per-term `A1/A2/A3/A4`) and a staged fitting workflow that produces an overall A4 fit plus per-mixture-ratio individual A4 fits, validated against the FBSA·CPF·IMI workbook.

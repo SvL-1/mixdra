@@ -217,3 +217,75 @@ fixed-ratio dose series → A4 is one identifiable number per ratio).
 2. How Advanced S/A coexists with the existing registry / SA·DR·DL model
    selection — new model + staged path, or a separate analysis entry point?
 3. IA variant of the staged workflow + result-object shape.
+
+---
+
+## 5. Outcome — IMPLEMENTED & VERIFIED (2026-06-01)
+
+Plan T1 was implemented on branch `mixdra-engine` per
+`docs/superpowers/plans/2026-05-30-ternary-advanced-sa.md` (8 tasks, each
+spec- and quality-reviewed; final holistic review = ready to merge).
+
+**Delivered:**
+- `R/models-ternary-asa.R` — `ca_asa_tri` predictor (per-term A1-A4) +
+  `ca_asa_tri_vec`. (New hand-written file, NOT the verbatim-port
+  `R/models-ternary.R`.)
+- `R/registry.R` — `model_spec` "ASA" deviation (ternary-only; extra A1-A4).
+- `R/fit.R` — fix so `fit_model` handles FIXED deviation params
+  (`intersect(spec$extra, free)` in parscale + multi-start perturbation).
+- `R/fit-ternary-asa.R` — `classify_rows`, `ternary_ratio_key` (exact-nominal,
+  6 sig-fig), `fit_ternary_asa` (the staged fitter), and the **exported API**
+  `analyse_ternary()` + `ternary_effect_table()`.
+- Fixture `tests/testthat/fixtures/ternary_fbsa_cpf_imi_continuous.csv` (419
+  rows: 19 control / 75 single / 225 binary / 100 ternary across 4 ratios) +
+  `extract_ternary_fixture.R`; tests `test-models-ternary-asa.R`,
+  `test-fit-ternary-asa.R`, `test-validation-ternary.R`.
+
+**Deviation formula CONFIRMED** (resolves §4 open question 1). Candidate
+`F = exp(A1·z1·z2 + A2·z1·z3 + A3·z2·z3 + A4·z1·z2·z3)` reproduces the workbook:
+8 independent base + pairwise quantities match to 4–5 significant figures.
+
+- **Validation source:** `FBSA CPF IMI ternary -simplified_correct.xls` (Sam's
+  corrected file; raw data identical to the original `-simplified.xls`).
+- **Anchored to sheet `CA CPF FBSA IMI Overall`** — the base-fixed, binaries-only
+  column, which is exactly what our staged engine computes (Stage-1 base from
+  singles → workbook base; Stage-2 A1/A2/A3 from binaries). The main sheet's
+  all-data CA column is a *different* (jointly-refit) fit and was correctly NOT
+  used.
+
+| quantity | workbook | engine |
+|---|---|---|
+| max | 872.198 | 872.21 |
+| ec50_1 | 0.12747 | 0.12747 |
+| ec50_3 | 0.57507 | 0.57505 |
+| slope1 | 4.6721 | 4.674 |
+| slope3 | 3.6274 | 3.629 |
+| A1 | 0.7295 | 0.751 |
+| A2 | -0.2890 | -0.289 |
+| A3 | -1.8424 | -1.872 |
+
+- **EC50_2 (FBSA) is weakly identified** (workbook pins it at 5.58; the validation
+  pins it via a tight bound). Its slope is unconstrained — not a fit error.
+- **A4 (three-way)** is NOT independently checkable against this "simplified"
+  workbook (its per-ratio A4 sheets use exploratory ratios that don't match the
+  fixture's 4 ratios, fitted with a refit base). A4 structure is therefore
+  verified by the **synthetic recovery test** in `test-fit-ternary-asa.R`
+  (simulate from the formula with known per-ratio A4, recover them). Per-ratio A4
+  on the real data genuinely vary (the "averaging-out" signal).
+
+**Tests:** ternary feature green — 42 fast + 23 validation, 0 failures.
+
+**Scope delivered:** CA + continuous only (as planned). IA Advanced S/A and
+quantal ternary remain deferred (§4 open questions 2–3 likewise deferred: ASA is
+a separate staged entry point, not wired into SA·DR·DL model selection).
+
+### Not part of T1 (separate, Sam's concurrent work)
+A broader refactor of the *general* engine's seeding (`analyse_mixture` now fits
+curves from singles then a/b; interaction solve starts a=0, b=1 — see
+`[[mixdra-staged-fitting]]`) landed on the same branch. It deliberately changes
+model selection (e.g. quantal binary now chooses DR), which left **8 pre-existing
+engine tests with stale expectations** (`test-validation-binary`, `test-analyse`,
+`test-nchem`). These are NOT caused by the ternary feature and need re-baselining
+to the new intended outcomes before the branch is fully green. Sam also noted the
+ternary workbook still has DR/DL columns in some (non-`Overall`) tabs to clean up
+— this does not affect the validation, which reads only the `Overall` sheet.
