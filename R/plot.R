@@ -148,6 +148,7 @@ plot_isoplane <- function(res, df = NULL, n = 30) {
 #' @export
 plot_sigma_tu <- function(res, n = 21) {
   require_plotly()
+  chem_cols <- c(C1 = "#E66100", C2 = "#FFC20A", C3 = "#5D3A9B")
   d <- sigma_tu_plot_data(res, n = n)
   p <- plotly::plot_ly()
   for (ch in c("C1", "C2", "C3")) {
@@ -155,7 +156,8 @@ plot_sigma_tu <- function(res, n = 21) {
       seg <- d[d$chem == ch & d$series == s, ]
       p <- plotly::add_lines(p, x = seg$z, y = seg$sigma_tu,
                              name = paste(ch, s),
-                             line = list(dash = if (s == "CA+S/A") "solid" else "dash"))
+                             line = list(color = chem_cols[[ch]],
+                                         dash = if (s == "CA+S/A") "solid" else "dash"))
     }
   }
   p <- plotly::add_lines(p, x = c(0, 1), y = c(1, 1), name = "ΣTU = 1",
