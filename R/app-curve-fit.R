@@ -1,36 +1,44 @@
-# Single Chemical stage: upload one chemical's dose-response data, then either
-# Autofit a three-parameter log-logistic curve via analyse_single() or Simulate
-# the curve for caller-entered parameter values via eval_single(). Shows the
-# curve, observed-vs-predicted, an editable parameter grid with bounds, and a
-# live SSR readout.
+# Reusable interactive curve-fit panel. Given an injected reactive `fit_df`
+# (a single chemical's `C1` + response columns), it fits a 3-parameter
+# log-logistic curve via analyse_single() (Autofit) or evaluates caller-entered
+# values via eval_single() (Simulate), and shows the curve, observed-vs-predicted,
+# an editable parameter grid with bounds, and a live SSR/n readout. It returns a
+# reactive of the current fit so a parent (Single or Binary tab) can read it.
+# The panel owns no data source and knows nothing about upload validation.
 
-#' Concentration-axis label from the shared meta store
-#'
-#' With `chem_field` (e.g. "chem1") uses that chemical's name; without it uses a
-#' generic "Concentration". Appends the unit when present. Used by the single
-#' stage (generic) and the binary stage (per chemical).
+#' Visible model-equation header for the curve-fit panel
+#' @return A `shiny` tag.
 #' @keywords internal
-axis_label <- function(meta, chem_field = NULL) {
-  nm <- if (!is.null(chem_field)) meta[[chem_field]] else NULL
-  unit <- meta$unit
-  base <- if (!is.null(nm) && nzchar(nm)) nm else "Concentration"
-  if (!is.null(unit) && nzchar(unit)) paste0(base, " (", unit, ")") else base
+single_model_equation <- function() {
+  shiny::tags$p(
+    shiny::tags$b("Model: "),
+    shiny::tags$code("Y = max / (1 + (C / EC50)", shiny::tags$sup("slope"), ")")
+  )
 }
 
-#' Single Chemical stage UI
+#' One parameter row: label, plain-English meaning, and lower/upper/value inputs
+#' @param ns Module namespace function.
+#' @param param Parameter key (`max`/`slope`/`ec50`); drives input ids.
+#' @param label Display label.
+#' @param meaning One-line explanation.
+#' @param hi_default Default for the upper-bound input (NA = blank).
+#' @keywords internal
+param_row <- function(ns, param, label, meaning, hi_default = NA) {
+  shiny::fluidRow(
+    shiny::column(2, shiny::tags$b(label)),
+    shiny::column(4, shiny::tags$small(meaning)),
+    shiny::column(2, shiny::numericInput(ns(paste0("lo_", param)), NULL, value = NA)),
+    shiny::column(2, shiny::numericInput(ns(paste0("hi_", param)), NULL, value = hi_default)),
+    shiny::column(2, shiny::numericInput(ns(paste0("val_", param)), NULL, value = NA))
+  )
+}
+
+#' Curve-fit panel UI (plots + parameter grid + Autofit/Simulate)
 #' @param id Module id.
 #' @keywords internal
-single_ui <- function(id) {
+curve_fit_ui <- function(id) {
   ns <- shiny::NS(id)
-  bslib::layout_sidebar(
-    sidebar = bslib::sidebar(
-      width = 360,
-      shiny::radioButtons(ns("response"), "Response type",
-                          c("Continuous" = "continuous", "Quantal" = "quantal")),
-      shiny::downloadButton(ns("template"), "Download template"),
-      shiny::fileInput(ns("file"), "Upload CSV", accept = ".csv"),
-      shiny::uiOutput(ns("errors"))
-    ),
+  shiny::tagList(
     bslib::layout_columns(
       bslib::card(bslib::card_header("Dose-response curve"),
                   plotly::plotlyOutput(ns("dr"))),
@@ -60,40 +68,17 @@ single_ui <- function(id) {
   )
 }
 
-#' Single Chemical stage server
+#' Curve-fit panel server
 #' @param id Module id.
-#' @param meta Shared reactiveValues for experiment metadata.
+#' @param fit_df A reactive returning the fit data frame (`C1` + response columns).
+#' @param meta Shared reactiveValues for experiment metadata (axis labels).
+#' @param chem_field Optional meta field for the x-axis label (e.g. "chem1"); NULL
+#'   uses a generic "Concentration" label.
+#' @return A reactive returning the current fit (a [fit_single()]/[eval_single()]
+#'   result), or NULL before any fit.
 #' @keywords internal
-single_server <- function(id, meta) {
+curve_fit_server <- function(id, fit_df, meta, chem_field = NULL) {
   shiny::moduleServer(id, function(input, output, session) {
-
-    output$template <- shiny::downloadHandler(
-      filename = function() paste0("single_", input$response, "_template.csv"),
-      content  = function(file)
-        utils::write.csv(template_df("single", input$response), file, row.names = FALSE)
-    )
-
-    parsed <- shiny::reactive({
-      shiny::req(input$file)
-      read_upload(input$file$datapath)
-    })
-
-    errs <- shiny::reactive({
-      shiny::req(input$file)
-      validate_upload(parsed(), "single", input$response)
-    })
-
-    output$errors <- shiny::renderUI({
-      e <- errs()
-      if (length(e)) shiny::div(class = "text-danger",
-                                lapply(e, function(x) shiny::tags$p(x)))
-    })
-
-    fit_df <- shiny::reactive({
-      shiny::req(input$file, length(errs()) == 0)
-      to_engine_df(parsed(), "single")
-    })
-
     current_fit <- shiny::reactiveVal(NULL)
 
     # The Value column read as a named numeric (blank -> NA).
@@ -104,7 +89,8 @@ single_server <- function(id, meta) {
     }
 
     shiny::observeEvent(input$autofit, {
-      shiny::req(length(errs()) == 0)
+      df <- fit_df()
+      shiny::req(df)
       b <- collect_bounds(shiny::reactiveValuesToList(input), c("max", "slope", "ec50"))
       if (!is.null(b$lower) && !is.null(b$upper)) {
         common <- intersect(names(b$lower), names(b$upper))
@@ -117,7 +103,7 @@ single_server <- function(id, meta) {
       start <- vals[!is.na(vals)]
       if (!length(start)) start <- NULL
       fit <- tryCatch(
-        analyse_single(fit_df(), lower = b$lower, upper = b$upper, start = start),
+        analyse_single(df, lower = b$lower, upper = b$upper, start = start),
         error = function(e) {
           shiny::showNotification(paste("Fit failed:", conditionMessage(e)), type = "error")
           NULL
@@ -130,21 +116,22 @@ single_server <- function(id, meta) {
     })
 
     shiny::observeEvent(input$simulate, {
-      shiny::req(input$file, length(errs()) == 0)
+      df <- fit_df()
+      shiny::req(df)
       vals <- current_values()
       if (any(is.na(vals))) {
         shiny::showNotification("Enter max, slope and EC50 to simulate.", type = "warning")
         return()
       }
-      resp <- obs_response(fit_df())
-      current_fit(eval_single(fit_df()$C1, resp,
+      resp <- obs_response(df)
+      current_fit(eval_single(df$C1, resp,
                               vals[["max"]], vals[["slope"]], vals[["ec50"]]))
     })
 
     output$dr <- plotly::renderPlotly({
       shiny::req(current_fit())
       p <- plot_dose_response(current_fit(), fit_df())
-      plotly::layout(p, xaxis = list(title = axis_label(meta)),
+      plotly::layout(p, xaxis = list(title = axis_label(meta, chem_field)),
                      yaxis = list(title = if (!is.null(meta$endpoint) && nzchar(meta$endpoint))
                                             meta$endpoint else "Response"))
     })
@@ -159,5 +146,7 @@ single_server <- function(id, meta) {
         "   |   ", shiny::tags$b("n: "), nrow(fit_df())
       )
     })
+
+    current_fit
   })
 }
