@@ -58,3 +58,66 @@ mixture_design <- function(par, reference = "CA", deviation = "reference",
   rownames(out) <- NULL
   out
 }
+
+#' Apply the response-appropriate noise layer to expected responses
+#'
+#' Continuous: additive Gaussian with SD = `cv * |mu|` (relative CV; `cv = 0`
+#' returns `mu` exactly). Binary: when `group_size` is infinite, returns exact
+#' (fractional) counts `Affected = 100 * mu` with `Exposed = 100`; otherwise
+#' draws `Affected ~ Binomial(group_size, mu)`.
+#' @param mu Numeric vector of expected responses (probabilities for binary).
+#' @param response "continuous" or "binary".
+#' @param cv Relative noise (continuous only).
+#' @param group_size Binomial group size (binary only); `Inf` = exact.
+#' @return A named list of response columns to bind onto the design frame.
+#' @keywords internal
+.apply_noise <- function(mu, response, cv, group_size) {
+  if (response == "continuous") {
+    res <- if (cv > 0) mu + stats::rnorm(length(mu), 0, cv * abs(mu)) else mu
+    list(Res = res)
+  } else if (is.infinite(group_size)) {
+    list(Exposed = rep(100, length(mu)), Affected = 100 * mu)
+  } else {
+    list(Exposed = rep(group_size, length(mu)),
+         Affected = stats::rbinom(length(mu), group_size, mu))
+  }
+}
+
+#' Simulate a mixture dose-response dataset from known parameters
+#'
+#' Forward generator for verification by parameter recovery: builds (or accepts)
+#' a design grid, predicts the noise-free expected response through the same
+#' model the fitter uses ([mixture_predict()]), then applies an optional noise
+#' layer. At `cv = 0` (continuous) or `group_size = Inf` (binary) the output is
+#' deterministic and exact, so a downstream [analyse_mixture()] should recover
+#' `par`.
+#' @param par Named full parameter vector matching
+#'   `model_spec(reference, deviation, n_chem)$params`.
+#' @param reference "CA" or "IA".
+#' @param deviation "reference", "SA", "DR", or "DL".
+#' @param response "continuous" or "binary".
+#' @param design Optional concentration design (`C1`..`Cn`); defaults to
+#'   [mixture_design()].
+#' @param cv Relative Gaussian noise for continuous responses (0 = none).
+#' @param group_size Binomial group size for binary responses; `Inf` (default)
+#'   yields exact proportions.
+#' @param reps Replicate each design row this many times before adding noise.
+#' @param seed Optional RNG seed for reproducible noisy draws.
+#' @return A data frame the engine consumes unchanged: `C1`..`Cn` plus `Res`
+#'   (continuous) or `Exposed`/`Affected` (binary).
+#' @export
+simulate_mixture <- function(par, reference = "CA", deviation = "reference",
+                             response = c("continuous", "binary"),
+                             design = NULL, cv = 0, group_size = Inf,
+                             reps = 1, seed = NULL) {
+  response <- match.arg(response)
+  if (response == "binary" && "max" %in% names(par) && par[["max"]] > 1)
+    stop("simulate_mixture: binary `max` is a probability and must be <= 1")
+  if (!is.null(seed)) set.seed(seed)
+  if (is.null(design)) design <- mixture_design(par, reference, deviation)
+  if (reps > 1) design <- design[rep(seq_len(nrow(design)), reps), , drop = FALSE]
+  rownames(design) <- NULL
+
+  mu <- mixture_predict(design, par, reference, deviation)
+  cbind(design, as.data.frame(.apply_noise(unname(mu), response, cv, group_size)))
+}

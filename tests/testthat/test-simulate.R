@@ -53,3 +53,44 @@ test_that("mixture_design errors when an EC50 is missing from par", {
     "must supply every EC50"
   )
 })
+
+test_that("simulate_mixture continuous at cv=0 returns exact predictions", {
+  par <- c(max = 800, slope1 = 4, slope2 = 1.5, ec501 = 0.08, ec502 = 1)
+  d <- simulate_mixture(par, "CA", "reference", "continuous")  # cv = 0 default
+  mu <- mixture_predict(d[c("C1", "C2")], par, "CA", "reference")
+  expect_equal(d$Res, unname(mu))
+})
+
+test_that("simulate_mixture binary at group_size=Inf gives exact proportions", {
+  par <- c(max = 0.95, slope1 = 4, slope2 = 1.5, ec501 = 0.08, ec502 = 1)
+  d <- simulate_mixture(par, "CA", "reference", "binary")  # group_size = Inf
+  mu <- mixture_predict(d[c("C1", "C2")], par, "CA", "reference")
+  expect_true(all(d$Exposed == 100))
+  expect_equal(d$Affected / d$Exposed, unname(mu))   # exact, fractional Affected
+})
+
+test_that("simulate_mixture continuous noise scales with cv", {
+  par <- c(max = 800, slope1 = 4, slope2 = 1.5, ec501 = 0.08, ec502 = 1)
+  d0 <- simulate_mixture(par, "CA", "reference", "continuous", cv = 0)
+  d1 <- simulate_mixture(par, "CA", "reference", "continuous",
+                         cv = 0.1, reps = 200, seed = 1)
+  mu1 <- mixture_predict(d1[c("C1", "C2")], par, "CA", "reference")
+  rel <- (d1$Res - mu1) / abs(mu1)
+  rel <- rel[is.finite(rel) & abs(mu1) > 1]   # ignore rows where mu ~ 0
+  expect_equal(sd(rel), 0.1, tolerance = 0.03) # empirical CV near 0.1
+})
+
+test_that("simulate_mixture rejects binary max > 1", {
+  par <- c(max = 5, slope1 = 4, slope2 = 1.5, ec501 = 0.08, ec502 = 1)
+  expect_error(simulate_mixture(par, "CA", "reference", "binary"),
+               "must be <= 1")
+})
+
+test_that("simulate_mixture binary binomial sampling honours group_size", {
+  par <- c(max = 0.9, slope1 = 4, slope2 = 1.5, ec501 = 0.08, ec502 = 1)
+  d <- simulate_mixture(par, "CA", "reference", "binary",
+                        group_size = 50, seed = 7)
+  expect_true(all(d$Exposed == 50))
+  expect_true(all(d$Affected == round(d$Affected)))      # integer counts
+  expect_true(all(d$Affected >= 0 & d$Affected <= 50))
+})
