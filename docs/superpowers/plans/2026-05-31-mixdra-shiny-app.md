@@ -54,7 +54,7 @@
 - Create: `R/app-io.R`
 - Test: `tests/testthat/test-app-io.R`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/testthat/test-app-io.R`:
 
@@ -140,12 +140,12 @@ test_that("collect_bounds returns NULL bounds when nothing supplied", {
 })
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `devtools::test(filter = "app-io")`
 Expected: FAIL — `could not find function "upload_schema"`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `R/app-io.R`:
 
@@ -284,12 +284,12 @@ collect_bounds <- function(values) {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `devtools::test(filter = "app-io")`
 Expected: PASS (10 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add R/app-io.R tests/testthat/test-app-io.R
@@ -304,7 +304,7 @@ git commit -m "feat: pure I/O helpers for the Shiny app (schema, template, valid
 - Create: `R/app-intro.R`
 - Test: `tests/testthat/test-app-modules.R`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/testthat/test-app-modules.R`:
 
@@ -332,12 +332,12 @@ test_that("intro_ui builds a Shiny UI fragment", {
 })
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `devtools::test(filter = "app-modules")`
 Expected: FAIL — `could not find function "intro_server"`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `R/app-intro.R`:
 
@@ -389,12 +389,12 @@ intro_server <- function(id, meta) {
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `devtools::test(filter = "app-modules")`
 Expected: PASS (2 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add R/app-intro.R tests/testthat/test-app-modules.R
@@ -409,7 +409,7 @@ git commit -m "feat: Introduction stage module (experiment metadata)"
 - Create: `R/app-single.R`
 - Test: `tests/testthat/test-app-modules.R` (append)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/testthat/test-app-modules.R`:
 
@@ -450,12 +450,12 @@ test_that("single_ui builds a Shiny UI fragment", {
 })
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `devtools::test(filter = "app-modules")`
 Expected: FAIL — `could not find function "single_server"`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `R/app-single.R`:
 
@@ -568,12 +568,12 @@ single_server <- function(id, meta) {
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `devtools::test(filter = "app-modules")`
 Expected: PASS (5 tests so far in this file).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add R/app-single.R tests/testthat/test-app-modules.R
@@ -588,7 +588,7 @@ git commit -m "feat: Single Chemical stage module (upload, fit, plots)"
 - Create: `R/app-binary.R`
 - Test: `tests/testthat/test-app-modules.R` (append)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/testthat/test-app-modules.R`:
 
@@ -622,12 +622,12 @@ test_that("binary_ui builds a Shiny UI fragment", {
 })
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `devtools::test(filter = "app-modules")`
 Expected: FAIL — `could not find function "binary_server"`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `R/app-binary.R`:
 
@@ -816,12 +816,12 @@ binary_server <- function(id, meta) {
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `devtools::test(filter = "app-modules")`
 Expected: PASS (7 tests in this file). The binary fit runs at `n_starts = 1` so it is fast.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add R/app-binary.R tests/testthat/test-app-modules.R
@@ -839,7 +839,7 @@ git commit -m "feat: Binary Mixture stage module (fit, compare, plots, advanced 
 - Test: `tests/testthat/test-app-run.R`
 - Generated: `NAMESPACE`, `man/*.Rd`
 
-- [ ] **Step 1: Add UI dependencies to DESCRIPTION**
+- [x] **Step 1: Add UI dependencies to DESCRIPTION**
 
 In `DESCRIPTION`, change the `Suggests:` block from:
 
@@ -863,7 +863,7 @@ Suggests:
     testthat (>= 3.0.0)
 ```
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 Create `tests/testthat/test-app-run.R`:
 
@@ -891,12 +891,12 @@ test_that("run_app is exported and errors clearly when a dependency is missing",
 })
 ```
 
-- [ ] **Step 3: Run the test to verify it fails**
+- [x] **Step 3: Run the test to verify it fails**
 
 Run: `devtools::test(filter = "app-run")`
 Expected: FAIL — `could not find function "app_ui"`.
 
-- [ ] **Step 4: Write the implementation**
+- [x] **Step 4: Write the implementation**
 
 Create `R/app-run.R`:
 
@@ -951,18 +951,18 @@ library(mixdra)
 shiny::shinyApp(ui = mixdra:::app_ui(), server = mixdra:::app_server)
 ```
 
-- [ ] **Step 5: Run the test to verify it passes**
+- [x] **Step 5: Run the test to verify it passes**
 
 Run: `devtools::test(filter = "app-run")`
 Expected: PASS (3 tests).
 
-- [ ] **Step 6: Document and run the full fast suite**
+- [x] **Step 6: Document and run the full fast suite**
 
 Run: `devtools::document()` (regenerates `NAMESPACE` with `export(run_app)` and `man/run_app.Rd`)
 Run: `devtools::test()`
 Expected: the existing 54 fast tests plus the new app-io (10), app-modules (7), and app-run (3) tests pass, 0 failures. (The slow `validation-binary` file is unaffected.)
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add R/app-run.R inst/app/app.R DESCRIPTION NAMESPACE man/
