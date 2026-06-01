@@ -3,7 +3,10 @@
 # model-driven ec50_isoplane / sigma_tu_curve / ec50_markers functions.
 # Run from the repo root:
 #   R -q -e 'source("tests/testthat/fixtures/extract_isoplane_fixture.R")'
-# Sheet layouts verified 2026-06-01 (see plan Task 1).
+# Sheet layouts verified 2026-06-01 (see plan Task 1). Source sheets used:
+#   FBSA_CPF_IMI  — isoplane point cloud
+#   TU-zValues    — z-value curves (all experiments)
+#   TER_EC50      — EC50 marker points (all experiments)
 if (!requireNamespace("readxl", quietly = TRUE))
   stop("Package 'readxl' is required to regenerate this fixture.")
 .libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths()))
@@ -22,14 +25,14 @@ cat("wrote", nrow(pts), "isoplane points (",
 
 # z-value curves for this mixture.
 zv <- as.data.frame(readxl::read_excel(wb, sheet = "TU-zValues"))
-zv <- zv[zv$Exp == "Mixtox1", c("z", "TU", "Chem", "Mod"), drop = FALSE]
+zv <- zv[zv$Exp == "Mixtox1", c("z", "TU", "Chem", "Mod"), drop = FALSE]  # Mixtox1 = FBSA/CPF/IMI; workbook also has Mixtox2/Mixtox3_IMI/Mixtox3_CPF
 zv <- zv[stats::complete.cases(zv), , drop = FALSE]
 write.csv(zv, "tests/testthat/fixtures/isoplane_zvalues.csv", row.names = FALSE)
 cat("wrote", nrow(zv), "z-value rows\n")
 
 # EC50 marker points for this mixture.
 ec <- as.data.frame(readxl::read_excel(wb, sheet = "TER_EC50"))
-ec <- ec[ec$Exp == "Mixtox1", c("z", "TU", "Chem", "Ratio"), drop = FALSE]
+ec <- ec[ec$Exp == "Mixtox1", c("z", "TU", "Chem", "Ratio"), drop = FALSE]  # Mixtox1 = FBSA/CPF/IMI; workbook also has Mixtox2/Mixtox3_IMI/Mixtox3_CPF
 ec <- ec[stats::complete.cases(ec), , drop = FALSE]
 write.csv(ec, "tests/testthat/fixtures/isoplane_ec50.csv", row.names = FALSE)
 cat("wrote", nrow(ec), "EC50 marker rows\n")
