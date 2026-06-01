@@ -1,7 +1,8 @@
 # mixdra plotting layer (single + binary) — design
 
 **Date:** 2026-05-30
-**Status:** approved (design); pending implementation plan
+**Status:** implemented and merged to `main` (2026-06-01); this document has been
+reconciled to the as-built code (see "As-built deviations" at the end).
 **Depends on:** the completed engine (`docs/superpowers/specs/2026-05-30-mixdra-design.md`,
 plan `docs/superpowers/plans/2026-05-30-mixdra-engine.md`)
 
@@ -75,31 +76,43 @@ engine dependency-light.
 |---|---|---|
 | `plot_dose_response(fit, df, chem = 1)` | which chemical's marginal curve | single & each binary margin |
 | `plot_obs_pred(fit, df)` | — | any fit |
-| `plot_surface(fit, df, axes = c(1, 2), n = 100)` | grid resolution | binary only |
+| `plot_surface(fit, df, n = 100)` | grid resolution | binary only |
 | `plot_isobole(fit, df, levels = c(0.1, 0.25, 0.5, 0.75, 0.9), reference_fit = NULL, n = 100)` | effect levels (fractions of max), optional reference overlay | binary only |
+
+(`plot_surface` has no `axes` argument: a binary fit has only one axis pairing
+— C1↔`slope1`/`ec501`, C2↔`slope2`/`ec502` — so an axis swap would mislabel
+parameters. Axis selection returns with ternary plotting, its own plan.
+`plot_dose_response` also takes `log_x = TRUE` to toggle the log10 axis.)
 
 Each renderer calls its data builder, then assembles the plotly object:
 - `plot_dose_response`: line (fitted curve) + markers (observed). x = concentration
   (log10 axis), y = response (continuous) or proportion `Affected/Exposed` (binary).
 - `plot_obs_pred`: scatter of observed vs predicted + a 1:1 reference line.
 - `plot_surface`: `plot_ly(...) %>% add_trace(scatter3d observed) %>% add_surface(z)`.
-- `plot_isobole`: `add_contour` of the fitted model's response at `levels * max`
-  (solid). If `reference_fit` is supplied, overlay its contours dashed — Skylar's
-  deviation-vs-additivity comparison.
+- `plot_isobole`: equal-response contour paths extracted with
+  `grDevices::contourLines` at `levels * max` and drawn with `add_lines` (solid
+  black). If `reference_fit` is supplied, overlay its contours dashed red —
+  Skylar's deviation-vs-additivity comparison. (Plotly's `add_contour` can't
+  render arbitrary, non-evenly-spaced levels or a separate dashed overlay, so
+  contour *paths* are used instead — same result, all still plotly.)
 
 ### Data builders (internal, in R/plot-data.R) — numeric output only
 
 - `dr_curve_data(fit, df, chem)` → data frame: concentration grid + fitted
   response (via the single-curve log-logistic), plus the observed points for that
   chemical's marginal (rows where the other chemical is 0).
-- `obs_pred_data(fit, df)` → data frame: observed, predicted (`fit$pred`).
-- `surface_grid_data(fit, df, axes, n)` → list: `x_vals`, `y_vals`, and the `z`
+- `obs_pred_data(fit, df)` → data frame: observed, predicted. Mixture fits carry
+  `fit$pred`; single-chemical fits do not, so predictions are recomputed via
+  `ll3_predict()`.
+- `surface_grid_data(fit, df, n)` → list: `x_vals`, `y_vals`, and the `z`
   response **matrix**, built to Skylar's orientation (see Data flow). Evaluates
   `model_spec(fit$reference, fit$deviation, 2)$fn` over the grid, so it reflects
   the fitted model including deviation parameters. Also returns the observed
   points for the 3-D scatter overlay.
-- `isobole_data(fit, df, levels, n)` → reuses `surface_grid_data`; returns the
-  grid plus the absolute contour values (`levels * fit$par["max"]`).
+- `isobole_data(fit, df, levels, reference_fit, n)` → reuses `surface_grid_data`;
+  returns a data frame of contour paths (`source`, `level`, `group`, `x`, `y`) at
+  the absolute contour values (`levels * fit$par["max"]`), optionally including a
+  `reference_fit`'s contours (using that fit's own `max`).
 
 `plot_surface` and `plot_isobole` share `surface_grid_data` — an isobole is a
 contour view of the same predicted grid.
@@ -145,8 +158,7 @@ indices, and checks the control corner (`c1 = c2 = 0`) equals `max`.
 - **NaN responses** — the CA bisection predictor returns `NaN` at the response
   bounds; builders pass `NaN` through (plotly renders gaps) rather than erroring.
   A test covers a grid that hits this.
-- **Argument validation** — `chem` within range; `axes` a length-2 subset of the
-  fitted chemicals; `levels` in (0, 1).
+- **Argument validation** — `chem` within range; `levels` strictly in (0, 1).
 
 ## Testing
 
@@ -177,3 +189,31 @@ grid points using her published parameters, as a fixture test.
 - README and methodology vignette.
 - Static image export (kaleido / Cairo) — the renderers return interactive
   objects; callers can `htmlwidgets::saveWidget()` themselves if needed.
+
+## As-built deviations (reconciliation, 2026-06-01)
+
+The implementation (plan `docs/superpowers/plans/2026-05-30-mixdra-binary-plots.md`)
+matches every functional requirement above. Deliberate deviations, recorded here so
+the design doc and code agree:
+
+1. **`plot_surface` / `surface_grid_data` have no `axes` argument** — binary fits
+   have a single fixed axis pairing; an axis swap would mislabel parameters. Axis
+   selection is deferred to the ternary plan.
+2. **Isobole uses `grDevices::contourLines` paths + `add_lines`, not plotly
+   `add_contour`** — needed for arbitrary effect levels and the dashed reference
+   overlay. Still all-plotly; same visual result.
+3. **`plot_dose_response` gained `log_x = TRUE`** — toggles the (default) log10
+   concentration axis.
+4. **`obs_pred_data` recomputes predictions for single-chemical fits** (which lack
+   `fit$pred`) via `ll3_predict()`.
+5. **Engine enrichment also adds a `kind` field** (`"mixture"` / `"single"`) — the
+   "light marker" the spec called for, used to distinguish fit shapes.
+
+Known minor test-quality gaps (non-blocking, behaviour verified correct):
+- The `surface_grid_data` "NaN passthrough" test's fixture produces an all-finite
+  grid, so it does not actually exercise the NaN path (the passthrough itself is
+  correct and was verified independently in review).
+- Renderer smoke tests assert `expect_s3_class(p, "plotly")` only; the isobole
+  two-set (fit + reference) property is checked at the data-builder layer, not by
+  counting plotly traces.
+- The optional Skylar CPF/IMI surface regression anchor was not implemented.
