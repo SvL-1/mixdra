@@ -37,27 +37,48 @@ test_that("single_ui builds a Shiny UI fragment", {
   expect_true(inherits(single_ui("single"), c("shiny.tag", "shiny.tag.list", "bslib_fragment")))
 })
 
-test_that("binary_server fits the four models and exposes the chosen model", {
+test_that("binary_server stages the fit: split, freeze gate, average max, override, invalidate", {
   skip_on_cran()
-  meta <- shiny::reactiveValues()
+  meta <- shiny::reactiveValues(chem1 = "A", chem2 = "B")
   shiny::testServer(binary_server, args = list(meta = meta), {
-    # Use the validated continuous binary fixture (C1, C2, Res).
     csv <- testthat::test_path("fixtures", "binary_mps_cpf_continuous.csv")
     skip_if_not(file.exists(csv), "binary fixture missing")
-    session$setInputs(response = "continuous", reference = "CA",
-                      thorough = FALSE,
+    session$setInputs(response = "continuous", reference = "CA", thorough = FALSE,
                       n_starts = 1, alpha = 0.05, time_limit = 30,
-                      lo_max = NA, hi_max = NA, lo_slope1 = NA, hi_slope1 = NA,
-                      lo_slope2 = NA, hi_slope2 = NA, lo_ec501 = NA, hi_ec501 = NA,
-                      lo_ec502 = NA, hi_ec502 = NA,
                       file = list(datapath = csv, name = "binary.csv"))
     expect_length(errs(), 0)
-    session$setInputs(fit = 1)
-    res <- res_r()
-    expect_setequal(names(res$fits), c("reference", "SA", "DR", "DL"))
-    expect_true(res$chosen %in% c("reference", "SA", "DR", "DL"))
-    # the displayed fit defaults to the chosen model (deviation tag matches)
-    expect_equal(shown_fit()$deviation, res$chosen)
+
+    # marginal split: each panel's series drops the other chemical's column
+    expect_false("C2" %in% names(m1()))
+    expect_false("C2" %in% names(m2()))
+
+    # nothing frozen yet
+    expect_false(isTRUE(frozen()))
+
+    # supply both single curves deterministically via Simulate, with distinct max
+    session$setInputs(`chem1-val_max` = 700, `chem1-val_slope` = 2,
+                      `chem1-val_ec50` = 1, `chem1-simulate` = 1)
+    session$setInputs(`chem2-val_max` = 600, `chem2-val_slope` = 1,
+                      `chem2-val_ec50` = 5, `chem2-simulate` = 1)
+
+    # frozen curve parameters: shared max is the average; per-chemical slope/ec50 kept
+    expect_equal(unname(curve_params()[["max"]]), 650)
+    expect_equal(unname(curve_params()[["slope1"]]), 2)
+    expect_equal(unname(curve_params()[["ec502"]]), 5)
+
+    # freeze -> fits the four models and reveals the result
+    session$setInputs(freeze = 1)
+    expect_true(isTRUE(frozen()))
+    expect_setequal(names(res_r()$fits), c("reference", "SA", "DR", "DL"))
+    expect_equal(shown_fit()$deviation, res_r()$chosen)
+
+    # picker overrides the displayed model
+    session$setInputs(model = "DR")
+    expect_equal(shown_fit()$deviation, "DR")
+
+    # editing a single curve after freezing invalidates the freeze
+    session$setInputs(`chem1-val_max` = 720, `chem1-simulate` = 2)
+    expect_false(isTRUE(frozen()))
   })
 })
 

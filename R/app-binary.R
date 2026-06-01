@@ -89,7 +89,6 @@ binary_ui <- function(id) {
 #' @keywords internal
 binary_server <- function(id, meta) {
   shiny::moduleServer(id, function(input, output, session) {
-    ns <- session$ns
 
     output$template <- shiny::downloadHandler(
       filename = function() paste0("binary_", input$response, "_template.csv"),
@@ -101,6 +100,13 @@ binary_server <- function(id, meta) {
       if (isTRUE(input$thorough))
         shiny::div(class = "text-warning",
                    shiny::tags$small("Multi-start fitting may take several minutes."))
+    })
+
+    output$chem1_title <- shiny::renderText({
+      nm <- meta$chem1; if (!is.null(nm) && nzchar(nm)) nm else "Chemical 1"
+    })
+    output$chem2_title <- shiny::renderText({
+      nm <- meta$chem2; if (!is.null(nm) && nzchar(nm)) nm else "Chemical 2"
     })
 
     parsed <- shiny::reactive({
@@ -115,21 +121,61 @@ binary_server <- function(id, meta) {
                                 lapply(e, function(x) shiny::tags$p(x)))
     })
 
-    fit_df <- shiny::eventReactive(input$fit, {
-      shiny::req(length(errs()) == 0)
+    engine_df <- shiny::reactive({
+      shiny::req(input$file, length(errs()) == 0)
       to_engine_df(parsed(), "binary")
     })
+    m1 <- shiny::reactive(marginal_df(engine_df(), 1))
+    m2 <- shiny::reactive(marginal_df(engine_df(), 2))
 
-    res_r <- shiny::eventReactive(input$fit, {
-      shiny::req(length(errs()) == 0)
-      df <- to_engine_df(parsed(), "binary")
+    # Stage 1: two embedded single-chemical fitters, one per marginal series.
+    fit1 <- curve_fit_server("chem1", fit_df = m1, meta = meta, chem_field = "chem1")
+    fit2 <- curve_fit_server("chem2", fit_df = m2, meta = meta, chem_field = "chem2")
+
+    # Checkpoint state. `frozen` gates Stages 2-3 (exposed to the UI as an output).
+    frozen <- shiny::reactiveVal(FALSE)
+    output$frozen <- shiny::reactive(isTRUE(frozen()))
+    shiny::outputOptions(output, "frozen", suspendWhenHidden = FALSE)
+
+    # Frozen curve-parameter vector (shared max = average of the two fits).
+    curve_params <- shiny::reactive({
+      shiny::req(fit1(), fit2())
+      assemble_curve_params(fit1(), fit2())
+    })
+
+    output$freeze_note <- shiny::renderUI({
+      if (is.null(fit1()) || is.null(fit2()))
+        shiny::div(class = "text-muted",
+                   shiny::tags$small(
+                     "Fit both single curves (Autofit or Simulate) before freezing."))
+    })
+
+    # Freeze requires both curves; marking frozen triggers the interaction fit.
+    shiny::observeEvent(input$freeze, {
+      if (is.null(fit1()) || is.null(fit2())) {
+        shiny::showNotification("Fit both single curves before freezing.", type = "warning")
+        return()
+      }
+      frozen(TRUE)
+    })
+
+    # A changed curve or header model invalidates the freeze (result can't go stale).
+    shiny::observeEvent(
+      list(fit1(), fit2(), input$reference, input$response),
+      { if (isTRUE(frozen())) frozen(FALSE) },
+      ignoreInit = TRUE)
+
+    # Stage 2/3: fit reference + deviations with the frozen curve params fixed.
+    res_r <- shiny::eventReactive(input$freeze, {
+      shiny::req(fit1(), fit2())
+      df <- engine_df()
       engine_response <- if (input$response == "quantal") "binary" else "continuous"
       n_starts <- if (isTRUE(input$thorough)) max(input$n_starts, 20) else input$n_starts
-      b <- collect_bounds(shiny::reactiveValuesToList(input))
-      shiny::withProgress(message = "Fitting models...", value = 0.5, {
+      start <- curve_params()
+      shiny::withProgress(message = "Fitting interaction models...", value = 0.5, {
         tryCatch(
           analyse_mixture(df, reference = input$reference, response = engine_response,
-                          alpha = input$alpha, lower = b$lower, upper = b$upper,
+                          start = start, alpha = input$alpha,
                           n_starts = n_starts, time_limit = input$time_limit),
           error = function(e) {
             shiny::showNotification(paste("Fit failed:", conditionMessage(e)), type = "error")
@@ -138,15 +184,14 @@ binary_server <- function(id, meta) {
       })
     })
 
-    # Refresh the (static) model picker after each fit, defaulting to the chosen model.
+    # Refresh the model picker after each fit, defaulting to the chosen model.
     shiny::observeEvent(res_r(), {
+      shiny::req(res_r())
       shiny::updateSelectInput(session, "model",
                                choices = names(res_r()$fits), selected = res_r()$chosen)
     })
 
-    # Fall back to the chosen model until the picker's input has populated (also
-    # makes the reactive testable under shiny::testServer, where updateSelectInput
-    # does not round-trip an input value).
+    # Fall back to the chosen model until the picker's input has populated.
     shown_fit <- shiny::reactive({
       shiny::req(res_r())
       m <- input$model
@@ -154,37 +199,30 @@ binary_server <- function(id, meta) {
       res_r()$fits[[m]]
     })
 
-    output$dr1 <- plotly::renderPlotly({
-      plotly::layout(plot_dose_response(shown_fit(), fit_df(), chem = 1),
-                     xaxis = list(title = axis_label(meta, "chem1")))
-    })
-    output$dr2 <- plotly::renderPlotly({
-      plotly::layout(plot_dose_response(shown_fit(), fit_df(), chem = 2),
-                     xaxis = list(title = axis_label(meta, "chem2")))
-    })
     output$surface <- plotly::renderPlotly({
-      plot_surface(shown_fit(), fit_df())
+      shiny::req(frozen()); plot_surface(shown_fit(), engine_df())
     })
     output$isobole <- plotly::renderPlotly({
-      plot_isobole(shown_fit(), fit_df(), reference_fit = res_r()$fits$reference)
+      shiny::req(frozen())
+      plot_isobole(shown_fit(), engine_df(), reference_fit = res_r()$fits$reference)
     })
     output$op <- plotly::renderPlotly({
-      plot_obs_pred(shown_fit(), fit_df())
+      shiny::req(frozen()); plot_obs_pred(shown_fit(), engine_df())
     })
 
     output$results <- DT::renderDT({
-      shiny::req(res_r())
+      shiny::req(frozen(), res_r())
       tab <- round(result_table(res_r()), 4)
       DT::datatable(as.data.frame(tab), options = list(dom = "t"))
     })
     output$comparison <- DT::renderDT({
-      shiny::req(res_r())
+      shiny::req(frozen(), res_r())
       DT::datatable(res_r()$comparison, rownames = FALSE, options = list(dom = "t"))
     })
     output$cis <- DT::renderDT({
-      shiny::req(shown_fit())
+      shiny::req(frozen(), shown_fit())
       f <- shown_fit()
-      DT::datatable(param_ci(f, fit_df(), f$reference, f$deviation, f$response),
+      DT::datatable(param_ci(f, engine_df(), f$reference, f$deviation, f$response),
                     rownames = FALSE, options = list(dom = "t"))
     })
 
