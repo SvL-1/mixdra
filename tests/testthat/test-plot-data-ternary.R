@@ -16,6 +16,8 @@ test_that("isoplane_plot_data stacks SA, ASA and markers with a series label", {
   expect_true(all(c("C1", "C2", "C3", "series") %in% names(d)))
   expect_setequal(unique(d$series), c("CA+S/A", "CA+S/A+S/A", "EC50"))
   expect_equal(sum(d$series == "EC50"), nrow(res$individual))
+  expect_equal(sum(d$series == "CA+S/A"),     (6 + 1) * (6 + 2) / 2)
+  expect_equal(sum(d$series == "CA+S/A+S/A"), (6 + 1) * (6 + 2) / 2)
 })
 
 test_that("sigma_tu_plot_data stacks SA and ASA per-chemical curves", {
@@ -24,4 +26,6 @@ test_that("sigma_tu_plot_data stacks SA and ASA per-chemical curves", {
   expect_true(all(c("chem", "z", "sigma_tu", "series") %in% names(d)))
   expect_setequal(unique(d$series), c("CA+S/A", "CA+S/A+S/A"))
   expect_setequal(unique(d$chem), c("C1", "C2", "C3"))
+  expect_equal(sum(d$series == "CA+S/A"),     3 * 11)
+  expect_equal(sum(d$series == "CA+S/A+S/A"), 3 * 11)
 })
