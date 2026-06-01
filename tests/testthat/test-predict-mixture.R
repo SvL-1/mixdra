@@ -22,3 +22,24 @@ test_that("mixture_predict errors on a missing parameter", {
     "missing parameter"
   )
 })
+
+test_that("mixture_predict matches the verbatim CA-DR binary predictor", {
+  df <- expand.grid(C1 = c(0, 0.05, 0.2), C2 = c(0, 0.5, 5))
+  par <- c(max = 0.9, slope1 = 4, slope2 = 1.5, ec501 = 0.08, ec502 = 1,
+           a = 2, b = 0.5)
+  got <- mixture_predict(df, par, "CA", "DR")
+  want <- ca_dr_bi_vec(df$C1, df$C2, 0.9, 4, 1.5, 0.08, 1, 2, 0.5)
+  expect_equal(unname(got), unname(want))
+  expect_true(all(got >= 0 & got <= 0.9))   # probabilities bounded by max
+})
+
+test_that("mixture_predict is order-independent and drops extra params", {
+  df <- expand.grid(C1 = c(0, 0.05, 0.2), C2 = c(0, 0.5, 5))
+  ordered <- c(max = 800, slope1 = 4, slope2 = 1.5, ec501 = 0.08, ec502 = 1)
+  shuffled <- c(ec502 = 1, junk = 99, slope2 = 1.5, max = 800,
+                ec501 = 0.08, slope1 = 4)
+  expect_equal(
+    unname(mixture_predict(df, ordered,  "CA", "reference")),
+    unname(mixture_predict(df, shuffled, "CA", "reference"))
+  )
+})
