@@ -4,10 +4,13 @@
 \alias{analyse_single}
 \title{Analyse a single chemical (dose-response curve only)}
 \usage{
-analyse_single(df)
+analyse_single(df, lower = NULL, upper = NULL, start = NULL)
 }
 \arguments{
 \item{df}{Data frame with \code{C1} and \code{Res} (or \code{Exposed}/\code{Affected}).}
+
+\item{lower, upper, start}{Optional named numeric vectors forwarded to
+\code{\link[=fit_single]{fit_single()}} (\code{max}/\code{slope}/\code{ec50}).}
 }
 \value{
 The \code{\link[=fit_single]{fit_single()}} result.

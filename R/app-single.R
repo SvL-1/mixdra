@@ -1,6 +1,8 @@
-# Single Chemical stage: upload one chemical's dose-response data, fit a
-# three-parameter log-logistic curve via analyse_single(), and show the curve,
-# observed-vs-predicted, and a parameter table.
+# Single Chemical stage: upload one chemical's dose-response data, then either
+# Autofit a three-parameter log-logistic curve via analyse_single() or Simulate
+# the curve for caller-entered parameter values via eval_single(). Shows the
+# curve, observed-vs-predicted, an editable parameter grid with bounds, and a
+# live SSR readout.
 
 #' Concentration-axis label from the shared meta store
 #'
@@ -15,38 +17,30 @@ axis_label <- function(meta, chem_field = NULL) {
   if (!is.null(unit) && nzchar(unit)) paste0(base, " (", unit, ")") else base
 }
 
-#' Static "About this model" help markup for the Single Chemical tab
-#'
-#' Explains the fitted three-parameter log-logistic curve and what each reported
-#' value means. Pure markup, independent of any fit, so it is unit-testable on
-#' its own. Rendered as plain HTML (no MathJax) so it works offline.
-#' @return A `shiny` tag list.
+#' Visible model-equation header for the Single Chemical tab
+#' @return A `shiny` tag.
 #' @keywords internal
-model_help_single <- function() {
-  shiny::tagList(
-    shiny::tags$p(
-      "The Single Chemical tab fits a three-parameter ",
-      shiny::tags$b("log-logistic"), " dose-response curve:"
-    ),
-    shiny::tags$p(shiny::tags$code(
-      "Y = max / (1 + (C / EC50)", shiny::tags$sup("slope"), ")"
-    )),
-    shiny::tags$p(shiny::tags$small(
-      "The response falls from ", shiny::tags$code("max"), " at zero dose."
-    )),
-    shiny::tags$dl(
-      shiny::tags$dt("max"),
-      shiny::tags$dd("Control / baseline response at C = 0 (the upper plateau)."),
-      shiny::tags$dt("slope"),
-      shiny::tags$dd("Steepness of the decline (> 0 means the response decreases with dose)."),
-      shiny::tags$dt("EC50"),
-      shiny::tags$dd("Concentration that halves the response.")
-    ),
-    shiny::tags$p(shiny::tags$small(
-      shiny::tags$b("SSR"), " = residual sum of squares (goodness of fit); ",
-      shiny::tags$b("n"), " = number of data points. ",
-      "These describe the fit, not the curve."
-    ))
+single_model_equation <- function() {
+  shiny::tags$p(
+    shiny::tags$b("Model: "),
+    shiny::tags$code("Y = max / (1 + (C / EC50)", shiny::tags$sup("slope"), ")")
+  )
+}
+
+#' One parameter row: label, plain-English meaning, and lower/upper/value inputs
+#' @param ns Module namespace function.
+#' @param param Parameter key (`max`/`slope`/`ec50`); drives input ids.
+#' @param label Display label.
+#' @param meaning One-line explanation.
+#' @param hi_default Default for the upper-bound input (NA = blank).
+#' @keywords internal
+param_row <- function(ns, param, label, meaning, hi_default = NA) {
+  shiny::fluidRow(
+    shiny::column(2, shiny::tags$b(label)),
+    shiny::column(4, shiny::tags$small(meaning)),
+    shiny::column(2, shiny::numericInput(ns(paste0("lo_", param)), NULL, value = NA)),
+    shiny::column(2, shiny::numericInput(ns(paste0("hi_", param)), NULL, value = hi_default)),
+    shiny::column(2, shiny::numericInput(ns(paste0("val_", param)), NULL, value = NA))
   )
 }
 
@@ -62,8 +56,7 @@ single_ui <- function(id) {
                           c("Continuous" = "continuous", "Quantal" = "quantal")),
       shiny::downloadButton(ns("template"), "Download template"),
       shiny::fileInput(ns("file"), "Upload CSV", accept = ".csv"),
-      shiny::uiOutput(ns("errors")),
-      shiny::actionButton(ns("fit"), "Fit", class = "btn-primary")
+      shiny::uiOutput(ns("errors"))
     ),
     bslib::layout_columns(
       bslib::card(bslib::card_header("Dose-response curve"),
@@ -71,11 +64,26 @@ single_ui <- function(id) {
       bslib::card(bslib::card_header("Observed vs predicted"),
                   plotly::plotlyOutput(ns("op")))
     ),
-    bslib::accordion(
-      open = FALSE,
-      bslib::accordion_panel("About this model", model_help_single())
-    ),
-    bslib::card(bslib::card_header("Parameters"), DT::DTOutput(ns("params")))
+    bslib::card(
+      bslib::card_header("Parameters"),
+      single_model_equation(),
+      shiny::fluidRow(
+        shiny::column(2, shiny::tags$small(shiny::tags$b("Parameter"))),
+        shiny::column(4, shiny::tags$small(shiny::tags$b("Meaning"))),
+        shiny::column(2, shiny::tags$small(shiny::tags$b("Lower"))),
+        shiny::column(2, shiny::tags$small(shiny::tags$b("Upper"))),
+        shiny::column(2, shiny::tags$small(shiny::tags$b("Value")))
+      ),
+      param_row(ns, "max", "max", "Response at C = 0 (control / upper plateau)."),
+      param_row(ns, "slope", "slope", "Steepness of the decline (> 0 = decreasing).",
+                hi_default = 50),
+      param_row(ns, "ec50", "EC50", "Concentration that halves the response."),
+      shiny::uiOutput(ns("diagnostics")),
+      shiny::div(
+        shiny::actionButton(ns("autofit"), "Autofit parameters", class = "btn-primary"),
+        shiny::actionButton(ns("simulate"), "Simulate")
+      )
+    )
   )
 }
 
@@ -108,38 +116,75 @@ single_server <- function(id, meta) {
                                 lapply(e, function(x) shiny::tags$p(x)))
     })
 
-    fit_df <- shiny::eventReactive(input$fit, {
-      shiny::req(length(errs()) == 0)
+    fit_df <- shiny::reactive({
+      shiny::req(input$file, length(errs()) == 0)
       to_engine_df(parsed(), "single")
     })
 
-    fit_r <- shiny::eventReactive(input$fit, {
+    current_fit <- shiny::reactiveVal(NULL)
+
+    # The Value column read as a named numeric (blank -> NA).
+    current_values <- function() {
+      raw <- list(max = input$val_max, slope = input$val_slope, ec50 = input$val_ec50)
+      vapply(raw, function(x)
+        if (is.null(x) || length(x) == 0) NA_real_ else as.numeric(x), numeric(1))
+    }
+
+    shiny::observeEvent(input$autofit, {
       shiny::req(length(errs()) == 0)
-      tryCatch(analyse_single(fit_df()), error = function(e) {
-        shiny::showNotification(paste("Fit failed:", conditionMessage(e)), type = "error")
-        NULL
-      })
+      b <- collect_bounds(shiny::reactiveValuesToList(input), c("max", "slope", "ec50"))
+      if (!is.null(b$lower) && !is.null(b$upper)) {
+        common <- intersect(names(b$lower), names(b$upper))
+        if (length(common) && any(b$lower[common] > b$upper[common])) {
+          shiny::showNotification("Lower bound exceeds upper bound.", type = "error")
+          return()
+        }
+      }
+      vals <- current_values()
+      start <- vals[!is.na(vals)]
+      if (!length(start)) start <- NULL
+      fit <- tryCatch(
+        analyse_single(fit_df(), lower = b$lower, upper = b$upper, start = start),
+        error = function(e) {
+          shiny::showNotification(paste("Fit failed:", conditionMessage(e)), type = "error")
+          NULL
+        })
+      if (is.null(fit)) return()
+      shiny::updateNumericInput(session, "val_max",   value = round(fit$par[["max"]], 4))
+      shiny::updateNumericInput(session, "val_slope", value = round(fit$par[["slope"]], 4))
+      shiny::updateNumericInput(session, "val_ec50",  value = round(fit$par[["ec50"]], 4))
+      current_fit(fit)
+    })
+
+    shiny::observeEvent(input$simulate, {
+      shiny::req(input$file, length(errs()) == 0)
+      vals <- current_values()
+      if (any(is.na(vals))) {
+        shiny::showNotification("Enter max, slope and EC50 to simulate.", type = "warning")
+        return()
+      }
+      resp <- obs_response(fit_df())
+      current_fit(eval_single(fit_df()$C1, resp,
+                              vals[["max"]], vals[["slope"]], vals[["ec50"]]))
     })
 
     output$dr <- plotly::renderPlotly({
-      shiny::req(fit_r())
-      p <- plot_dose_response(fit_r(), fit_df())
+      shiny::req(current_fit())
+      p <- plot_dose_response(current_fit(), fit_df())
       plotly::layout(p, xaxis = list(title = axis_label(meta)),
                      yaxis = list(title = if (!is.null(meta$endpoint) && nzchar(meta$endpoint))
                                             meta$endpoint else "Response"))
     })
     output$op <- plotly::renderPlotly({
-      shiny::req(fit_r())
-      plot_obs_pred(fit_r(), fit_df())
+      shiny::req(current_fit())
+      plot_obs_pred(current_fit(), fit_df())
     })
-    output$params <- DT::renderDT({
-      shiny::req(fit_r())
-      p <- fit_r()$par
-      DT::datatable(
-        data.frame(Parameter = c("max", "slope", "ec50", "SSR", "n"),
-                   Value = c(round(unname(p[c("max", "slope", "ec50")]), 4),
-                             round(fit_r()$ssr, 2), nrow(fit_df()))),
-        rownames = FALSE, options = list(dom = "t"))
+    output$diagnostics <- shiny::renderUI({
+      shiny::req(current_fit())
+      shiny::tags$p(
+        shiny::tags$b("SSR: "), round(current_fit()$ssr, 2),
+        "   |   ", shiny::tags$b("n: "), nrow(fit_df())
+      )
     })
   })
 }

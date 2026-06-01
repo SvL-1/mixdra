@@ -4,17 +4,19 @@
 \alias{collect_bounds}
 \title{Assemble lower/upper bound vectors from Advanced-panel inputs}
 \usage{
-collect_bounds(values)
+collect_bounds(values, params = c("max", "slope1", "slope2", "ec501", "ec502"))
 }
 \arguments{
 \item{values}{Named list (e.g. a Shiny \code{input}) holding \verb{lo_*}/\verb{hi_*} numbers.}
+
+\item{params}{Character vector of parameter names to read.}
 }
 \value{
 A list with \code{lower} and \code{upper} named numeric vectors (or NULL).
 }
 \description{
-Reads \verb{lo_<param>} / \verb{hi_<param>} values for the five binary base parameters;
-blank/NA entries are dropped. To FIX a parameter, set its lower and upper to
-the same value (the engine has no \code{fixed} argument via \code{analyse_mixture}).
+Reads \verb{lo_<param>} / \verb{hi_<param>} values for \code{params}; blank/NA entries are
+dropped. To FIX a parameter, set its lower and upper to the same value. The
+default \code{params} is the binary base set; the single tab passes its own.
 }
 \keyword{internal}

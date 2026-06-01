@@ -4,16 +4,23 @@
 \alias{fit_single}
 \title{Fit a three-parameter log-logistic curve to single-chemical data}
 \usage{
-fit_single(conc, resp)
+fit_single(conc, resp, lower = NULL, upper = NULL, start = NULL)
 }
 \arguments{
 \item{conc}{Numeric vector of concentrations.}
 
 \item{resp}{Numeric vector of responses (same length as \code{conc}).}
+
+\item{lower, upper, start}{Optional named numeric vectors (\code{max}/\code{slope}/\code{ec50})
+overriding the corresponding defaults.}
 }
 \value{
-A list with \code{par} (named: max, slope, ec50), \code{ssr}, and \code{convergence}.
+A list with \code{par} (named: max, slope, ec50), \code{ssr}, \code{convergence}, and
+\code{kind = "single"}.
 }
 \description{
-Minimises the residual sum of squares.
+Minimises the residual sum of squares. \code{lower}, \code{upper}, and \code{start} are
+optional \strong{named, partial} overrides of the built-in defaults
+(\verb{lower = max 1e-8 / slope 1e-3 / ec50 1e-8}, \verb{upper = max Inf / slope 50 / ec50 Inf}, and a data-driven start). The effective start is clamped into
+\verb{[lower, upper]} so the optimiser never receives an out-of-bounds seed.
 }

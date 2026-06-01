@@ -20,24 +20,6 @@ test_that("intro_ui builds a Shiny UI fragment", {
               inherits(ui, "bslib_fragment"))
 })
 
-test_that("single_server validates, fits, and exposes a single fit", {
-  meta <- shiny::reactiveValues()
-  shiny::testServer(single_server, args = list(meta = meta), {
-    # Valid continuous single-chemical CSV with >= 4 distinct concentrations.
-    path <- tempfile(fileext = ".csv")
-    utils::write.csv(
-      data.frame(Conc = c(0, 0.1, 0.3, 1, 3, 10),
-                 Res  = ll3_predict(c(0, 0.1, 0.3, 1, 3, 10), 100, 2, 0.5)),
-      path, row.names = FALSE)
-    session$setInputs(response = "continuous",
-                      file = list(datapath = path, name = "single.csv"))
-    expect_length(errs(), 0)               # passes validation
-    session$setInputs(fit = 1)
-    expect_equal(fit_r()$kind, "single")
-    expect_equal(unname(round(fit_r()$par[["ec50"]], 2)), 0.5)
-  })
-})
-
 test_that("single_server surfaces validation errors and withholds a fit", {
   meta <- shiny::reactiveValues()
   shiny::testServer(single_server, args = list(meta = meta), {
@@ -83,16 +65,46 @@ test_that("binary_ui builds a Shiny UI fragment", {
   expect_true(inherits(binary_ui("binary"), c("shiny.tag", "shiny.tag.list", "bslib_fragment")))
 })
 
-test_that("model_help_single explains the log-logistic model and its parameters", {
-  tag <- model_help_single()
-  expect_true(inherits(tag, c("shiny.tag", "shiny.tag.list")))
-  html <- as.character(tag)
-  expect_match(html, "log-logistic")
-  expect_match(html, "EC50")
-  expect_match(html, "slope")
-  expect_match(html, "SSR")
+test_that("single_server autofit fits and exposes the fit via current_fit", {
+  meta <- shiny::reactiveValues()
+  shiny::testServer(single_server, args = list(meta = meta), {
+    path <- tempfile(fileext = ".csv")
+    utils::write.csv(
+      data.frame(Conc = c(0, 0.1, 0.3, 1, 3, 10),
+                 Res  = ll3_predict(c(0, 0.1, 0.3, 1, 3, 10), 100, 2, 0.5)),
+      path, row.names = FALSE)
+    session$setInputs(response = "continuous",
+                      file = list(datapath = path, name = "single.csv"),
+                      val_max = NA, val_slope = NA, val_ec50 = NA,
+                      lo_max = NA, hi_max = NA, lo_slope = NA, hi_slope = NA,
+                      lo_ec50 = NA, hi_ec50 = NA)
+    expect_length(errs(), 0)
+    session$setInputs(autofit = 1)
+    expect_equal(current_fit()$kind, "single")
+    expect_equal(unname(round(current_fit()$par[["ec50"]], 2)), 0.5)
+  })
 })
 
-test_that("single_ui embeds the model help panel", {
-  expect_match(as.character(single_ui("single")), "About this model")
+test_that("single_server simulate evaluates the typed parameter values", {
+  meta <- shiny::reactiveValues()
+  shiny::testServer(single_server, args = list(meta = meta), {
+    path <- tempfile(fileext = ".csv")
+    utils::write.csv(
+      data.frame(Conc = c(0, 0.1, 0.3, 1, 3, 10),
+                 Res  = ll3_predict(c(0, 0.1, 0.3, 1, 3, 10), 100, 2, 0.5)),
+      path, row.names = FALSE)
+    session$setInputs(response = "continuous",
+                      file = list(datapath = path, name = "single.csv"),
+                      val_max = 100, val_slope = 2, val_ec50 = 0.5,
+                      simulate = 1)
+    expect_equal(unname(current_fit()$par[c("max", "slope", "ec50")]), c(100, 2, 0.5))
+    expect_equal(current_fit()$ssr, 0)
+  })
+})
+
+test_that("single_ui shows the model equation and Autofit/Simulate buttons", {
+  html <- as.character(single_ui("single"))
+  expect_match(html, "Y = max / (1 + (C / EC50)", fixed = TRUE)
+  expect_match(html, "Autofit parameters", fixed = TRUE)
+  expect_match(html, "Simulate", fixed = TRUE)
 })
