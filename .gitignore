@@ -11,3 +11,14 @@ papers/
 
 # Brainstorming visual-companion mockups — local only
 .superpowers/
+
+# Local input material — validated source scripts/data, not committed
+recieved/
+*.xls
+*.xlsm
+
+# Session scratch — diagnostics, demo renders, logs
+diag_*
+demo_*
+plots_demo/
+*.log
