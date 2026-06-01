@@ -65,11 +65,7 @@ fit_model <- function(df, reference, deviation = "reference",
   free <- setdiff(spec$params, fixed)
   conc <- stats::setNames(as.list(df[conc_cols]), paste0("c", seq_along(conc_cols)))
 
-  predict_with <- function(p_full) {
-    args <- c(conc, as.list(p_full))
-    names(args) <- c(names(conc), names(p_full))
-    do.call(spec$fn, args)
-  }
+  predict_with <- function(p_full) .mixture_eval(spec$fn, conc, p_full)
   objective_of <- function(p_full) {
     pred <- predict_with(p_full)
     if (response == "continuous") {
