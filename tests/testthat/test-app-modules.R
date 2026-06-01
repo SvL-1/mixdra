@@ -48,9 +48,12 @@ test_that("binary_server stages the fit: split, freeze gate, average max, overri
                       file = list(datapath = csv, name = "binary.csv"))
     expect_length(errs(), 0)
 
-    # marginal split: each panel's series drops the other chemical's column
+    # marginal split: each panel's series drops the other chemical's column and
+    # exposes the kept chemical's concentration as C1
     expect_false("C2" %in% names(m1()))
     expect_false("C2" %in% names(m2()))
+    expect_true("C1" %in% names(m1()))
+    expect_true("C1" %in% names(m2()))
 
     # nothing frozen yet
     expect_false(isTRUE(frozen()))

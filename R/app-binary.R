@@ -166,8 +166,8 @@ binary_server <- function(id, meta) {
       ignoreInit = TRUE)
 
     # Stage 2/3: fit reference + deviations with the frozen curve params fixed.
-    res_r <- shiny::eventReactive(input$freeze, {
-      shiny::req(fit1(), fit2())
+    res_r <- shiny::eventReactive(frozen(), {
+      shiny::req(isTRUE(frozen()), fit1(), fit2())
       df <- engine_df()
       engine_response <- if (input$response == "quantal") "binary" else "continuous"
       n_starts <- if (isTRUE(input$thorough)) max(input$n_starts, 20) else input$n_starts
@@ -186,7 +186,6 @@ binary_server <- function(id, meta) {
 
     # Refresh the model picker after each fit, defaulting to the chosen model.
     shiny::observeEvent(res_r(), {
-      shiny::req(res_r())
       shiny::updateSelectInput(session, "model",
                                choices = names(res_r()$fits), selected = res_r()$chosen)
     })
