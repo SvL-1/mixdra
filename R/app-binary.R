@@ -130,24 +130,15 @@ binary_ui <- function(id) {
       bslib::card(
         bslib::card_header("Stage 2 · Interaction model"),
 
-        # Model picker + the all-models comparison action (alpha drives the
-        # parsimony test) on one row.
-        bslib::layout_columns(
-          col_widths = c(5, 3, 4),
-          shiny::selectInput(
-            ns("model"), "Model",
-            choices = c("No interaction (reference)" = "reference",
-                        "Similar action (S/A)"       = "SA",
-                        "Dose-ratio (DR)"            = "DR",
-                        "Dose-level (DL)"            = "DL")),
-          shiny::div(class = "mt-4",
-                     shiny::actionButton(ns("find_best"), "Find best model")),
-          shiny::numericInput(ns("alpha"), "alpha", value = 0.05, min = 0, max = 1, step = 0.01)
-        ),
-        shiny::helpText(
-          "alpha (α) is the significance threshold for the model comparison: ",
-          "Find best model keeps a more complex model only if it improves the fit ",
-          "at p < α (default 0.05)."),
+        # Single-model picker: choose which interaction model to view / fit by
+        # hand. Model SELECTION (Find best + alpha) lives in the Results & model
+        # comparison card below, where the chosen model is highlighted.
+        shiny::selectInput(
+          ns("model"), "Model",
+          choices = c("No interaction (reference)" = "reference",
+                      "Similar action (S/A)"       = "SA",
+                      "Dose-ratio (DR)"            = "DR",
+                      "Dose-level (DL)"            = "DL")),
 
         shiny::uiOutput(ns("interaction_help")),
 
@@ -228,9 +219,19 @@ binary_ui <- function(id) {
                     plotly::plotlyOutput(ns("op"))),
         bslib::layout_columns(
           bslib::card(bslib::card_header("Results & model comparison"),
-                      shiny::helpText("Shows every model you've fitted. ",
-                                      "Run “Find best model” to add the LR p-values ",
-                                      "and highlight the selected (best) model."),
+                      bslib::layout_columns(
+                        col_widths = c(7, 5),
+                        shiny::div(class = "mt-4",
+                                   shiny::actionButton(ns("find_best"), "Find best model",
+                                                       class = "btn-primary")),
+                        shiny::numericInput(ns("alpha"), "alpha", value = 0.05,
+                                            min = 0, max = 1, step = 0.01)),
+                      shiny::helpText(
+                        "alpha (α) is the significance threshold for the model comparison: ",
+                        "Find best model keeps a more complex model only if it improves the ",
+                        "fit at p < α (default 0.05). The table shows every model you've ",
+                        "fitted; Find best fills all four and highlights the selected (best) ",
+                        "model."),
                       DT::DTOutput(ns("results"))),
           bslib::card(bslib::card_header("Confidence intervals (displayed model)"),
                       DT::DTOutput(ns("cis")))
@@ -546,22 +547,28 @@ binary_server <- function(id, meta) {
       shiny::req(frozen(), current_fit()); plot_obs_pred(current_fit(), engine_df())
     })
 
-    # Table-2 style matrix (params + objective/df + LR p-value) over EVERY model
-    # the user has fitted so far -- a single Autofit/Simulate populates its own
-    # column; Find best fills all four. The LR p-value row and the highlighted
-    # "best" column only appear once Find best has run (it is the sole writer of
-    # `last_compare()`, which carries the parent comparison + chosen model).
+    # One row per interaction model the user has fitted (model name in the first
+    # column): params + objective/df + LR p-value across the columns. A single
+    # Autofit/Simulate adds its own row; Find best fills all four. The p-value
+    # column and the highlighted best-model row only appear once Find best has
+    # run (it is the sole writer of `last_compare()`, which carries the parent
+    # comparison + chosen model). Sorting is disabled -- row order is fixed.
     output$results <- DT::renderDT({
       fits <- fits_store()
       shiny::req(length(fits) > 0)
       ord    <- intersect(c("reference", "SA", "DR", "DL"), names(fits))
       cmp    <- if (!is.null(last_compare())) last_compare()$comparison else NULL
       chosen <- if (!is.null(last_compare())) last_compare()$chosen else NULL
-      tab <- round(result_table(list(fits = fits[ord], comparison = cmp)), 4)
-      dt <- DT::datatable(as.data.frame(tab), options = list(dom = "t"))
-      if (!is.null(chosen) && chosen %in% colnames(tab))
-        dt <- DT::formatStyle(dt, columns = chosen, target = "cell",
-                              fontWeight = "bold", backgroundColor = "#d8f0d8")
+      mat  <- round(result_table(list(fits = fits[ord], comparison = cmp)), 4)
+      disp <- as.data.frame(t(mat), check.names = FALSE)        # models -> rows
+      disp <- cbind(`Interaction model` = rownames(disp), disp, stringsAsFactors = FALSE)
+      rownames(disp) <- NULL
+      dt <- DT::datatable(disp, rownames = FALSE,
+                          options = list(dom = "t", ordering = FALSE, scrollX = TRUE))
+      if (!is.null(chosen) && chosen %in% disp[["Interaction model"]])
+        dt <- DT::formatStyle(dt, "Interaction model", target = "row",
+                              fontWeight = DT::styleEqual(chosen, "bold"),
+                              backgroundColor = DT::styleEqual(chosen, "#d8f0d8"))
       dt
     })
     # CIs for a fitted model; a simulated (hand-entered) set has no CIs, so show
