@@ -3,7 +3,9 @@
 #' @param reference "CA" or "IA".
 #' @param deviation "reference", "SA", "DR", "DL", or "ASA".
 #' @param n_chem Number of chemicals (2 for binary, 3 for ternary).
-#' @return A list: `fn` (vectorised predictor), `params` (all free parameter
+#' @return A list: `fn` (vectorised predictor; an adapter closure over
+#'   [mix_response()] for the reference/SA/DR/DL family, or the dedicated
+#'   `ca_asa_tri_vec` for ASA), `params` (all free parameter
 #'   names), `extra` (deviation parameters beyond the reference), `parent`
 #'   (the deviation this one nests within, or NULL for the reference).
 #' @keywords internal
