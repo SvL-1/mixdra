@@ -91,6 +91,11 @@ test_that("binary_server workspace: auto-reveal, autofit/simulate/find-best, inv
     expect_true(isTRUE(current_fit()$joint))
     expect_equal(current_fit()$deviation, chosen)
     expect_lte(current_fit()$objective, pre_obj + 1e-6)
+    # Initial vs Optimized bookkeeping: the seed (par + objective) is captured
+    # and the post-refine fit is stored for the table to display side by side.
+    expect_equal(optimize_pre(), pre_obj)
+    expect_true("max" %in% names(optimize_init()))
+    expect_equal(optimize_fit()$objective, current_fit()$objective)
 
     # Pinning max via equal bounds holds it across a re-optimize.
     held <- unname(current_fit()$par[["max"]])
@@ -156,11 +161,13 @@ test_that("interaction_param_row renders a value input with inert bound cells", 
   expect_false(grepl("binary-hi_a", html, fixed = TRUE))  # no Upper input
 })
 
-test_that("binary_ui: Optimize-all card with the 7-param bounds grid", {
+test_that("binary_ui: Optimize-all card with bounds grid + initial/optimized cells", {
   html <- as.character(binary_ui("binary"))
   expect_match(html, "Optimize all params", fixed = TRUE)     # button
   expect_match(html, "binary-olo_max", fixed = TRUE)          # lower input
   expect_match(html, "binary-ohi_ec502", fixed = TRUE)        # upper input
-  expect_match(html, "binary-oval_a", fixed = TRUE)           # start value input
+  expect_match(html, "binary-oini_a", fixed = TRUE)           # initial (seed) cell
+  expect_match(html, "binary-oopt_a", fixed = TRUE)           # optimized result cell
+  expect_match(html, "binary-optimize_obj_row", fixed = TRUE) # SSR/Deviance row
   expect_match(html, "binary-optimize_all", fixed = TRUE)     # action id
 })

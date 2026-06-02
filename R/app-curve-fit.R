@@ -53,24 +53,27 @@ interaction_param_row <- function(ns, param, label, meaning) {
   )
 }
 
-#' One Optimize-all row: label, meaning, lower/upper bound inputs, start value
+#' One Optimize-all row: label, lower/upper bound inputs, initial + optimized
 #'
-#' Five-column layout matching [param_row()]. Uses the `olo_`/`ohi_`/`oval_`
-#' prefixes (distinct from the Stage-1 curve grid and the Stage-2 a/b inputs) so
-#' the joint Optimize-all panel never collides with other binary inputs. Set
-#' Lower = Upper to pin a parameter.
+#' Five-column layout: parameter name (with the plain-English `meaning` as a
+#' hover tooltip), the `olo_`/`ohi_` bound inputs (set Lower = Upper to pin a
+#' parameter), then read-only `oini_` (seed / pre-optimize value) and `oopt_`
+#' (post-optimize value) cells. The `o*` prefixes are distinct from the Stage-1
+#' curve grid and the Stage-2 a/b inputs so the panel never collides with them.
 #' @param ns Module namespace function.
-#' @param param Parameter key (e.g. `max`, `a`); drives the input ids.
+#' @param param Parameter key (e.g. `max`, `a`); drives the input/output ids.
 #' @param label Display label.
-#' @param meaning One-line explanation.
+#' @param meaning One-line explanation (shown as a hover tooltip on the label).
 #' @keywords internal
 optimize_param_row <- function(ns, param, label, meaning) {
   shiny::fluidRow(
-    shiny::column(2, shiny::tags$b(label)),
-    shiny::column(4, shiny::tags$small(meaning)),
+    shiny::column(2, shiny::tags$b(label, title = meaning)),
     shiny::column(2, shiny::numericInput(ns(paste0("olo_", param)), NULL, value = NA)),
     shiny::column(2, shiny::numericInput(ns(paste0("ohi_", param)), NULL, value = NA)),
-    shiny::column(2, shiny::numericInput(ns(paste0("oval_", param)), NULL, value = NA))
+    shiny::column(3, shiny::div(class = "pt-2",
+                                shiny::textOutput(ns(paste0("oini_", param)), inline = TRUE))),
+    shiny::column(3, shiny::div(class = "pt-2",
+                                shiny::textOutput(ns(paste0("oopt_", param)), inline = TRUE)))
   )
 }
 

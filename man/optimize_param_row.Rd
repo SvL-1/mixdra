@@ -2,23 +2,24 @@
 % Please edit documentation in R/app-curve-fit.R
 \name{optimize_param_row}
 \alias{optimize_param_row}
-\title{One Optimize-all row: label, meaning, lower/upper bound inputs, start value}
+\title{One Optimize-all row: label, lower/upper bound inputs, initial + optimized}
 \usage{
 optimize_param_row(ns, param, label, meaning)
 }
 \arguments{
 \item{ns}{Module namespace function.}
 
-\item{param}{Parameter key (e.g. \code{max}, \code{a}); drives the input ids.}
+\item{param}{Parameter key (e.g. \code{max}, \code{a}); drives the input/output ids.}
 
 \item{label}{Display label.}
 
-\item{meaning}{One-line explanation.}
+\item{meaning}{One-line explanation (shown as a hover tooltip on the label).}
 }
 \description{
-Five-column layout matching \code{\link[=param_row]{param_row()}}. Uses the \code{olo_}/\code{ohi_}/\code{oval_}
-prefixes (distinct from the Stage-1 curve grid and the Stage-2 a/b inputs) so
-the joint Optimize-all panel never collides with other binary inputs. Set
-Lower = Upper to pin a parameter.
+Five-column layout: parameter name (with the plain-English \code{meaning} as a
+hover tooltip), the \code{olo_}/\code{ohi_} bound inputs (set Lower = Upper to pin a
+parameter), then read-only \code{oini_} (seed / pre-optimize value) and \code{oopt_}
+(post-optimize value) cells. The \verb{o*} prefixes are distinct from the Stage-1
+curve grid and the Stage-2 a/b inputs so the panel never collides with them.
 }
 \keyword{internal}
