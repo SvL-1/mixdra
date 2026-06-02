@@ -41,7 +41,7 @@ test_that("binary_server workspace: freeze gate, autofit/simulate/find-best, inv
   skip_on_cran()
   meta <- shiny::reactiveValues(chem1 = "A", chem2 = "B")
   shiny::testServer(binary_server, args = list(meta = meta), {
-    csv <- testthat::test_path("fixtures", "binary_mps_cpf_continuous.csv")
+    csv <- testthat::test_path("fixtures", "binary_ca_mps_cpf_imi_continuous.csv")
     skip_if_not(file.exists(csv), "binary fixture missing")
     session$setInputs(response = "continuous", reference = "CA", thorough = FALSE,
                       n_starts = 1, alpha = 0.05, time_limit = 30, model = "reference",
@@ -126,4 +126,13 @@ test_that("interaction_param_row renders a value input with inert bound cells", 
   expect_match(html, "—", fixed = TRUE)          # em-dash placeholder present
   expect_false(grepl("binary-lo_a", html, fixed = TRUE))  # no Lower input
   expect_false(grepl("binary-hi_a", html, fixed = TRUE))  # no Upper input
+})
+
+test_that("binary_ui: Optimize-all card with the 7-param bounds grid", {
+  html <- as.character(binary_ui("binary"))
+  expect_match(html, "Optimize all params", fixed = TRUE)     # button
+  expect_match(html, "binary-olo_max", fixed = TRUE)          # lower input
+  expect_match(html, "binary-ohi_ec502", fixed = TRUE)        # upper input
+  expect_match(html, "binary-oval_a", fixed = TRUE)           # start value input
+  expect_match(html, "binary-optimize_all", fixed = TRUE)     # action id
 })

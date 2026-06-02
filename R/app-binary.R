@@ -166,7 +166,36 @@ binary_ui <- function(id) {
           shiny::numericInput(ns("time_limit"), "time_limit (s/model)", value = 30, min = 1)
         ),
         shiny::checkboxInput(ns("thorough"), "Thorough fit (multi-start, slower)", FALSE),
-        shiny::uiOutput(ns("thorough_note"))
+        shiny::uiOutput(ns("thorough_note")),
+        shiny::conditionalPanel(
+          condition = "output.has_fit", ns = ns,
+          bslib::card(
+            bslib::card_header("Optimize all parameters (joint)"),
+            shiny::p("Refines the displayed model by fitting every parameter at ",
+                     "once, seeded from the current fit. Fix any parameter by ",
+                     "setting its Lower = Upper."),
+            shiny::fluidRow(
+              shiny::column(2, shiny::tags$small(shiny::tags$b("Parameter"))),
+              shiny::column(4, shiny::tags$small(shiny::tags$b("Meaning"))),
+              shiny::column(2, shiny::tags$small(shiny::tags$b("Lower"))),
+              shiny::column(2, shiny::tags$small(shiny::tags$b("Upper"))),
+              shiny::column(2, shiny::tags$small(shiny::tags$b("Value (start)")))
+            ),
+            optimize_param_row(ns, "max", "max", "Control response (upper plateau)."),
+            optimize_param_row(ns, "slope1", "slope1", "Chemical 1 curve steepness."),
+            optimize_param_row(ns, "slope2", "slope2", "Chemical 2 curve steepness."),
+            optimize_param_row(ns, "ec501", "EC50 1", "Chemical 1 half-effect conc."),
+            optimize_param_row(ns, "ec502", "EC50 2", "Chemical 2 half-effect conc."),
+            optimize_param_row(ns, "a", "a", "Overall interaction strength/direction."),
+            shiny::conditionalPanel(
+              condition = "input.model == 'DR' || input.model == 'DL'", ns = ns,
+              optimize_param_row(ns, "b", "b",
+                                 "Interaction shift with ratio / dose level.")),
+            shiny::actionButton(ns("optimize_all"), "Optimize all params",
+                                class = "btn-primary"),
+            shiny::uiOutput(ns("optimize_readout"))
+          )
+        )
       )
     ),
 
@@ -265,6 +294,10 @@ binary_server <- function(id, meta) {
       if (is.null(m)) return(NULL)
       fits_store()[[m]]
     })
+
+    # Reveal the Optimize-all card only once a model is displayed.
+    output$has_fit <- shiny::reactive(!is.null(current_fit()))
+    shiny::outputOptions(output, "has_fit", suspendWhenHidden = FALSE)
 
     engine_response <- shiny::reactive(
       if (input$response == "quantal") "binary" else "continuous")
