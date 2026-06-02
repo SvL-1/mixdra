@@ -260,3 +260,31 @@ eval_mixture <- function(df, reference, deviation, response,
   fit$simulated <- TRUE
   fit
 }
+
+#' Joint refinement of a mixture fit ("Optimize all params")
+#'
+#' Re-fits EVERY parameter of an existing mixture fit at once, seeded from that
+#' fit's parameters, optionally constrained by `lower`/`upper`. A parameter whose
+#' lower and upper bounds are equal is pinned (held fixed) via
+#' [split_fixed_bounds()]. Because the seed is the prior fit and the bisection
+#' surface is non-smooth, multi-start (`n_starts`) is recommended. The returned
+#' fit carries `joint = TRUE`.
+#' @param fit An enriched mixture fit (from [fit_model()] / the staged analysis).
+#' @param df The mixture data frame the fit was built from.
+#' @param lower,upper Optional named numeric vectors of bounds over any model
+#'   parameter (curve or interaction). Equal lower==upper pins that parameter.
+#' @param n_starts,time_limit Forwarded to [fit_model()].
+#' @return An enriched fit (as [fit_model()]) with `joint = TRUE`.
+#' @keywords internal
+refine_joint <- function(fit, df, lower = NULL, upper = NULL,
+                         n_starts = 1, time_limit = 30) {
+  spec  <- model_spec(fit$reference, fit$deviation, fit$n_chem)
+  start <- fit$par[spec$params]
+  sp    <- split_fixed_bounds(lower, upper, start)
+  out <- fit_model(df, fit$reference, fit$deviation, fit$response,
+                   start = sp$start, fixed = sp$fixed,
+                   lower = sp$lower, upper = sp$upper,
+                   n_starts = n_starts, time_limit = time_limit)
+  out$joint <- TRUE
+  out
+}
