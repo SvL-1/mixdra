@@ -96,19 +96,20 @@ test_that("binary_server stages the fit: split, freeze gate, average max, overri
   })
 })
 
-test_that("binary_ui builds and exposes the relocated fit options + intro", {
+test_that("binary_ui: Freeze-only button + Stage 2 workspace", {
   html <- as.character(binary_ui("binary"))
-  # the four controls now live in the Stage 1 Fit-options group (ids unchanged)
-  expect_match(html, "binary-alpha", fixed = TRUE)
+  # Freeze no longer fits
+  expect_match(html, "Freeze curves", fixed = TRUE)
+  expect_false(grepl("Freeze curves → fit interactions", html, fixed = TRUE))
+  # Stage 2 workspace: model picker, a/b value input, the three actions
+  expect_match(html, "binary-model", fixed = TRUE)
+  expect_match(html, "binary-val_a", fixed = TRUE)
+  expect_match(html, "Autofit (a, b)", fixed = TRUE)
+  expect_match(html, "Simulate", fixed = TRUE)
+  expect_match(html, "Find best model", fixed = TRUE)
+  # relocated fit options + the per-model explanation slot
   expect_match(html, "binary-n_starts", fixed = TRUE)
-  expect_match(html, "binary-thorough", fixed = TRUE)
-  expect_match(html, "binary-time_limit", fixed = TRUE)
-  # the group label and the always-visible intro sentence are present
-  expect_match(html, "Fit options", fixed = TRUE)
-  expect_match(html, "fits only the interaction terms", fixed = TRUE)
-  # the old sidebar "Advanced" accordion is gone
-  expect_false(grepl("Advanced", html, fixed = TRUE))
-  # Stage 2 hosts the per-model explanation output
+  expect_match(html, "binary-alpha", fixed = TRUE)
   expect_match(html, "binary-interaction_help", fixed = TRUE)
 })
 

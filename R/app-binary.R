@@ -101,33 +101,65 @@ binary_ui <- function(id) {
         shiny::div(shiny::h5(shiny::textOutput(ns("chem2_title"))),
                    curve_fit_ui(ns("chem2")))
       ),
-      shiny::p(class = "text-muted",
-               "Freezing locks both curves above and fits only the interaction terms ",
-               "(a, b) to the mixture rows, then compares four models ",
-               "(no interaction → S/A → dose-ratio → dose-level) ",
-               "and flags the most parsimonious."),
-      shiny::tags$b("Fit options"),
-      bslib::layout_columns(
-        shiny::numericInput(ns("alpha"), "alpha", value = 0.05, min = 0, max = 1, step = 0.01),
-        shiny::numericInput(ns("n_starts"), "n_starts", value = 1, min = 1),
-        shiny::numericInput(ns("time_limit"), "time_limit (s/model)", value = 30, min = 1)
-      ),
-      shiny::checkboxInput(ns("thorough"), "Thorough fit (multi-start, slower)", FALSE),
-      shiny::uiOutput(ns("thorough_note")),
-      shiny::actionButton(ns("freeze"), "Freeze curves → fit interactions",
-                          class = "btn-primary"),
+      shiny::actionButton(ns("freeze"), "Freeze curves", class = "btn-primary"),
       shiny::uiOutput(ns("freeze_note"))
     ),
 
-    # Stage 2 -- interaction-model comparison + model picker (revealed once frozen).
+    # Stage 2 -- per-model interaction workspace (revealed once frozen).
     shiny::conditionalPanel(
       condition = "output.frozen", ns = ns,
       bslib::card(
-        bslib::card_header("Stage 2 · Interaction models"),
-        shiny::selectInput(ns("model"), "Model to display", choices = NULL),
-        shiny::helpText("The most parsimonious model is pre-selected; ",
-                        "override above to inspect another."),
+        bslib::card_header("Stage 2 · Interaction model"),
+        shiny::selectInput(
+          ns("model"), "Model",
+          choices = c("No interaction (reference)" = "reference",
+                      "Similar action (S/A)"       = "SA",
+                      "Dose-ratio (DR)"            = "DR",
+                      "Dose-level (DL)"            = "DL")),
         shiny::uiOutput(ns("interaction_help")),
+
+        # a/b parameter grid (hidden for the reference model; b shown for DR/DL).
+        shiny::conditionalPanel(
+          condition = "input.model != 'reference'", ns = ns,
+          bslib::card(
+            bslib::card_header("Parameters"),
+            shiny::fluidRow(
+              shiny::column(2, shiny::tags$small(shiny::tags$b("Parameter"))),
+              shiny::column(4, shiny::tags$small(shiny::tags$b("Meaning"))),
+              shiny::column(2, shiny::tags$small(shiny::tags$b("Lower"))),
+              shiny::column(2, shiny::tags$small(shiny::tags$b("Upper"))),
+              shiny::column(2, shiny::tags$small(shiny::tags$b("Value")))
+            ),
+            interaction_param_row(ns, "a", "a",
+                                  "Overall strength & direction (a > 0 antagonism, a < 0 synergism)."),
+            shiny::conditionalPanel(
+              condition = "input.model == 'DR' || input.model == 'DL'", ns = ns,
+              interaction_param_row(ns, "b", "b",
+                                    "How the interaction shifts with the mixture ratio / dose level."))
+          )
+        ),
+
+        shiny::div(
+          shiny::actionButton(ns("autofit"), "Autofit (a, b)", class = "btn-primary"),
+          shiny::actionButton(ns("simulate"), "Simulate")
+        ),
+        shiny::uiOutput(ns("objective")),
+
+        shiny::tags$b("Fit options"),
+        bslib::layout_columns(
+          shiny::numericInput(ns("n_starts"), "n_starts", value = 1, min = 1),
+          shiny::numericInput(ns("time_limit"), "time_limit (s/model)", value = 30, min = 1)
+        ),
+        shiny::checkboxInput(ns("thorough"), "Thorough fit (multi-start, slower)", FALSE),
+        shiny::uiOutput(ns("thorough_note")),
+
+        shiny::hr(),
+        shiny::p(shiny::tags$b("Find best model"),
+                 shiny::tags$small(" — fit all four models and pick the most parsimonious.")),
+        bslib::layout_columns(
+          shiny::numericInput(ns("alpha"), "alpha", value = 0.05, min = 0, max = 1, step = 0.01),
+          shiny::actionButton(ns("find_best"), "Find best model")
+        ),
         DT::DTOutput(ns("comparison"))
       )
     ),
