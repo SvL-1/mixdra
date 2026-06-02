@@ -231,3 +231,33 @@ fit_model <- function(df, reference, deviation = "reference",
        reference = reference, deviation = deviation, response = response,
        conc_cols = conc_cols, n_chem = n_chem, kind = "mixture")
 }
+
+#' Forward-evaluate a mixture model at fixed parameters (Simulate)
+#'
+#' Mixture counterpart of [eval_single()]. Assembles the full parameter vector
+#' from the frozen curve parameters plus caller-supplied interaction parameters
+#' and evaluates the model without optimising, returning the enriched shape of
+#' [fit_model()] (so the plotting layer consumes it unchanged) with an added
+#' `simulated = TRUE` flag. Delegates to [fit_model()]'s all-fixed path.
+#'
+#' @param df Mixture data frame (`C1`/`C2`[/`C3`] + response columns).
+#' @param reference "CA" or "IA".
+#' @param deviation "reference", "SA", "DR", or "DL".
+#' @param response "continuous" or "binary".
+#' @param curve_params Named numeric of curve params (max, slope1, slope2,
+#'   ec501, ec502).
+#' @param interaction Named numeric of interaction params (e.g. `c(a = .., b = ..)`).
+#'   Entries the chosen model does not use are dropped.
+#' @return An enriched mixture fit list (as [fit_model()]) with `simulated = TRUE`.
+#' @keywords internal
+eval_mixture <- function(df, reference, deviation, response,
+                         curve_params, interaction = numeric(0)) {
+  n_chem <- length(intersect(c("C1", "C2", "C3"), names(df)))
+  spec <- model_spec(reference, deviation, n_chem)
+  use  <- interaction[intersect(names(interaction), spec$extra)]
+  par  <- c(curve_params, use)
+  fit  <- fit_model(df, reference, deviation, response,
+                    start = par, fixed = spec$params)   # all fixed -> evaluate only
+  fit$simulated <- TRUE
+  fit
+}
