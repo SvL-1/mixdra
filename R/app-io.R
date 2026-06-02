@@ -211,6 +211,6 @@ split_fixed_bounds <- function(lower, upper, start) {
   drop_hi <- upper[setdiff(names(upper), eq)]
   list(fixed = eq,
        start = start,
-       lower = if (length(drop_lo)) as.list(drop_lo) else NULL,
-       upper = if (length(drop_hi)) as.list(drop_hi) else NULL)
+       lower = if (length(drop_lo)) drop_lo else NULL,
+       upper = if (length(drop_hi)) drop_hi else NULL)
 }

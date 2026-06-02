@@ -133,7 +133,7 @@ test_that("split_fixed_bounds turns equal lower/upper into a fixed param", {
   expect_true("max" %in% sp$fixed)     # equal bounds -> fixed
   expect_false("a" %in% sp$fixed)      # a is a true range, not pinned
   expect_equal(sp$start[["max"]], 800) # pinned at the equal-bound value
-  expect_null(sp$lower[["max"]])       # pinned param dropped from bounds
+  expect_false("max" %in% names(sp$lower))   # pinned param dropped from bounds
   expect_equal(sp$lower[["a"]], 0)
   expect_equal(sp$upper[["a"]], 5)
 })
