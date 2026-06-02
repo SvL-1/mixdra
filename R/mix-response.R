@@ -78,3 +78,56 @@ mix_response <- function(concs, max, slopes, ec50s,
     max * stats::pnorm(stats::qnorm(base) + shift)
   }
 }
+
+# --- production dispatch adapter ----------------------------------------------
+# model_spec() returns make_adapter(...) as `$fn` for the reference/SA/DR/DL
+# family. It preserves the historical by-name call contract used by
+# `.mixture_eval()` / `param_ci()` -- do.call(fn, c(conc_list, as.list(par))) --
+# and repacks each measurement row into mix_response()'s vector signature.
+
+# Map the flat `b` parameter onto mix_response()'s expected shape.
+#   DR binary : scalar b -> c(b, 0)   (b weights chemical 1's dose fraction)
+#   DR ternary: b1,b2,b3 -> c(b1,b2,b3)   (not reached via model_spec today, but
+#               kept faithful to mix_response()'s contract / the equivalence test)
+#   DL        : scalar b passes through
+#   reference / SA: b unused -> 0
+.adapter_bmap <- function(deviation, n_chem, A) {
+  if (deviation == "DR") {
+    if (n_chem == 2) c(A$b, 0) else c(A$b1, A$b2, A$b3)
+  } else if (deviation == "DL") {
+    A$b
+  } else {
+    0
+  }
+}
+
+#' Build a vectorised, by-name predictor over `mix_response()`
+#'
+#' @param reference "CA" or "IA".
+#' @param deviation "reference", "SA", "DR", or "DL".
+#' @param n_chem 2 or 3.
+#' @return A function accepting named concentration vectors (`c1`, `c2`[, `c3`])
+#'   and named scalar parameters (`max`, `slope1..`, `ec50..`, `a`, `b`/`b1..b3`),
+#'   returning one prediction per row.
+#' @keywords internal
+make_adapter <- function(reference, deviation, n_chem) {
+  slope_names <- if (n_chem == 2) c("slope1", "slope2")
+                 else            c("slope1", "slope2", "slope3")
+  ec50_names  <- if (n_chem == 2) c("ec501", "ec502")
+                 else            c("ec50_1", "ec50_2", "ec50_3")
+  cc_names    <- paste0("c", seq_len(n_chem))
+
+  function(...) {
+    A      <- list(...)
+    concs  <- lapply(cc_names, function(k) A[[k]])
+    slopes <- vapply(slope_names, function(k) A[[k]], numeric(1))
+    ec50s  <- vapply(ec50_names,  function(k) A[[k]], numeric(1))
+    a      <- if (is.null(A$a)) 0 else A$a
+    b      <- .adapter_bmap(deviation, n_chem, A)
+    n_pts  <- length(concs[[1]])
+    vapply(seq_len(n_pts), function(i) {
+      mix_response(vapply(concs, function(v) v[[i]], numeric(1)),
+                   A$max, slopes, ec50s, reference, deviation, a = a, b = b)
+    }, numeric(1))
+  }
+}
