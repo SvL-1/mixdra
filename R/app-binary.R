@@ -314,18 +314,22 @@ binary_server <- function(id, meta) {
     # re-evaluated at the new curve parameters (not cleared) so Stage 3 stays live.
     fits_store   <- shiny::reactiveVal(list())
     last_compare <- shiny::reactiveVal(NULL)
-    # Optimize-all readout: seed vs refined objective (before -> after).
-    optimize_pre  <- shiny::reactiveVal(NULL)
-    optimize_post <- shiny::reactiveVal(NULL)
+
+    # Number of chemicals present (binary tab -> 2; future-proofs the loop order).
+    n_chem <- shiny::reactive(
+      length(intersect(c("C1", "C2", "C3"), names(engine_df()))))
+
+    # Live joint compare-all loop. `loop_queue` holds the models still to fit;
+    # `stepper_on` arms the timer-driven stepper. We fit ONE model per tick and
+    # let Shiny flush (paint the new table row) between ticks via invalidateLater.
+    loop_queue <- shiny::reactiveVal(NULL)
+    stepper_on <- shiny::reactiveVal(FALSE)
+
     current_fit  <- shiny::reactive({
       m <- input$model
       if (is.null(m)) return(NULL)
       fits_store()[[m]]
     })
-
-    # Reveal the Optimize-all card only once a model is displayed.
-    output$has_fit <- shiny::reactive(!is.null(current_fit()))
-    shiny::outputOptions(output, "has_fit", suspendWhenHidden = FALSE)
 
     engine_response <- shiny::reactive(
       if (input$response == "quantal") "binary" else "continuous")
@@ -347,7 +351,6 @@ binary_server <- function(id, meta) {
       {
         fits_store(list())
         last_compare(NULL)
-        optimize_pre(NULL); optimize_post(NULL)
       },
       ignoreInit = TRUE)
 
@@ -384,6 +387,57 @@ binary_server <- function(id, meta) {
       },
       ignoreInit = TRUE)
 
+    # Kick: clear the store and arm the joint chain (reference -> SA -> DR -> DL).
+    shiny::observeEvent(input$compare_all, {
+      shiny::req(frozen(), curve_params())
+      fits_store(list())
+      last_compare(NULL)
+      loop_queue(joint_chain_order(n_chem()))
+      stepper_on(TRUE)
+    })
+
+    # Stepper: re-runs on each timer tick while armed. Reads the queue with
+    # isolate() so only the timer (not its own writes) re-triggers it, which is
+    # what forces a client paint between models.
+    shiny::observe({
+      if (!isTRUE(stepper_on())) return()
+      shiny::invalidateLater(0)                 # schedule the next tick
+      q <- shiny::isolate(loop_queue())
+      if (is.null(q) || length(q) == 0) { stepper_on(FALSE); return() }
+      shiny::isolate({
+        dev    <- q[[1]]
+        s      <- fits_store()
+        pkey   <- model_spec(input$reference, dev, n_chem())$parent
+        parent <- if (is.null(pkey)) NULL else s[[pkey]]
+        fit <- tryCatch(
+          joint_fit_one(engine_df(), input$reference, dev, engine_response(),
+                        seed_curves = curve_params(), parent_fit = parent,
+                        n_starts = n_starts_eff(), time_limit = input$time_limit),
+          error = function(e) {
+            shiny::showNotification(
+              paste0("Fit failed (", dev, "): ", conditionMessage(e)), type = "error")
+            NULL
+          })
+        if (!is.null(fit)) { s[[dev]] <- fit; fits_store(s) }
+        rest <- q[-1]
+        loop_queue(rest)
+        if (length(rest) == 0) {
+          stepper_on(FALSE)
+          cmp <- compare_fits(fits_store(), nrow(engine_df()),
+                              engine_response(), input$alpha)
+          last_compare(list(fits = fits_store(), comparison = cmp$comparison,
+                            chosen = cmp$chosen, reference = input$reference,
+                            response = engine_response()))
+          shiny::updateSelectInput(session, "model", selected = cmp$chosen)
+          ch <- fits_store()[[cmp$chosen]]
+          shiny::updateNumericInput(session, "val_a",
+            value = if ("a" %in% names(ch$par)) round(ch$par[["a"]], 4) else NA)
+          shiny::updateNumericInput(session, "val_b",
+            value = if ("b" %in% names(ch$par)) round(ch$par[["b"]], 4) else NA)
+        }
+      })
+    })
+
     # Read the entered a/b as a named numeric (blank -> NA).
     read_ab <- function() {
       raw <- list(a = input$val_a, b = input$val_b)
@@ -410,7 +464,6 @@ binary_server <- function(id, meta) {
       if ("b" %in% names(fit$par))
         shiny::updateNumericInput(session, "val_b", value = round(fit$par[["b"]], 4))
       s <- fits_store(); s[[dev]] <- fit; fits_store(s)
-      optimize_pre(NULL); optimize_post(NULL)  # a new fit voids the last refine readout
     })
 
     # Simulate: evaluate the selected model with the entered a/b (no refit).
@@ -437,33 +490,6 @@ binary_server <- function(id, meta) {
         })
       if (is.null(fit)) return()
       s <- fits_store(); s[[dev]] <- fit; fits_store(s)
-      optimize_pre(NULL); optimize_post(NULL)  # a new fit voids the last refine readout
-    })
-
-    # Find best model: fit all four + select; store every fit, land on the chosen.
-    shiny::observeEvent(input$find_best, {
-      shiny::req(frozen(), curve_params())
-      res <- tryCatch(
-        shiny::withProgress(message = "Comparing interaction models...", value = 0.5,
-          analyse_mixture(engine_df(), reference = input$reference,
-                          response = engine_response(), start = curve_params(),
-                          alpha = input$alpha, n_starts = n_starts_eff(),
-                          time_limit = input$time_limit)),
-        error = function(e) {
-          shiny::showNotification(paste("Fit failed:", conditionMessage(e)), type = "error")
-          NULL
-        })
-      if (is.null(res)) return()
-      last_compare(res)
-      s <- fits_store()
-      for (m in names(res$fits)) s[[m]] <- res$fits[[m]]
-      fits_store(s)
-      shiny::updateSelectInput(session, "model", selected = res$chosen)
-      ch <- res$fits[[res$chosen]]
-      shiny::updateNumericInput(session, "val_a",
-        value = if ("a" %in% names(ch$par)) round(ch$par[["a"]], 4) else NA)
-      shiny::updateNumericInput(session, "val_b",
-        value = if ("b" %in% names(ch$par)) round(ch$par[["b"]], 4) else NA)
     })
 
     # Switching the picker syncs the grid to that model's stored a/b (blank if none).
@@ -473,54 +499,12 @@ binary_server <- function(id, meta) {
         value = if (!is.null(f) && "a" %in% names(f$par)) round(f$par[["a"]], 4) else NA)
       shiny::updateNumericInput(session, "val_b",
         value = if (!is.null(f) && "b" %in% names(f$par)) round(f$par[["b"]], 4) else NA)
-      optimize_pre(NULL); optimize_post(NULL)
     }, ignoreInit = TRUE)
-
-    # Optimize all params: jointly refine the displayed model, seeded from it
-    # (every parameter free, positivity-constrained -- no per-parameter pinning).
-    shiny::observeEvent(input$optimize_all, {
-      shiny::req(frozen(), current_fit())
-      f <- current_fit()
-      pre <- f$objective
-      newfit <- tryCatch(
-        shiny::withProgress(message = "Optimizing all parameters...", value = 0.5,
-          refine_joint(f, engine_df(),
-                       n_starts = n_starts_eff(), time_limit = input$time_limit)),
-        error = function(e) {
-          shiny::showNotification(paste("Optimize failed:", conditionMessage(e)),
-                                  type = "error")
-          NULL
-        })
-      if (is.null(newfit)) return()
-      s <- fits_store(); s[[f$deviation]] <- newfit; fits_store(s)
-      optimize_pre(pre); optimize_post(newfit$objective)
-      p <- newfit$par
-      if ("a" %in% names(p))
-        shiny::updateNumericInput(session, "val_a", value = round(p[["a"]], 4))
-      if ("b" %in% names(p))
-        shiny::updateNumericInput(session, "val_b", value = round(p[["b"]], 4))
-      # Write the refined curve parameters back into the chemical panels -- one
-      # shared max to BOTH. The re-evaluation observer then reconciles the stored
-      # fit at these curves, keeping everything in sync.
-      inject1(list(max = p[["max"]], slope = p[["slope1"]], ec50 = p[["ec501"]]))
-      inject2(list(max = p[["max"]], slope = p[["slope2"]], ec50 = p[["ec502"]]))
-    })
 
     # Per-model explanation: tracks the reference and the selected model.
     output$interaction_help <- shiny::renderUI({
       shiny::req(frozen())
       interaction_help(input$reference, input$model)
-    })
-
-    # SSR/Deviance before -> after readout for the joint refine.
-    output$optimize_readout <- shiny::renderUI({
-      shiny::req(!is.null(optimize_post()), current_fit())
-      lab <- if (identical(current_fit()$response, "binary")) "Deviance" else "SSR"
-      improved <- optimize_post() <= optimize_pre() + 1e-9
-      shiny::tags$p(
-        shiny::tags$b(paste0(lab, ": ")),
-        round(optimize_pre(), 2), shiny::HTML(" &rarr; "), round(optimize_post(), 2),
-        if (improved) shiny::tags$span(style = "color:green", " ✓ improved"))
     })
 
     # Fit-objective readout for the displayed model.

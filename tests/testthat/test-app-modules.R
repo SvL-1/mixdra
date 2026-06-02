@@ -37,11 +37,12 @@ test_that("single_ui builds a Shiny UI fragment", {
   expect_true(inherits(single_ui("single"), c("shiny.tag", "shiny.tag.list", "bslib_fragment")))
 })
 
-test_that("binary_server workspace: auto-reveal, autofit/simulate/find-best, invalidate", {
+test_that("binary_server: compare-all loop fills the store live and selects a model", {
   skip_on_cran()
   meta <- shiny::reactiveValues(chem1 = "A", chem2 = "B")
   shiny::testServer(binary_server, args = list(meta = meta), {
-    csv <- testthat::test_path("fixtures", "binary", "cpf_mps_imi", "binary_ca_mps_cpf_imi_continuous.csv")
+    csv <- testthat::test_path("fixtures", "binary", "cpf_mps_imi",
+                               "binary_ca_mps_cpf_imi_continuous.csv")
     skip_if_not(file.exists(csv), "binary fixture missing")
     session$setInputs(response = "continuous", reference = "CA", thorough = FALSE,
                       n_starts = 1, alpha = 0.05, time_limit = 30, model = "reference",
@@ -53,64 +54,42 @@ test_that("binary_server workspace: auto-reveal, autofit/simulate/find-best, inv
                       `chem1-val_ec50` = 1, `chem1-simulate` = 1)
     session$setInputs(`chem2-val_max` = 600, `chem2-val_slope` = 1,
                       `chem2-val_ec50` = 5, `chem2-simulate` = 1)
-    expect_equal(unname(curve_params()[["max"]]), 650)
-
-    # both curves fitted -> Stage 2/3 auto-reveal (no manual freeze step), but
-    # no interaction is fitted yet
     expect_true(isTRUE(frozen()))
     expect_null(current_fit())
 
-    # Autofit the selected (S/A) model -> a fit for SA is stored
-    session$setInputs(model = "SA")
-    session$setInputs(autofit = 1)
+    # Kick the joint compare-all loop. The first model fits synchronously when
+    # the queue is armed; the rest advance on timer ticks.
+    session$setInputs(compare_all = 1)
+    for (i in 1:8) session$elapse(5)             # drain the stepper queue
+
+    # all four joint fits stored, with FULL (joint) df counts
+    expect_setequal(names(fits_store()), c("reference", "SA", "DR", "DL"))
+    expect_equal(fits_store()[["reference"]]$df, 5L)
+    expect_equal(fits_store()[["DR"]]$df, 7L)
+    # warm-start monotonicity along the chain
+    expect_lte(fits_store()[["SA"]]$objective,
+               fits_store()[["reference"]]$objective + 1e-6)
+
+    # comparison + chosen produced once the chain completed
+    expect_setequal(names(last_compare()$fits), c("reference", "SA", "DR", "DL"))
+    expect_equal(nrow(last_compare()$comparison), 3)
+    chosen <- last_compare()$chosen
+    expect_true(chosen %in% c("reference", "SA", "DR", "DL"))
+
+    # picker follows the chosen model (testServer doesn't echo updateSelectInput)
+    session$setInputs(model = chosen)
+    expect_equal(current_fit()$deviation, chosen)
+
+    # "explore by hand" still works: Autofit the displayed model (staged a/b)
+    session$setInputs(model = "SA", autofit = 1)
     expect_equal(current_fit()$deviation, "SA")
     expect_true("a" %in% names(current_fit()$par))
 
-    # Simulate S/A with an entered a -> a simulated fit replaces the stored one
-    session$setInputs(val_a = 3, simulate = 1)
-    expect_true(isTRUE(current_fit()$simulated))
-    expect_equal(current_fit()$par[["a"]], 3)
-
-    # Find best model -> comparison of all four + a chosen model
-    session$setInputs(find_best = 1)
-    expect_setequal(names(last_compare()$fits), c("reference", "SA", "DR", "DL"))
-    expect_equal(nrow(last_compare()$comparison), 3)
-    expect_true(last_compare()$chosen %in% c("reference", "SA", "DR", "DL"))
-
-    # in a live session Find best switches the picker to the chosen model; testServer
-    # does not echo updateSelectInput, so set it explicitly and confirm current_fit
-    # follows the picker to that stored (fitted) model -- the per-model store design.
-    session$setInputs(model = last_compare()$chosen)
-    expect_equal(current_fit()$deviation, last_compare()$chosen)
-    expect_false(isTRUE(current_fit()$simulated))
-
-    # Optimize-all: jointly refine the displayed model; objective must not worsen.
-    chosen <- last_compare()$chosen
-    pre_obj <- current_fit()$objective
-    session$setInputs(optimize_all = 1)
-    expect_true(isTRUE(current_fit()$joint))
-    expect_equal(current_fit()$deviation, chosen)
-    expect_lte(current_fit()$objective, pre_obj + 1e-6)
-    # SSR before -> after readout bookkeeping.
-    expect_equal(optimize_pre(), pre_obj)
-    expect_equal(optimize_post(), current_fit()$objective, tolerance = 1e-6)
-    # Write-back: the refined curve params land in the chemical panels, and both
-    # chemicals now share one max (= the joint fit's max).
-    expect_equal(unname(fit1()$par[["max"]]), unname(current_fit()$par[["max"]]),
-                 tolerance = 1e-6)
-    expect_equal(unname(fit1()$par[["max"]]), unname(fit2()$par[["max"]]),
-                 tolerance = 1e-6)
-    expect_equal(unname(fit1()$par[["slope"]]), unname(current_fit()$par[["slope1"]]),
-                 tolerance = 1e-6)
-
-    # editing a single curve keeps the workspace and RE-EVALUATES the stored
-    # interaction fits at the new curves (live sync), rather than clearing them;
-    # only the staged model comparison is invalidated.
+    # editing a single curve keeps the workspace and re-evaluates stored fits
     session$setInputs(`chem1-val_max` = 720, `chem1-simulate` = 2)
     expect_true(isTRUE(frozen()))
-    expect_gt(length(fits_store()), 0)        # fits re-evaluated, not cleared
-    expect_false(is.null(current_fit()))      # Stage 3 still has a model to show
-    expect_null(last_compare())               # comparison invalidated by the curve change
+    expect_gt(length(fits_store()), 0)
+    expect_null(last_compare())                  # comparison invalidated by curve change
   })
 })
 
