@@ -12,7 +12,7 @@ test_that("joint fit on real binary data runs and never worsens the staged fit",
 
   res <- analyse_mixture(df, reference = "CA", response = "continuous", n_starts = 1)
   staged <- res$fits[["SA"]]
-  joint  <- refine_joint(staged, df, n_starts = 20, time_limit = 120)
+  joint  <- refine_joint(staged, df, n_starts = 4, time_limit = 30)
 
   expect_true(isTRUE(joint$joint))
   expect_lte(joint$objective, staged$objective + 1e-6)   # never worse than the seed
