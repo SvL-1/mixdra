@@ -6,6 +6,10 @@
 app_ui <- function() {
   bslib::page_navbar(
     title = "Mixture Toxicity (mixdra)",
+    # Tabs use normal document flow and scroll rather than being squeezed into
+    # one viewport (the staged Binary tab in particular is tall: two curve
+    # panels + two gated stages).
+    fillable = FALSE,
     bslib::nav_panel("Introduction", intro_ui("intro")),
     bslib::nav_panel("Single Chemical", single_ui("single")),
     bslib::nav_panel("Binary Mixture", binary_ui("binary"))
