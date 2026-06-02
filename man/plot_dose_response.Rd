@@ -7,7 +7,8 @@
 plot_dose_response(fit, df, chem = 1, log_x = TRUE)
 }
 \arguments{
-\item{fit}{An enriched fit from \code{\link[=fit_model]{fit_model()}} or \code{\link[=fit_single]{fit_single()}}.}
+\item{fit}{An enriched fit from \code{\link[=fit_model]{fit_model()}} or \code{\link[=fit_single]{fit_single()}}, or \code{NULL}
+to plot the observed points alone (no fitted curve).}
 
 \item{df}{The data frame the fit was built from.}
 
@@ -21,5 +22,6 @@ A plotly object.
 }
 \description{
 Draws the fitted log-logistic marginal curve with the observed points
-overlaid, as an interactive plotly object.
+overlaid, as an interactive plotly object. With \code{fit = NULL} it shows only
+the observed points (raw data, before any fit).
 }

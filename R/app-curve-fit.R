@@ -177,13 +177,18 @@ curve_fit_server <- function(id, fit_df, meta, chem_field = NULL) {
                               vals[["max"]], vals[["slope"]], vals[["ec50"]]))
     })
 
+    # Dose-response: show the raw observed points as soon as data is imported
+    # (current_fit() is NULL -> no curve yet); the fitted curve overlays once
+    # Autofit/Simulate has run.
     output$dr <- plotly::renderPlotly({
-      shiny::req(current_fit())
-      p <- plot_dose_response(current_fit(), fit_df())
+      df <- fit_df()
+      shiny::req(!is.null(df), nrow(df) > 0)
+      p <- plot_dose_response(current_fit(), df)
       plotly::layout(p, xaxis = list(title = axis_label(meta, chem_field)),
                      yaxis = list(title = if (!is.null(meta$endpoint) && nzchar(meta$endpoint))
                                             meta$endpoint else "Response"))
     })
+    # Observed-vs-predicted needs model predictions, so it stays empty until a fit.
     output$op <- plotly::renderPlotly({
       shiny::req(current_fit())
       plot_obs_pred(current_fit(), fit_df())

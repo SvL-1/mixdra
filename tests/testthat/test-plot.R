@@ -8,6 +8,13 @@ test_that("plot_dose_response builds a plotly object", {
   expect_s3_class(p, "plotly")
 })
 
+test_that("plot_dose_response builds a plotly object from raw data (no fit)", {
+  skip_if_not_installed("plotly")
+  df <- data.frame(C1 = c(0, 0.5, 1, 2), Res = c(10, 8, 5, 2))
+  p <- plot_dose_response(NULL, df)
+  expect_s3_class(p, "plotly")
+})
+
 test_that("plot_obs_pred builds a plotly object", {
   skip_if_not_installed("plotly")
   fit <- list(kind = "mixture", pred = c(0.9, 0.5, 0.2))

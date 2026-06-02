@@ -15,13 +15,21 @@ obs_response <- function(df) {
 #' When every other chemical is at 0, both CA and IA reduce to the single
 #' three-parameter log-logistic, so the marginal curve is just [ll3_predict()]
 #' with that chemical's `slope`/`ec50` and the shared `max`.
-#' @param fit An enriched fit (from [fit_model()] or [fit_single()]).
+#' @param fit An enriched fit (from [fit_model()] or [fit_single()]), or `NULL`
+#'   to show only the observed points (raw data, before any fit). A `NULL` fit
+#'   uses the `C1` column (as produced for the Single tab and each marginal).
 #' @param df The data frame the fit was built from.
 #' @param chem Index of the chemical whose marginal to draw (mixtures only).
-#' @return A list: `curve` (data frame conc/response), `observed` (data frame
-#'   conc/response), `chem` (the concentration column name).
+#' @return A list: `curve` (data frame conc/response, or `NULL` when `fit` is
+#'   `NULL`), `observed` (data frame conc/response), `chem` (the concentration
+#'   column name).
 #' @keywords internal
 dr_curve_data <- function(fit, df, chem = 1) {
+  if (is.null(fit)) {
+    return(list(curve    = NULL,
+                observed = data.frame(conc = df$C1, response = obs_response(df)),
+                chem     = "C1"))
+  }
   if (isTRUE(fit$kind == "single")) {
     conc_col <- "C1"
     mx <- fit$par[["max"]]; sl <- fit$par[["slope"]]; ec <- fit$par[["ec50"]]

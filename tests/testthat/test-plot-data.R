@@ -17,6 +17,17 @@ test_that("dr_curve_data handles a single-chemical fit", {
   expect_equal(d$observed$response, df$Res)
 })
 
+test_that("dr_curve_data with no fit returns raw points only (no curve)", {
+  df <- data.frame(C1 = c(0, 0.5, 1, 2), Res = c(10, 8, 5, 2))
+  d <- dr_curve_data(NULL, df)
+  expect_null(d$curve)
+  expect_equal(d$observed$conc, df$C1)
+  expect_equal(d$observed$response, df$Res)
+  # also works for quantal data (proportion)
+  q <- data.frame(C1 = c(0, 1, 2), Affected = c(0, 5, 9), Exposed = rep(10, 3))
+  expect_equal(dr_curve_data(NULL, q)$observed$response, q$Affected / q$Exposed)
+})
+
 test_that("obs_pred_data returns fit$pred for a mixture fit", {
   fit <- list(kind = "mixture", pred = c(0.9, 0.5, 0.2))
   df <- data.frame(C1 = c(0, 1, 2), C2 = 0, Affected = c(9, 5, 2), Exposed = rep(10, 3))

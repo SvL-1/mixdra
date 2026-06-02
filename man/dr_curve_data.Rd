@@ -7,15 +7,18 @@
 dr_curve_data(fit, df, chem = 1)
 }
 \arguments{
-\item{fit}{An enriched fit (from \code{\link[=fit_model]{fit_model()}} or \code{\link[=fit_single]{fit_single()}}).}
+\item{fit}{An enriched fit (from \code{\link[=fit_model]{fit_model()}} or \code{\link[=fit_single]{fit_single()}}), or \code{NULL}
+to show only the observed points (raw data, before any fit). A \code{NULL} fit
+uses the \code{C1} column (as produced for the Single tab and each marginal).}
 
 \item{df}{The data frame the fit was built from.}
 
 \item{chem}{Index of the chemical whose marginal to draw (mixtures only).}
 }
 \value{
-A list: \code{curve} (data frame conc/response), \code{observed} (data frame
-conc/response), \code{chem} (the concentration column name).
+A list: \code{curve} (data frame conc/response, or \code{NULL} when \code{fit} is
+\code{NULL}), \code{observed} (data frame conc/response), \code{chem} (the concentration
+column name).
 }
 \description{
 When every other chemical is at 0, both CA and IA reduce to the single

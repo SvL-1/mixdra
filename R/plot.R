@@ -13,8 +13,10 @@ require_plotly <- function() {
 #' Plot a chemical's dose-response curve
 #'
 #' Draws the fitted log-logistic marginal curve with the observed points
-#' overlaid, as an interactive plotly object.
-#' @param fit An enriched fit from [fit_model()] or [fit_single()].
+#' overlaid, as an interactive plotly object. With `fit = NULL` it shows only
+#' the observed points (raw data, before any fit).
+#' @param fit An enriched fit from [fit_model()] or [fit_single()], or `NULL`
+#'   to plot the observed points alone (no fitted curve).
 #' @param df The data frame the fit was built from.
 #' @param chem Index of the chemical whose marginal to draw (mixtures only).
 #' @param log_x Use a log10 concentration axis (default `TRUE`). Control points
@@ -27,8 +29,9 @@ plot_dose_response <- function(fit, df, chem = 1, log_x = TRUE) {
   p <- plotly::plot_ly()
   p <- plotly::add_markers(p, x = d$observed$conc, y = d$observed$response,
                            name = "observed", marker = list(color = "black", size = 6))
-  p <- plotly::add_lines(p, x = d$curve$conc, y = d$curve$response,
-                         name = "fitted", line = list(color = "steelblue"))
+  if (!is.null(d$curve))
+    p <- plotly::add_lines(p, x = d$curve$conc, y = d$curve$response,
+                           name = "fitted", line = list(color = "steelblue"))
   plotly::layout(p,
     xaxis = list(title = d$chem, type = if (log_x) "log" else "linear"),
     yaxis = list(title = "response"))
