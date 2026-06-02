@@ -98,12 +98,15 @@ test_that("binary_server workspace: freeze gate, autofit/simulate/find-best, inv
     expect_equal(unname(current_fit()$par[["max"]]), held, tolerance = 1e-8)
     expect_true("max" %in% current_fit()$fixed)
 
-    # CI table: a pinned parameter shows no interval (it was not estimated).
-    cis <- param_ci(current_fit(), engine_df(), current_fit()$reference,
-                    current_fit()$deviation, current_fit()$response)
-    cis$lower[cis$parameter %in% current_fit()$fixed] <- NA
-    cis$upper[cis$parameter %in% current_fit()$fixed] <- NA
+    # CI table: a pinned parameter shows no interval (it was not estimated),
+    # but its held estimate is preserved. Uses the same helper the renderer does.
+    cis <- blank_pinned_ci(
+      param_ci(current_fit(), engine_df(), current_fit()$reference,
+               current_fit()$deviation, current_fit()$response),
+      current_fit()$fixed)
     expect_true(is.na(cis$lower[cis$parameter == "max"]))
+    expect_true(is.na(cis$upper[cis$parameter == "max"]))
+    expect_false(is.na(cis$estimate[cis$parameter == "max"]))  # held value preserved
 
     # editing a single curve after freezing invalidates everything
     session$setInputs(`chem1-val_max` = 720, `chem1-simulate` = 2)

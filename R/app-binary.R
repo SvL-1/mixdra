@@ -520,10 +520,7 @@ binary_server <- function(id, meta) {
         data.frame(parameter = names(f$par), value = round(unname(f$par), 4))
       } else {
         ci <- param_ci(f, engine_df(), f$reference, f$deviation, f$response)
-        if (isTRUE(f$joint) && length(f$fixed)) {
-          ci$lower[ci$parameter %in% f$fixed] <- NA
-          ci$upper[ci$parameter %in% f$fixed] <- NA
-        }
+        if (isTRUE(f$joint)) ci <- blank_pinned_ci(ci, f$fixed)
         ci
       }
       DT::datatable(tab, rownames = FALSE, options = list(dom = "t"))

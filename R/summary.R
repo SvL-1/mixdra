@@ -36,6 +36,25 @@ param_ci <- function(fit, df, reference, deviation, response, level = 0.95) {
              upper = unname(fit$par) + z * se)
 }
 
+#' Blank the confidence interval of pinned parameters
+#'
+#' Pinned (fixed) parameters in a joint fit were not estimated, so their
+#' [param_ci()] interval is meaningless. This sets `lower`/`upper` to `NA` for
+#' those parameters while leaving the held `estimate` intact. Returns `ci`
+#' unchanged when `fixed` is empty.
+#' @param ci A data frame from [param_ci()] (`parameter`, `estimate`, `lower`,
+#'   `upper`).
+#' @param fixed Character vector of parameter names that were held fixed.
+#' @return `ci` with pinned-parameter intervals blanked.
+#' @keywords internal
+blank_pinned_ci <- function(ci, fixed) {
+  if (length(fixed)) {
+    ci$lower[ci$parameter %in% fixed] <- NA
+    ci$upper[ci$parameter %in% fixed] <- NA
+  }
+  ci
+}
+
 #' Assemble the Table-2 style result block from an analysis
 #' @param res An [analyse_mixture()] result.
 #' @return A matrix: parameters + `objective`/`df` in rows, models in columns.
