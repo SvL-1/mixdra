@@ -4,12 +4,20 @@
 \alias{collect_bounds}
 \title{Assemble lower/upper bound vectors from Advanced-panel inputs}
 \usage{
-collect_bounds(values, params = c("max", "slope1", "slope2", "ec501", "ec502"))
+collect_bounds(
+  values,
+  params = c("max", "slope1", "slope2", "ec501", "ec502"),
+  lo_prefix = "lo_",
+  hi_prefix = "hi_"
+)
 }
 \arguments{
 \item{values}{Named list (e.g. a Shiny \code{input}) holding \verb{lo_*}/\verb{hi_*} numbers.}
 
 \item{params}{Character vector of parameter names to read.}
+
+\item{lo_prefix, hi_prefix}{Input-id prefix for lower/upper bounds
+(default \code{"lo_"} / \code{"hi_"}).}
 }
 \value{
 A list with \code{lower} and \code{upper} named numeric vectors (or NULL).

@@ -113,3 +113,36 @@ test_that("assemble_curve_params averages max and keeps per-chemical slope/ec50"
   expect_equal(unname(p[["ec501"]]),  1)
   expect_equal(unname(p[["ec502"]]),  5)
 })
+
+test_that("collect_bounds_all reads lower/upper for all seven binary params", {
+  vals <- list(olo_max = 100, ohi_max = 1000,
+               olo_a = 0,   ohi_a = 5,
+               olo_b = NA,  ohi_b = NA)
+  b <- collect_bounds_all(vals)
+  expect_equal(b$lower[["max"]], 100)
+  expect_equal(b$upper[["max"]], 1000)
+  expect_equal(b$lower[["a"]], 0)
+  expect_equal(b$upper[["a"]], 5)
+  expect_false("b" %in% names(b$lower))   # blank dropped
+})
+
+test_that("split_fixed_bounds turns equal lower/upper into a fixed param", {
+  start <- c(max = 800, slope1 = 4, slope2 = 1.5, ec501 = 0.08, ec502 = 1, a = 1.5)
+  sp <- split_fixed_bounds(lower = c(max = 800, a = 0),
+                           upper = c(max = 800, a = 5), start = start)
+  expect_true("max" %in% sp$fixed)     # equal bounds -> fixed
+  expect_false("a" %in% sp$fixed)      # a is a true range, not pinned
+  expect_equal(sp$start[["max"]], 800) # pinned at the equal-bound value
+  expect_null(sp$lower[["max"]])       # pinned param dropped from bounds
+  expect_equal(sp$lower[["a"]], 0)
+  expect_equal(sp$upper[["a"]], 5)
+})
+
+test_that("split_fixed_bounds with no bounds returns empty fixed and NULL bounds", {
+  start <- c(max = 800, slope1 = 4, slope2 = 1.5, ec501 = 0.08, ec502 = 1)
+  sp <- split_fixed_bounds(lower = numeric(0), upper = numeric(0), start = start)
+  expect_length(sp$fixed, 0)
+  expect_null(sp$lower)
+  expect_null(sp$upper)
+  expect_equal(sp$start, start)
+})

@@ -155,10 +155,13 @@ assemble_curve_params <- function(fit1, fit2) {
 #' `max`/`slope`/`ec50`); the default is the binary base set.
 #' @param values Named list (e.g. a Shiny `input`) holding `lo_*`/`hi_*` numbers.
 #' @param params Character vector of parameter names to read.
+#' @param lo_prefix,hi_prefix Input-id prefix for lower/upper bounds
+#'   (default `"lo_"` / `"hi_"`).
 #' @return A list with `lower` and `upper` named numeric vectors (or NULL).
 #' @keywords internal
 collect_bounds <- function(values,
-                           params = c("max", "slope1", "slope2", "ec501", "ec502")) {
+                           params = c("max", "slope1", "slope2", "ec501", "ec502"),
+                           lo_prefix = "lo_", hi_prefix = "hi_") {
   pick <- function(prefix) {
     v <- vapply(params, function(p) {
       x <- values[[paste0(prefix, p)]]
@@ -167,5 +170,47 @@ collect_bounds <- function(values,
     v <- v[!is.na(v)]
     if (length(v)) v else NULL
   }
-  list(lower = pick("lo_"), upper = pick("hi_"))
+  list(lower = pick(lo_prefix), upper = pick(hi_prefix))
+}
+
+#' Read the 7-parameter lower/upper grid from the Optimize-all panel
+#'
+#' Thin wrapper over [collect_bounds()] for the full binary parameter set
+#' (curve params + interaction `a`/`b`), reading the Optimize-all panel's
+#' `olo_*` / `ohi_*` inputs.
+#' @param values Named list (e.g. a Shiny `input`) holding `olo_*`/`ohi_*`.
+#' @param params Parameter names to read (default: the binary 7-set).
+#' @return A list with `lower` and `upper` named numeric vectors (or NULL).
+#' @keywords internal
+collect_bounds_all <- function(values,
+                               params = c("max", "slope1", "slope2",
+                                          "ec501", "ec502", "a", "b")) {
+  collect_bounds(values, params, lo_prefix = "olo_", hi_prefix = "ohi_")
+}
+
+#' Split a lower/upper bound set into pinned (fixed) params and free bounds
+#'
+#' A parameter whose lower and upper bounds are both present and equal is treated
+#' as PINNED: it goes into `fixed` at that value (and `start` is set to it). The
+#' remaining bounds pass through as true ranges. This routes "fix via Lower =
+#' Upper" through [fit_model()]'s `fixed` argument, avoiding the `lower == upper`
+#' error that L-BFGS-B would otherwise raise.
+#' @param lower,upper Named numeric vectors of bounds (may be empty or NULL).
+#' @param start Named numeric starting vector (all model params).
+#' @return A list: `fixed` (character), `start` (with pinned values applied),
+#'   `lower`, `upper` (named numerics with pinned params removed, or NULL).
+#' @keywords internal
+split_fixed_bounds <- function(lower, upper, start) {
+  if (is.null(lower)) lower <- numeric(0)
+  if (is.null(upper)) upper <- numeric(0)
+  common <- intersect(names(lower), names(upper))
+  eq <- common[is.finite(lower[common]) & is.finite(upper[common]) &
+                 abs(lower[common] - upper[common]) <= 1e-12]
+  start[eq] <- lower[eq]
+  drop_lo <- lower[setdiff(names(lower), eq)]
+  drop_hi <- upper[setdiff(names(upper), eq)]
+  list(fixed = eq,
+       start = start,
+       lower = if (length(drop_lo)) as.list(drop_lo) else NULL,
+       upper = if (length(drop_hi)) as.list(drop_hi) else NULL)
 }
