@@ -56,13 +56,19 @@ blank_pinned_ci <- function(ci, fixed) {
 }
 
 #' Assemble the Table-2 style result block from an analysis
+#'
+#' Rows are the union of model parameters plus `objective`, `df`, and
+#' `p (vs parent)` -- the likelihood-ratio p-value comparing each model to the
+#' one it nests within (from `res$comparison`). The reference model has no
+#' parent, so its p-value is `NA`.
 #' @param res An [analyse_mixture()] result.
-#' @return A matrix: parameters + `objective`/`df` in rows, models in columns.
+#' @return A matrix: parameters + `objective`/`df`/`p (vs parent)` in rows,
+#'   models in columns.
 #' @export
 result_table <- function(res) {
   models <- names(res$fits)
   all_params <- unique(unlist(lapply(res$fits, function(f) names(f$par))))
-  rows <- c(all_params, "objective", "df")
+  rows <- c(all_params, "objective", "df", "p (vs parent)")
   tab <- matrix(NA_real_, nrow = length(rows), ncol = length(models),
                 dimnames = list(rows, models))
   for (m in models) {
@@ -70,6 +76,12 @@ result_table <- function(res) {
     tab[names(f$par), m] <- f$par
     tab["objective", m] <- f$objective
     tab["df", m] <- f$df
+  }
+  if (!is.null(res$comparison) && nrow(res$comparison)) {
+    for (i in seq_len(nrow(res$comparison))) {
+      m <- res$comparison$model[i]
+      if (m %in% models) tab["p (vs parent)", m] <- res$comparison$p[i]
+    }
   }
   tab
 }

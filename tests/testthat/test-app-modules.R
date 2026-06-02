@@ -37,7 +37,7 @@ test_that("single_ui builds a Shiny UI fragment", {
   expect_true(inherits(single_ui("single"), c("shiny.tag", "shiny.tag.list", "bslib_fragment")))
 })
 
-test_that("binary_server workspace: freeze gate, autofit/simulate/find-best, invalidate", {
+test_that("binary_server workspace: auto-reveal, autofit/simulate/find-best, invalidate", {
   skip_on_cran()
   meta <- shiny::reactiveValues(chem1 = "A", chem2 = "B")
   shiny::testServer(binary_server, args = list(meta = meta), {
@@ -55,8 +55,8 @@ test_that("binary_server workspace: freeze gate, autofit/simulate/find-best, inv
                       `chem2-val_ec50` = 5, `chem2-simulate` = 1)
     expect_equal(unname(curve_params()[["max"]]), 650)
 
-    # freeze locks curves but does NOT fit
-    session$setInputs(freeze = 1)
+    # both curves fitted -> Stage 2/3 auto-reveal (no manual freeze step), but
+    # no interaction is fitted yet
     expect_true(isTRUE(frozen()))
     expect_null(current_fit())
 
@@ -108,19 +108,23 @@ test_that("binary_server workspace: freeze gate, autofit/simulate/find-best, inv
     expect_true(is.na(cis$upper[cis$parameter == "max"]))
     expect_false(is.na(cis$estimate[cis$parameter == "max"]))  # held value preserved
 
-    # editing a single curve after freezing invalidates everything
+    # editing a single curve clears the stale interaction fits; the workspace
+    # itself stays revealed because both curves are still fitted
     session$setInputs(`chem1-val_max` = 720, `chem1-simulate` = 2)
-    expect_false(isTRUE(frozen()))
+    expect_true(isTRUE(frozen()))
     expect_equal(length(fits_store()), 0)
     expect_null(last_compare())
   })
 })
 
-test_that("binary_ui: Freeze-only button + Stage 2 workspace", {
+test_that("binary_ui: auto-reveal (no Freeze button) + Stage 2 workspace", {
   html <- as.character(binary_ui("binary"))
-  # Freeze no longer fits
-  expect_match(html, "Freeze curves", fixed = TRUE)
-  expect_false(grepl("Freeze curves → fit interactions", html, fixed = TRUE))
+  # the manual Freeze checkpoint is gone -- Stage 2/3 auto-reveal
+  expect_false(grepl("Freeze curves", html, fixed = TRUE))
+  expect_false(grepl("binary-freeze", html, fixed = TRUE))
+  # the Stage-2 LR comparison table moved down into the results section
+  expect_false(grepl("binary-comparison", html, fixed = TRUE))
+  expect_match(html, "binary-results", fixed = TRUE)
   # Stage 2 workspace: model picker, a/b value input, the three actions
   expect_match(html, "binary-model", fixed = TRUE)
   expect_match(html, "binary-val_a", fixed = TRUE)

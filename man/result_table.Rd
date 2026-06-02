@@ -10,8 +10,12 @@ result_table(res)
 \item{res}{An \code{\link[=analyse_mixture]{analyse_mixture()}} result.}
 }
 \value{
-A matrix: parameters + \code{objective}/\code{df} in rows, models in columns.
+A matrix: parameters + \code{objective}/\code{df}/\verb{p (vs parent)} in rows,
+models in columns.
 }
 \description{
-Assemble the Table-2 style result block from an analysis
+Rows are the union of model parameters plus \code{objective}, \code{df}, and
+\verb{p (vs parent)} -- the likelihood-ratio p-value comparing each model to the
+one it nests within (from \code{res$comparison}). The reference model has no
+parent, so its p-value is \code{NA}.
 }

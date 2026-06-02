@@ -89,20 +89,21 @@ binary_ui <- function(id) {
       shiny::uiOutput(ns("errors"))
     ),
 
-    # Stage 1 -- two single-chemical curve panels + the freeze checkpoint.
+    # Stage 1 -- two single-chemical curve panels. The interaction workspace
+    # (Stage 2) appears automatically once both curves are fitted.
     bslib::card(
       bslib::card_header("Stage 1 · Single curves"),
-      shiny::p("Review and adjust each chemical's dose-response curve, then freeze ",
-               "to fit the interaction. The mixture model uses one shared ",
-               shiny::tags$code("max"), " (the average of the two fits)."),
+      shiny::p("Fit each chemical's dose-response curve (Autofit or Simulate). ",
+               "The interaction workspace appears once both are fitted. The ",
+               "mixture model uses one shared ", shiny::tags$code("max"),
+               " (the average of the two fits)."),
       bslib::layout_columns(
         shiny::div(shiny::h5(shiny::textOutput(ns("chem1_title"))),
                    curve_fit_ui(ns("chem1"))),
         shiny::div(shiny::h5(shiny::textOutput(ns("chem2_title"))),
                    curve_fit_ui(ns("chem2")))
       ),
-      shiny::actionButton(ns("freeze"), "Freeze curves", class = "btn-primary"),
-      shiny::uiOutput(ns("freeze_note"))
+      shiny::uiOutput(ns("reveal_note"))
     ),
 
     # Stage 2 -- per-model interaction workspace (revealed once frozen).
@@ -158,7 +159,6 @@ binary_ui <- function(id) {
           shiny::actionButton(ns("simulate"), "Simulate")
         ),
         shiny::uiOutput(ns("objective")),
-        DT::DTOutput(ns("comparison")),
 
         shiny::tags$b("Fit options"),
         bslib::layout_columns(
@@ -213,7 +213,10 @@ binary_ui <- function(id) {
         bslib::card(bslib::card_header("Observed vs predicted"),
                     plotly::plotlyOutput(ns("op"))),
         bslib::layout_columns(
-          bslib::card(bslib::card_header("Results table"), DT::DTOutput(ns("results"))),
+          bslib::card(bslib::card_header("Results & model comparison"),
+                      shiny::helpText("Run “Find best model” to populate. ",
+                                      "The selected (best) model is highlighted."),
+                      DT::DTOutput(ns("results"))),
           bslib::card(bslib::card_header("Confidence intervals (displayed model)"),
                       DT::DTOutput(ns("cis")))
         )
@@ -271,8 +274,9 @@ binary_server <- function(id, meta) {
     fit1 <- curve_fit_server("chem1", fit_df = m1, meta = meta, chem_field = "chem1")
     fit2 <- curve_fit_server("chem2", fit_df = m2, meta = meta, chem_field = "chem2")
 
-    # Checkpoint state. `frozen` gates Stages 2-3 (exposed to the UI as an output).
-    frozen <- shiny::reactiveVal(FALSE)
+    # Stages 2-3 are gated on `frozen`: both single curves fitted. There is no
+    # manual freeze step -- the workspace simply appears once both fits exist.
+    frozen <- shiny::reactive(!is.null(fit1()) && !is.null(fit2()))
     output$frozen <- shiny::reactive(isTRUE(frozen()))
     shiny::outputOptions(output, "frozen", suspendWhenHidden = FALSE)
 
@@ -306,36 +310,26 @@ binary_server <- function(id, meta) {
     n_starts_eff <- shiny::reactive(
       if (isTRUE(input$thorough)) max(input$n_starts, 20) else input$n_starts)
 
-    output$freeze_note <- shiny::renderUI({
+    output$reveal_note <- shiny::renderUI({
       if (is.null(fit1()) || is.null(fit2()))
         shiny::div(class = "text-muted",
                    shiny::tags$small(
-                     "Fit both single curves (Autofit or Simulate) before freezing."))
+                     "Fit both single curves (Autofit or Simulate) to reveal ",
+                     "the interaction workspace."))
     })
 
-    # Freeze only locks the curves and reveals Stage 2 -- it does not fit.
-    shiny::observeEvent(input$freeze, {
-      if (is.null(fit1()) || is.null(fit2())) {
-        shiny::showNotification("Fit both single curves before freezing.", type = "warning")
-        return()
-      }
-      frozen(TRUE)
-    })
-
-    # A changed curve or header model invalidates the freeze and clears all fits.
+    # A changed curve or header model makes the stored interaction fits stale, so
+    # clear them (the workspace itself stays visible while both curves are fit).
     shiny::observeEvent(
       list(fit1(), fit2(), input$reference, input$response),
       {
-        if (isTRUE(frozen())) {
-          frozen(FALSE)
-          fits_store(list())
-          last_compare(NULL)
-          optimize_pre(NULL)
-          optimize_post(NULL)
-          for (p in c("max", "slope1", "slope2", "ec501", "ec502", "a", "b")) {
-            shiny::updateNumericInput(session, paste0("olo_", p), value = NA)
-            shiny::updateNumericInput(session, paste0("ohi_", p), value = NA)
-          }
+        fits_store(list())
+        last_compare(NULL)
+        optimize_pre(NULL)
+        optimize_post(NULL)
+        for (p in c("max", "slope1", "slope2", "ec501", "ec502", "a", "b")) {
+          shiny::updateNumericInput(session, paste0("olo_", p), value = NA)
+          shiny::updateNumericInput(session, paste0("ohi_", p), value = NA)
         }
       },
       ignoreInit = TRUE)
@@ -507,15 +501,18 @@ binary_server <- function(id, meta) {
       shiny::req(frozen(), current_fit()); plot_obs_pred(current_fit(), engine_df())
     })
 
-    # Table-2 style all-models matrix -- only meaningful after Find best.
+    # Table-2 style all-models matrix (params + objective/df + LR p-value), with
+    # the selected (best) model's column highlighted. Only meaningful after Find
+    # best, which is the sole writer of `last_compare()`.
     output$results <- DT::renderDT({
       shiny::req(last_compare())
+      chosen <- last_compare()$chosen
       tab <- round(result_table(last_compare()), 4)
-      DT::datatable(as.data.frame(tab), options = list(dom = "t"))
-    })
-    output$comparison <- DT::renderDT({
-      shiny::req(last_compare())
-      DT::datatable(last_compare()$comparison, rownames = FALSE, options = list(dom = "t"))
+      dt <- DT::datatable(as.data.frame(tab), options = list(dom = "t"))
+      if (!is.null(chosen) && chosen %in% colnames(tab))
+        dt <- DT::formatStyle(dt, columns = chosen, target = "cell",
+                              fontWeight = "bold", backgroundColor = "#d8f0d8")
+      dt
     })
     # CIs for a fitted model; a simulated (hand-entered) set has no CIs, so show
     # its entered values instead (honest -- those are the numbers you set).
