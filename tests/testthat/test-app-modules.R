@@ -77,6 +77,13 @@ test_that("binary_server workspace: freeze gate, autofit/simulate/find-best, inv
     expect_equal(nrow(last_compare()$comparison), 3)
     expect_true(last_compare()$chosen %in% c("reference", "SA", "DR", "DL"))
 
+    # in a live session Find best switches the picker to the chosen model; testServer
+    # does not echo updateSelectInput, so set it explicitly and confirm current_fit
+    # follows the picker to that stored (fitted) model -- the per-model store design.
+    session$setInputs(model = last_compare()$chosen)
+    expect_equal(current_fit()$deviation, last_compare()$chosen)
+    expect_false(isTRUE(current_fit()$simulated))
+
     # editing a single curve after freezing invalidates everything
     session$setInputs(`chem1-val_max` = 720, `chem1-simulate` = 2)
     expect_false(isTRUE(frozen()))
