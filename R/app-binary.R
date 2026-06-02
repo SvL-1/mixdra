@@ -467,7 +467,7 @@ binary_server <- function(id, meta) {
     })
 
     output$optimize_readout <- shiny::renderUI({
-      shiny::req(optimize_post())
+      shiny::req(!is.null(optimize_post()))
       lab <- if (identical(current_fit()$response, "binary")) "Deviance" else "SSR"
       improved <- optimize_post() <= optimize_pre() + 1e-9
       shiny::tags$p(
