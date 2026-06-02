@@ -44,15 +44,13 @@ model_spec <- function(reference, deviation, n_chem) {
                    DR = "SA",
                    DL = "SA",
                    ASA = "SA")
-  dev_key <- switch(deviation,
-                    reference = suffix,
-                    SA = paste0("sa_", suffix),
-                    DR = paste0("dr_", suffix),
-                    DL = paste0("dl_", suffix),
-                    ASA = paste0("asa_", suffix))
-  key <- paste0(tolower(reference), "_", dev_key, "_vec")
+  fn <- if (deviation == "ASA") {
+    get(paste0(tolower(reference), "_asa_", suffix, "_vec"), mode = "function")
+  } else {
+    make_adapter(reference, deviation, n_chem)
+  }
 
-  list(fn = get(key, mode = "function"),
+  list(fn = fn,
        params = c(base_params, extra),
        extra = extra,
        parent = parent)
