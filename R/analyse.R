@@ -133,18 +133,8 @@ analyse_mixture <- function(df, reference, response = c("continuous", "binary"),
               time_limit = time_limit))
   names(fits) <- devs
 
-  n <- nrow(df)
-  parent_of <- c(SA = "reference", DR = "SA", DL = "SA")[
-    if (n_chem == 2) c("SA", "DR", "DL") else "SA"]
-  comparison <- do.call(rbind, lapply(names(parent_of), function(m) {
-    p <- parent_of[[m]]
-    t <- lr_test(fits[[p]]$objective, fits[[m]]$objective,
-                 fits[[p]]$df, fits[[m]]$df, n, response)
-    data.frame(model = m, parent = p, chi = t$chi, df = t$df, p = t$p)
-  }))
-
-  list(fits = fits, comparison = comparison,
-       chosen = select_parsimonious(fits, n, response, alpha),
+  cmp <- compare_fits(fits, nrow(df), response, alpha)
+  list(fits = fits, comparison = cmp$comparison, chosen = cmp$chosen,
        reference = reference, response = response)
 }
 

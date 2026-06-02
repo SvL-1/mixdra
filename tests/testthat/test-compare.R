@@ -26,3 +26,29 @@ test_that("select_parsimonious keeps the simplest model not significantly beaten
   pick <- select_parsimonious(fits, n = 145, response = "continuous", alpha = 0.05)
   expect_equal(pick, "reference")
 })
+
+test_that("compare_fits builds the LR comparison frame and chooses a model", {
+  df <- (function() {
+    g <- expand.grid(C1 = c(0, 0.05, 0.2), C2 = c(0, 0.5, 5))
+    g$Res <- ca_bi_vec(g$C1, g$C2, 800, 4, 1.5, 0.08, 1)
+    g
+  })()
+  seed <- c(max = 800, slope1 = 4, slope2 = 1.5, ec501 = 0.08, ec502 = 1)
+  fits <- lapply(c("reference", "SA", "DR", "DL"), function(d)
+    fit_model(df, "CA", d, "continuous", start = seed, fixed = names(seed)))
+  names(fits) <- c("reference", "SA", "DR", "DL")
+
+  cmp <- compare_fits(fits, n = nrow(df), response = "continuous", alpha = 0.05)
+  expect_true(all(c("model", "parent", "chi", "df", "p") %in% names(cmp$comparison)))
+  expect_equal(nrow(cmp$comparison), 3)          # SA, DR, DL each vs their parent
+  expect_true(cmp$chosen %in% c("reference", "SA", "DR", "DL"))
+})
+
+test_that("compare_fits handles a ternary (reference + SA only) fit set", {
+  fits <- list(
+    reference = list(objective = 10, df = 7),
+    SA        = list(objective = 9,  df = 8))
+  cmp <- compare_fits(fits, n = 27, response = "continuous", alpha = 0.05)
+  expect_equal(nrow(cmp$comparison), 1)          # only SA vs reference
+  expect_equal(cmp$comparison$model, "SA")
+})

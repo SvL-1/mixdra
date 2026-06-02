@@ -47,3 +47,35 @@ select_parsimonious <- function(fits, n, response, alpha = 0.05) {
   }
   best
 }
+
+#' Build the nested-model comparison frame and choose a model
+#'
+#' Regime-agnostic: works whether the fits are staged (curves fixed, only a/b
+#' free) or fully joint (all parameters free). It only reads each fit's
+#' `objective` and `df`, so the likelihood-ratio differences are identical in
+#' form either way. The parent chain is `SA` vs `reference`, `DR`/`DL` vs `SA`;
+#' models absent from `fits` are dropped (e.g. ternary reference + SA only).
+#' @param fits Named list of fits (subset of `reference`, `SA`, `DR`, `DL`),
+#'   each with `objective` and `df`.
+#' @param n Number of observations.
+#' @param response "continuous" or "binary".
+#' @param alpha Significance threshold for [select_parsimonious()].
+#' @return A list: `comparison` (data frame of LR tests, or `NULL` if no
+#'   non-reference model is present) and `chosen` (selected model name).
+#' @export
+compare_fits <- function(fits, n, response, alpha = 0.05) {
+  parent_of <- c(SA = "reference", DR = "SA", DL = "SA")
+  parent_of <- parent_of[intersect(names(parent_of), names(fits))]
+  comparison <- if (length(parent_of)) {
+    do.call(rbind, lapply(names(parent_of), function(m) {
+      p <- parent_of[[m]]
+      t <- lr_test(fits[[p]]$objective, fits[[m]]$objective,
+                   fits[[p]]$df, fits[[m]]$df, n, response)
+      data.frame(model = m, parent = p, chi = t$chi, df = t$df, p = t$p)
+    }))
+  } else {
+    NULL
+  }
+  list(comparison = comparison,
+       chosen = select_parsimonious(fits, n, response, alpha))
+}
