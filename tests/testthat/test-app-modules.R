@@ -91,11 +91,17 @@ test_that("binary_server workspace: auto-reveal, autofit/simulate/find-best, inv
     expect_true(isTRUE(current_fit()$joint))
     expect_equal(current_fit()$deviation, chosen)
     expect_lte(current_fit()$objective, pre_obj + 1e-6)
-    # Initial vs Optimized bookkeeping: the seed (par + objective) is captured
-    # and the post-refine fit is stored for the table to display side by side.
+    # SSR before -> after readout bookkeeping.
     expect_equal(optimize_pre(), pre_obj)
-    expect_true("max" %in% names(optimize_init()))
-    expect_equal(optimize_fit()$objective, current_fit()$objective)
+    expect_equal(optimize_post(), current_fit()$objective, tolerance = 1e-6)
+    # Write-back: the refined curve params land in the chemical panels, and both
+    # chemicals now share one max (= the joint fit's max).
+    expect_equal(unname(fit1()$par[["max"]]), unname(current_fit()$par[["max"]]),
+                 tolerance = 1e-6)
+    expect_equal(unname(fit1()$par[["max"]]), unname(fit2()$par[["max"]]),
+                 tolerance = 1e-6)
+    expect_equal(unname(fit1()$par[["slope"]]), unname(current_fit()$par[["slope1"]]),
+                 tolerance = 1e-6)
 
     # Pinning max via equal bounds holds it across a re-optimize.
     held <- unname(current_fit()$par[["max"]])
@@ -113,12 +119,14 @@ test_that("binary_server workspace: auto-reveal, autofit/simulate/find-best, inv
     expect_true(is.na(cis$upper[cis$parameter == "max"]))
     expect_false(is.na(cis$estimate[cis$parameter == "max"]))  # held value preserved
 
-    # editing a single curve clears the stale interaction fits; the workspace
-    # itself stays revealed because both curves are still fitted
+    # editing a single curve keeps the workspace and RE-EVALUATES the stored
+    # interaction fits at the new curves (live sync), rather than clearing them;
+    # only the staged model comparison is invalidated.
     session$setInputs(`chem1-val_max` = 720, `chem1-simulate` = 2)
     expect_true(isTRUE(frozen()))
-    expect_equal(length(fits_store()), 0)
-    expect_null(last_compare())
+    expect_gt(length(fits_store()), 0)        # fits re-evaluated, not cleared
+    expect_false(is.null(current_fit()))      # Stage 3 still has a model to show
+    expect_null(last_compare())               # comparison invalidated by the curve change
   })
 })
 
@@ -181,13 +189,14 @@ test_that("interaction_param_row renders a value input with inert bound cells", 
   expect_false(grepl("binary-hi_a", html, fixed = TRUE))  # no Upper input
 })
 
-test_that("binary_ui: Optimize-all card with bounds grid + initial/optimized cells", {
+test_that("binary_ui: Optimize-all card with a bounds/pin grid", {
   html <- as.character(binary_ui("binary"))
   expect_match(html, "Optimize all params", fixed = TRUE)     # button
   expect_match(html, "binary-olo_max", fixed = TRUE)          # lower input
   expect_match(html, "binary-ohi_ec502", fixed = TRUE)        # upper input
-  expect_match(html, "binary-oini_a", fixed = TRUE)           # initial (seed) cell
-  expect_match(html, "binary-oopt_a", fixed = TRUE)           # optimized result cell
-  expect_match(html, "binary-optimize_obj_row", fixed = TRUE) # SSR/Deviance row
+  expect_match(html, "binary-optimize_readout", fixed = TRUE) # SSR before->after readout
   expect_match(html, "binary-optimize_all", fixed = TRUE)     # action id
+  # the per-parameter Initial/Optimized cells are gone (single source of truth)
+  expect_false(grepl("binary-oini_a", html, fixed = TRUE))
+  expect_false(grepl("binary-oopt_a", html, fixed = TRUE))
 })

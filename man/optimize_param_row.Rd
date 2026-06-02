@@ -2,24 +2,24 @@
 % Please edit documentation in R/app-curve-fit.R
 \name{optimize_param_row}
 \alias{optimize_param_row}
-\title{One Optimize-all row: label, lower/upper bound inputs, initial + optimized}
+\title{One Optimize-all row: label, meaning, and lower/upper bound inputs}
 \usage{
 optimize_param_row(ns, param, label, meaning)
 }
 \arguments{
 \item{ns}{Module namespace function.}
 
-\item{param}{Parameter key (e.g. \code{max}, \code{a}); drives the input/output ids.}
+\item{param}{Parameter key (e.g. \code{max}, \code{a}); drives the input ids.}
 
 \item{label}{Display label.}
 
-\item{meaning}{One-line explanation (shown as a hover tooltip on the label).}
+\item{meaning}{One-line explanation.}
 }
 \description{
-Five-column layout: parameter name (with the plain-English \code{meaning} as a
-hover tooltip), the \code{olo_}/\code{ohi_} bound inputs (set Lower = Upper to pin a
-parameter), then read-only \code{oini_} (seed / pre-optimize value) and \code{oopt_}
-(post-optimize value) cells. The \verb{o*} prefixes are distinct from the Stage-1
-curve grid and the Stage-2 a/b inputs so the panel never collides with them.
+Four-column layout: parameter name, plain-English meaning, and the
+\code{olo_}/\code{ohi_} bound inputs (set Lower = Upper to pin a parameter). The current
+value is not shown here -- it lives in the chemical panels / a/b grid (single
+source of truth). The \verb{o*} prefixes are distinct from the Stage-1 curve grid
+and the Stage-2 a/b inputs so the panel never collides with them.
 }
 \keyword{internal}

@@ -167,40 +167,7 @@ binary_ui <- function(id) {
           shiny::actionButton(ns("autofit"), "Autofit (a, b)", class = "btn-primary"),
           shiny::actionButton(ns("simulate"), "Simulate")
         ),
-        shiny::uiOutput(ns("objective")),
-
-        shiny::conditionalPanel(
-          condition = "output.has_fit", ns = ns,
-          bslib::card(
-            bslib::card_header("Optimize all parameters (joint)"),
-            shiny::p("Refines the displayed model by fitting every parameter at ",
-                     "once, seeded from the current fit. Fix any parameter by ",
-                     "setting its Lower = Upper. ",
-                     shiny::tags$b("Initial"), " is the seeded value; ",
-                     shiny::tags$b("Optimized"), " is the result after clicking."),
-            shiny::fluidRow(
-              shiny::column(2, shiny::tags$small(shiny::tags$b("Parameter"))),
-              shiny::column(2, shiny::tags$small(shiny::tags$b("Lower"))),
-              shiny::column(2, shiny::tags$small(shiny::tags$b("Upper"))),
-              shiny::column(3, shiny::tags$small(shiny::tags$b("Initial"))),
-              shiny::column(3, shiny::tags$small(shiny::tags$b("Optimized")))
-            ),
-            optimize_param_row(ns, "max", "max", "Control response (upper plateau)."),
-            optimize_param_row(ns, "slope1", "slope1", "Chemical 1 curve steepness."),
-            optimize_param_row(ns, "slope2", "slope2", "Chemical 2 curve steepness."),
-            optimize_param_row(ns, "ec501", "EC50 1", "Chemical 1 half-effect conc."),
-            optimize_param_row(ns, "ec502", "EC50 2", "Chemical 2 half-effect conc."),
-            optimize_param_row(ns, "a", "a", "Overall interaction strength/direction."),
-            shiny::conditionalPanel(
-              condition = "input.model == 'DR' || input.model == 'DL'", ns = ns,
-              optimize_param_row(ns, "b", "b",
-                                 "Interaction shift with ratio / dose level.")),
-            shiny::hr(),
-            shiny::uiOutput(ns("optimize_obj_row")),
-            shiny::actionButton(ns("optimize_all"), "Optimize all params",
-                                class = "btn-primary")
-          )
-        )
+        shiny::uiOutput(ns("objective"))
       )
     ),
 
@@ -235,6 +202,40 @@ binary_ui <- function(id) {
                       DT::DTOutput(ns("results"))),
           bslib::card(bslib::card_header("Confidence intervals (displayed model)"),
                       DT::DTOutput(ns("cis")))
+        ),
+
+        # Joint refinement of the displayed model. Lives here in Stage 3 (a
+        # final polish on the chosen model), and writes its results straight
+        # back into the chemical panels + a/b grid -- one source of truth.
+        shiny::conditionalPanel(
+          condition = "output.has_fit", ns = ns,
+          bslib::card(
+            bslib::card_header("Optimize all parameters (joint)"),
+            shiny::p("Refines the displayed model by fitting every parameter at ",
+                     "once, seeded from the current values. The refined curve ",
+                     "parameters are written back into the chemical panels above ",
+                     "(both share one ", shiny::tags$code("max"), "). Fix any ",
+                     "parameter by setting its Lower = Upper."),
+            shiny::fluidRow(
+              shiny::column(3, shiny::tags$small(shiny::tags$b("Parameter"))),
+              shiny::column(5, shiny::tags$small(shiny::tags$b("Meaning"))),
+              shiny::column(2, shiny::tags$small(shiny::tags$b("Lower"))),
+              shiny::column(2, shiny::tags$small(shiny::tags$b("Upper")))
+            ),
+            optimize_param_row(ns, "max", "max", "Control response (upper plateau)."),
+            optimize_param_row(ns, "slope1", "slope1", "Chemical 1 curve steepness."),
+            optimize_param_row(ns, "slope2", "slope2", "Chemical 2 curve steepness."),
+            optimize_param_row(ns, "ec501", "EC50 1", "Chemical 1 half-effect conc."),
+            optimize_param_row(ns, "ec502", "EC50 2", "Chemical 2 half-effect conc."),
+            optimize_param_row(ns, "a", "a", "Overall interaction strength/direction."),
+            shiny::conditionalPanel(
+              condition = "input.model == 'DR' || input.model == 'DL'", ns = ns,
+              optimize_param_row(ns, "b", "b",
+                                 "Interaction shift with ratio / dose level.")),
+            shiny::actionButton(ns("optimize_all"), "Optimize all params",
+                                class = "btn-primary"),
+            shiny::uiOutput(ns("optimize_readout"))
+          )
         )
       )
     )
@@ -295,8 +296,15 @@ binary_server <- function(id, meta) {
     m2 <- shiny::reactive(marginal_df(engine_df(), 2))
 
     # Stage 1: two embedded single-chemical fitters, one per marginal series.
-    fit1 <- curve_fit_server("chem1", fit_df = m1, meta = meta, chem_field = "chem1")
-    fit2 <- curve_fit_server("chem2", fit_df = m2, meta = meta, chem_field = "chem2")
+    # `inject*` lets the joint refine (Optimize all) write its curve parameters
+    # back into the panels, so the chemical panels stay the single source of
+    # truth for the curves.
+    inject1 <- shiny::reactiveVal(NULL)
+    inject2 <- shiny::reactiveVal(NULL)
+    fit1 <- curve_fit_server("chem1", fit_df = m1, meta = meta,
+                             chem_field = "chem1", inject = inject1)
+    fit2 <- curve_fit_server("chem2", fit_df = m2, meta = meta,
+                             chem_field = "chem2", inject = inject2)
 
     # Stages 2-3 are gated on `frozen`: both single curves fitted. There is no
     # manual freeze step -- the workspace simply appears once both fits exist.
@@ -312,17 +320,13 @@ binary_server <- function(id, meta) {
 
     # Per-model interaction fits, keyed by model name. Autofit/Simulate write one
     # entry; Find best writes all four. `current_fit` is whatever is stored for the
-    # selected model (NULL if none yet). Keeping a store -- rather than a single
-    # reactiveVal that Find best would stomp when it switches the picker -- means
-    # the programmatic picker switch never re-triggers or clears a fit.
+    # selected model (NULL if none yet). When a curve changes, the stored fits are
+    # re-evaluated at the new curve parameters (not cleared) so Stage 3 stays live.
     fits_store   <- shiny::reactiveVal(list())
     last_compare <- shiny::reactiveVal(NULL)
-    # Optimize-all bookkeeping: the seed (par + objective) captured just before a
-    # joint refine, and the resulting fit -- so the panel can show Initial vs
-    # Optimized side by side even after the store has been overwritten.
-    optimize_pre  <- shiny::reactiveVal(NULL)   # seed objective
-    optimize_init <- shiny::reactiveVal(NULL)   # seed parameter vector
-    optimize_fit  <- shiny::reactiveVal(NULL)   # post-refine fit
+    # Optimize-all readout: seed vs refined objective (before -> after).
+    optimize_pre  <- shiny::reactiveVal(NULL)
+    optimize_post <- shiny::reactiveVal(NULL)
     current_fit  <- shiny::reactive({
       m <- input$model
       if (is.null(m)) return(NULL)
@@ -346,18 +350,51 @@ binary_server <- function(id, meta) {
                      "the interaction workspace."))
     })
 
-    # A changed curve or header model makes the stored interaction fits stale, so
-    # clear them (the workspace itself stays visible while both curves are fit).
+    # A structural change (reference model or response type) makes the stored
+    # fits meaningless, so clear everything.
     shiny::observeEvent(
-      list(fit1(), fit2(), input$reference, input$response),
+      list(input$reference, input$response),
       {
         fits_store(list())
         last_compare(NULL)
-        optimize_pre(NULL); optimize_init(NULL); optimize_fit(NULL)
+        optimize_pre(NULL); optimize_post(NULL)
         for (p in c("max", "slope1", "slope2", "ec501", "ec502", "a", "b")) {
           shiny::updateNumericInput(session, paste0("olo_", p), value = NA)
           shiny::updateNumericInput(session, paste0("ohi_", p), value = NA)
         }
+      },
+      ignoreInit = TRUE)
+
+    # A changed curve does NOT blank the interaction: re-evaluate each stored fit
+    # at the new curve parameters (keeping its a/b), so Stage 3 stays in sync with
+    # Stage 1 live. This is what makes editing chemical 1 show up in the
+    # diagnostics, and what reconciles a joint refine's write-back. The staged
+    # model comparison, however, was computed at the old curves, so it is
+    # invalidated (re-run Find best to compare at the new curves).
+    shiny::observeEvent(
+      list(fit1(), fit2()),
+      {
+        s <- fits_store()
+        if (length(s)) {
+          cp <- curve_params()
+          for (m in names(s)) {
+            old <- s[[m]]
+            ab  <- old$par[intersect(c("a", "b"), names(old$par))]
+            newf <- tryCatch(
+              eval_mixture(engine_df(), old$reference, m, old$response, cp,
+                           interaction = ab),
+              error = function(e) NULL)
+            if (is.null(newf)) next
+            # carry the metadata the diagnostics / comparison / CI layer relies on
+            newf$df        <- old$df
+            newf$joint     <- old$joint
+            newf$fixed     <- old$fixed
+            newf$simulated <- old$simulated
+            s[[m]] <- newf
+          }
+          fits_store(s)
+        }
+        last_compare(NULL)
       },
       ignoreInit = TRUE)
 
@@ -387,7 +424,7 @@ binary_server <- function(id, meta) {
       if ("b" %in% names(fit$par))
         shiny::updateNumericInput(session, "val_b", value = round(fit$par[["b"]], 4))
       s <- fits_store(); s[[dev]] <- fit; fits_store(s)
-      optimize_pre(NULL); optimize_init(NULL); optimize_fit(NULL)  # a new fit voids the last refine
+      optimize_pre(NULL); optimize_post(NULL)  # a new fit voids the last refine readout
     })
 
     # Simulate: evaluate the selected model with the entered a/b (no refit).
@@ -414,7 +451,7 @@ binary_server <- function(id, meta) {
         })
       if (is.null(fit)) return()
       s <- fits_store(); s[[dev]] <- fit; fits_store(s)
-      optimize_pre(NULL); optimize_init(NULL); optimize_fit(NULL)  # a new fit voids the last refine
+      optimize_pre(NULL); optimize_post(NULL)  # a new fit voids the last refine readout
     })
 
     # Find best model: fit all four + select; store every fit, land on the chosen.
@@ -450,29 +487,12 @@ binary_server <- function(id, meta) {
         value = if (!is.null(f) && "a" %in% names(f$par)) round(f$par[["a"]], 4) else NA)
       shiny::updateNumericInput(session, "val_b",
         value = if (!is.null(f) && "b" %in% names(f$par)) round(f$par[["b"]], 4) else NA)
-      optimize_pre(NULL); optimize_init(NULL); optimize_fit(NULL)
+      optimize_pre(NULL); optimize_post(NULL)
       for (p in c("max", "slope1", "slope2", "ec501", "ec502", "a", "b")) {
         shiny::updateNumericInput(session, paste0("olo_", p), value = NA)
         shiny::updateNumericInput(session, paste0("ohi_", p), value = NA)
       }
     }, ignoreInit = TRUE)
-
-    # Optimize-all grid: render the Initial (seed) and Optimized cells per
-    # parameter. Initial shows the captured seed once a refine has run, else the
-    # displayed fit's current value; Optimized shows the post-refine value.
-    opt_params <- c("max", "slope1", "slope2", "ec501", "ec502", "a", "b")
-    for (p in opt_params) local({
-      pp <- p
-      output[[paste0("oini_", pp)]] <- shiny::renderText({
-        f <- current_fit(); if (is.null(f)) return("")
-        seed <- if (!is.null(optimize_init())) optimize_init() else f$par
-        if (pp %in% names(seed)) format(round(seed[[pp]], 4)) else ""
-      })
-      output[[paste0("oopt_", pp)]] <- shiny::renderText({
-        nf <- optimize_fit(); if (is.null(nf)) return("")
-        if (pp %in% names(nf$par)) format(round(nf$par[[pp]], 4)) else ""
-      })
-    })
 
     # Optimize all params: jointly refine the displayed model, seeded from it.
     shiny::observeEvent(input$optimize_all, {
@@ -492,11 +512,17 @@ binary_server <- function(id, meta) {
         })
       if (is.null(newfit)) return()
       s <- fits_store(); s[[f$deviation]] <- newfit; fits_store(s)
-      optimize_pre(pre); optimize_init(f$par); optimize_fit(newfit)
-      if ("a" %in% names(newfit$par))
-        shiny::updateNumericInput(session, "val_a", value = round(newfit$par[["a"]], 4))
-      if ("b" %in% names(newfit$par))
-        shiny::updateNumericInput(session, "val_b", value = round(newfit$par[["b"]], 4))
+      optimize_pre(pre); optimize_post(newfit$objective)
+      p <- newfit$par
+      if ("a" %in% names(p))
+        shiny::updateNumericInput(session, "val_a", value = round(p[["a"]], 4))
+      if ("b" %in% names(p))
+        shiny::updateNumericInput(session, "val_b", value = round(p[["b"]], 4))
+      # Write the refined curve parameters back into the chemical panels -- one
+      # shared max to BOTH. The re-evaluation observer then reconciles the stored
+      # fit at these curves, keeping everything in sync.
+      inject1(list(max = p[["max"]], slope = p[["slope1"]], ec50 = p[["ec501"]]))
+      inject2(list(max = p[["max"]], slope = p[["slope2"]], ec50 = p[["ec502"]]))
     })
 
     # Per-model explanation: tracks the reference and the selected model.
@@ -505,23 +531,15 @@ binary_server <- function(id, meta) {
       interaction_help(input$reference, input$model)
     })
 
-    # Objective (SSR/Deviance) row for the Optimize-all table: Initial vs
-    # Optimized, aligned under the same columns as the parameter rows.
-    output$optimize_obj_row <- shiny::renderUI({
-      f <- current_fit(); shiny::req(f)
-      lab <- if (identical(f$response, "binary")) "Deviance" else "SSR"
-      pre <- optimize_pre(); nf <- optimize_fit()
-      ini <- if (!is.null(pre)) pre else f$objective
-      opt <- if (!is.null(nf)) nf$objective else NULL
-      improved <- !is.null(pre) && !is.null(nf) && nf$objective <= pre + 1e-9
-      shiny::fluidRow(
-        shiny::column(2, shiny::tags$b(lab)),
-        shiny::column(4, NULL),
-        shiny::column(3, if (!is.null(ini)) shiny::tags$b(round(ini, 2))),
-        shiny::column(3, shiny::tagList(
-          if (!is.null(opt)) shiny::tags$b(round(opt, 2)),
-          if (improved) shiny::tags$span(style = "color:green", " ✓ improved")))
-      )
+    # SSR/Deviance before -> after readout for the joint refine.
+    output$optimize_readout <- shiny::renderUI({
+      shiny::req(!is.null(optimize_post()), current_fit())
+      lab <- if (identical(current_fit()$response, "binary")) "Deviance" else "SSR"
+      improved <- optimize_post() <= optimize_pre() + 1e-9
+      shiny::tags$p(
+        shiny::tags$b(paste0(lab, ": ")),
+        round(optimize_pre(), 2), shiny::HTML(" &rarr; "), round(optimize_post(), 2),
+        if (improved) shiny::tags$span(style = "color:green", " ✓ improved"))
     })
 
     # Fit-objective readout for the displayed model.

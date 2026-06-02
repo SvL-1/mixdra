@@ -53,27 +53,24 @@ interaction_param_row <- function(ns, param, label, meaning) {
   )
 }
 
-#' One Optimize-all row: label, lower/upper bound inputs, initial + optimized
+#' One Optimize-all row: label, meaning, and lower/upper bound inputs
 #'
-#' Five-column layout: parameter name (with the plain-English `meaning` as a
-#' hover tooltip), the `olo_`/`ohi_` bound inputs (set Lower = Upper to pin a
-#' parameter), then read-only `oini_` (seed / pre-optimize value) and `oopt_`
-#' (post-optimize value) cells. The `o*` prefixes are distinct from the Stage-1
-#' curve grid and the Stage-2 a/b inputs so the panel never collides with them.
+#' Four-column layout: parameter name, plain-English meaning, and the
+#' `olo_`/`ohi_` bound inputs (set Lower = Upper to pin a parameter). The current
+#' value is not shown here -- it lives in the chemical panels / a/b grid (single
+#' source of truth). The `o*` prefixes are distinct from the Stage-1 curve grid
+#' and the Stage-2 a/b inputs so the panel never collides with them.
 #' @param ns Module namespace function.
-#' @param param Parameter key (e.g. `max`, `a`); drives the input/output ids.
+#' @param param Parameter key (e.g. `max`, `a`); drives the input ids.
 #' @param label Display label.
-#' @param meaning One-line explanation (shown as a hover tooltip on the label).
+#' @param meaning One-line explanation.
 #' @keywords internal
 optimize_param_row <- function(ns, param, label, meaning) {
   shiny::fluidRow(
-    shiny::column(2, shiny::tags$b(label, title = meaning)),
+    shiny::column(3, shiny::tags$b(label)),
+    shiny::column(5, shiny::tags$small(meaning)),
     shiny::column(2, shiny::numericInput(ns(paste0("olo_", param)), NULL, value = NA)),
-    shiny::column(2, shiny::numericInput(ns(paste0("ohi_", param)), NULL, value = NA)),
-    shiny::column(3, shiny::div(class = "pt-2",
-                                shiny::textOutput(ns(paste0("oini_", param)), inline = TRUE))),
-    shiny::column(3, shiny::div(class = "pt-2",
-                                shiny::textOutput(ns(paste0("oopt_", param)), inline = TRUE)))
+    shiny::column(2, shiny::numericInput(ns(paste0("ohi_", param)), NULL, value = NA))
   )
 }
 
@@ -125,12 +122,33 @@ curve_fit_ui <- function(id) {
 #' @param meta Shared reactiveValues for experiment metadata (axis labels).
 #' @param chem_field Optional meta field for the x-axis label (e.g. "chem1"); NULL
 #'   uses a generic "Concentration" label.
+#' @param inject Optional reactive returning a named list `list(max=, slope=,
+#'   ec50=)` (or NULL). When it changes, the panel's Value inputs and current fit
+#'   are overwritten with those values -- used by the Binary tab to write a joint
+#'   refine's curve parameters back into the chemical panels (single source of
+#'   truth). NULL disables write-back.
 #' @return A reactive returning the current fit (a [analyse_single()]/[eval_single()]
 #'   result), or NULL before any fit.
 #' @keywords internal
-curve_fit_server <- function(id, fit_df, meta, chem_field = NULL) {
+curve_fit_server <- function(id, fit_df, meta, chem_field = NULL, inject = NULL) {
   shiny::moduleServer(id, function(input, output, session) {
     current_fit <- shiny::reactiveVal(NULL)
+
+    # Write-back: when the parent injects curve parameters (e.g. from a joint
+    # refine), reflect them in the Value inputs and the displayed fit.
+    if (!is.null(inject)) {
+      shiny::observeEvent(inject(), {
+        v <- inject()
+        if (is.null(v)) return()
+        df <- fit_df()
+        shiny::req(!is.null(df), nrow(df) > 0)
+        shiny::updateNumericInput(session, "val_max",   value = round(v[["max"]], 4))
+        shiny::updateNumericInput(session, "val_slope", value = round(v[["slope"]], 4))
+        shiny::updateNumericInput(session, "val_ec50",  value = round(v[["ec50"]], 4))
+        current_fit(eval_single(df$C1, obs_response(df),
+                                v[["max"]], v[["slope"]], v[["ec50"]]))
+      }, ignoreInit = TRUE)
+    }
 
     # The Value column read as a named numeric (blank -> NA).
     current_values <- function() {

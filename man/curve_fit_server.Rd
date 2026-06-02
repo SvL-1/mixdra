@@ -4,7 +4,7 @@
 \alias{curve_fit_server}
 \title{Curve-fit panel server}
 \usage{
-curve_fit_server(id, fit_df, meta, chem_field = NULL)
+curve_fit_server(id, fit_df, meta, chem_field = NULL, inject = NULL)
 }
 \arguments{
 \item{id}{Module id.}
@@ -17,6 +17,11 @@ data is invalid; the panel fits whatever non-empty frame it is given.}
 
 \item{chem_field}{Optional meta field for the x-axis label (e.g. "chem1"); NULL
 uses a generic "Concentration" label.}
+
+\item{inject}{Optional reactive returning a named list \code{list(max=, slope=, ec50=)} (or NULL). When it changes, the panel's Value inputs and current fit
+are overwritten with those values -- used by the Binary tab to write a joint
+refine's curve parameters back into the chemical panels (single source of
+truth). NULL disables write-back.}
 }
 \value{
 A reactive returning the current fit (a \code{\link[=analyse_single]{analyse_single()}}/\code{\link[=eval_single]{eval_single()}}
