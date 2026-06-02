@@ -53,27 +53,6 @@ interaction_param_row <- function(ns, param, label, meaning) {
   )
 }
 
-#' One Optimize-all row: label, meaning, and lower/upper bound inputs
-#'
-#' Four-column layout: parameter name, plain-English meaning, and the
-#' `olo_`/`ohi_` bound inputs (set Lower = Upper to pin a parameter). The current
-#' value is not shown here -- it lives in the chemical panels / a/b grid (single
-#' source of truth). The `o*` prefixes are distinct from the Stage-1 curve grid
-#' and the Stage-2 a/b inputs so the panel never collides with them.
-#' @param ns Module namespace function.
-#' @param param Parameter key (e.g. `max`, `a`); drives the input ids.
-#' @param label Display label.
-#' @param meaning One-line explanation.
-#' @keywords internal
-optimize_param_row <- function(ns, param, label, meaning) {
-  shiny::fluidRow(
-    shiny::column(3, shiny::tags$b(label)),
-    shiny::column(5, shiny::tags$small(meaning)),
-    shiny::column(2, shiny::numericInput(ns(paste0("olo_", param)), NULL, value = NA)),
-    shiny::column(2, shiny::numericInput(ns(paste0("ohi_", param)), NULL, value = NA))
-  )
-}
-
 #' Curve-fit panel UI (plots + parameter grid + Autofit/Simulate)
 #' @param id Module id.
 #' @keywords internal

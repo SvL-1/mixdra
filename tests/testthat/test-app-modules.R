@@ -103,22 +103,6 @@ test_that("binary_server workspace: auto-reveal, autofit/simulate/find-best, inv
     expect_equal(unname(fit1()$par[["slope"]]), unname(current_fit()$par[["slope1"]]),
                  tolerance = 1e-6)
 
-    # Pinning max via equal bounds holds it across a re-optimize.
-    held <- unname(current_fit()$par[["max"]])
-    session$setInputs(olo_max = held, ohi_max = held, optimize_all = 2)
-    expect_equal(unname(current_fit()$par[["max"]]), held, tolerance = 1e-8)
-    expect_true("max" %in% current_fit()$fixed)
-
-    # CI table: a pinned parameter shows no interval (it was not estimated),
-    # but its held estimate is preserved. Uses the same helper the renderer does.
-    cis <- blank_pinned_ci(
-      param_ci(current_fit(), engine_df(), current_fit()$reference,
-               current_fit()$deviation, current_fit()$response),
-      current_fit()$fixed)
-    expect_true(is.na(cis$lower[cis$parameter == "max"]))
-    expect_true(is.na(cis$upper[cis$parameter == "max"]))
-    expect_false(is.na(cis$estimate[cis$parameter == "max"]))  # held value preserved
-
     # editing a single curve keeps the workspace and RE-EVALUATES the stored
     # interaction fits at the new curves (live sync), rather than clearing them;
     # only the staged model comparison is invalidated.
@@ -189,14 +173,12 @@ test_that("interaction_param_row renders a value input with inert bound cells", 
   expect_false(grepl("binary-hi_a", html, fixed = TRUE))  # no Upper input
 })
 
-test_that("binary_ui: Optimize-all card with a bounds/pin grid", {
+test_that("binary_ui: Optimize-all is a plain button + readout (no bounds grid)", {
   html <- as.character(binary_ui("binary"))
   expect_match(html, "Optimize all params", fixed = TRUE)     # button
-  expect_match(html, "binary-olo_max", fixed = TRUE)          # lower input
-  expect_match(html, "binary-ohi_ec502", fixed = TRUE)        # upper input
-  expect_match(html, "binary-optimize_readout", fixed = TRUE) # SSR before->after readout
   expect_match(html, "binary-optimize_all", fixed = TRUE)     # action id
-  # the per-parameter Initial/Optimized cells are gone (single source of truth)
-  expect_false(grepl("binary-oini_a", html, fixed = TRUE))
-  expect_false(grepl("binary-oopt_a", html, fixed = TRUE))
+  expect_match(html, "binary-optimize_readout", fixed = TRUE) # SSR before->after readout
+  # no per-parameter bounds/pin grid any more (bounds live in Stage 1; values too)
+  expect_false(grepl("binary-olo_max", html, fixed = TRUE))
+  expect_false(grepl("binary-ohi_ec502", html, fixed = TRUE))
 })

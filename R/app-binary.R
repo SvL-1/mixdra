@@ -212,26 +212,10 @@ binary_ui <- function(id) {
           bslib::card(
             bslib::card_header("Optimize all parameters (joint)"),
             shiny::p("Refines the displayed model by fitting every parameter at ",
-                     "once, seeded from the current values. The refined curve ",
-                     "parameters are written back into the chemical panels above ",
-                     "(both share one ", shiny::tags$code("max"), "). Fix any ",
-                     "parameter by setting its Lower = Upper."),
-            shiny::fluidRow(
-              shiny::column(3, shiny::tags$small(shiny::tags$b("Parameter"))),
-              shiny::column(5, shiny::tags$small(shiny::tags$b("Meaning"))),
-              shiny::column(2, shiny::tags$small(shiny::tags$b("Lower"))),
-              shiny::column(2, shiny::tags$small(shiny::tags$b("Upper")))
-            ),
-            optimize_param_row(ns, "max", "max", "Control response (upper plateau)."),
-            optimize_param_row(ns, "slope1", "slope1", "Chemical 1 curve steepness."),
-            optimize_param_row(ns, "slope2", "slope2", "Chemical 2 curve steepness."),
-            optimize_param_row(ns, "ec501", "EC50 1", "Chemical 1 half-effect conc."),
-            optimize_param_row(ns, "ec502", "EC50 2", "Chemical 2 half-effect conc."),
-            optimize_param_row(ns, "a", "a", "Overall interaction strength/direction."),
-            shiny::conditionalPanel(
-              condition = "input.model == 'DR' || input.model == 'DL'", ns = ns,
-              optimize_param_row(ns, "b", "b",
-                                 "Interaction shift with ratio / dose level.")),
+                     "once (curves + interaction), seeded from the current values. ",
+                     "The refined curve parameters are written back into the ",
+                     "chemical panels above (both share one ",
+                     shiny::tags$code("max"), ")."),
             shiny::actionButton(ns("optimize_all"), "Optimize all params",
                                 class = "btn-primary"),
             shiny::uiOutput(ns("optimize_readout"))
@@ -358,10 +342,6 @@ binary_server <- function(id, meta) {
         fits_store(list())
         last_compare(NULL)
         optimize_pre(NULL); optimize_post(NULL)
-        for (p in c("max", "slope1", "slope2", "ec501", "ec502", "a", "b")) {
-          shiny::updateNumericInput(session, paste0("olo_", p), value = NA)
-          shiny::updateNumericInput(session, paste0("ohi_", p), value = NA)
-        }
       },
       ignoreInit = TRUE)
 
@@ -488,22 +468,17 @@ binary_server <- function(id, meta) {
       shiny::updateNumericInput(session, "val_b",
         value = if (!is.null(f) && "b" %in% names(f$par)) round(f$par[["b"]], 4) else NA)
       optimize_pre(NULL); optimize_post(NULL)
-      for (p in c("max", "slope1", "slope2", "ec501", "ec502", "a", "b")) {
-        shiny::updateNumericInput(session, paste0("olo_", p), value = NA)
-        shiny::updateNumericInput(session, paste0("ohi_", p), value = NA)
-      }
     }, ignoreInit = TRUE)
 
-    # Optimize all params: jointly refine the displayed model, seeded from it.
+    # Optimize all params: jointly refine the displayed model, seeded from it
+    # (every parameter free, positivity-constrained -- no per-parameter pinning).
     shiny::observeEvent(input$optimize_all, {
       shiny::req(frozen(), current_fit())
       f <- current_fit()
-      spec <- model_spec(input$reference, f$deviation, 2)
-      b <- collect_bounds_all(shiny::reactiveValuesToList(input), params = spec$params)
       pre <- f$objective
       newfit <- tryCatch(
         shiny::withProgress(message = "Optimizing all parameters...", value = 0.5,
-          refine_joint(f, engine_df(), lower = b$lower, upper = b$upper,
+          refine_joint(f, engine_df(),
                        n_starts = n_starts_eff(), time_limit = input$time_limit)),
         error = function(e) {
           shiny::showNotification(paste("Optimize failed:", conditionMessage(e)),
