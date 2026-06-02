@@ -79,10 +79,14 @@ plot_surface <- function(fit, df, n = 100) {
                          marker = list(size = 3, color = "blue"), name = "observed")
   p <- plotly::add_surface(p, x = g$x_vals, y = g$y_vals, z = g$z,
                            opacity = 0.8, showscale = FALSE)
-  plotly::layout(p, scene = list(
-    xaxis = list(title = g$labels$x),
-    yaxis = list(title = g$labels$y),
-    zaxis = list(title = "response")))
+  # Trim the surrounding white space and let the 3-D scene fill the card.
+  plotly::layout(p,
+    margin = list(l = 0, r = 0, b = 0, t = 0),
+    scene = list(
+      domain = list(x = c(0, 1), y = c(0, 1)),
+      xaxis = list(title = g$labels$x),
+      yaxis = list(title = g$labels$y),
+      zaxis = list(title = "response")))
 }
 
 #' Plot 2-D isoboles (equal-response contours) of a binary mixture

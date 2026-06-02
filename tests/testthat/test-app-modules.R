@@ -122,6 +122,26 @@ test_that("binary_server workspace: auto-reveal, autofit/simulate/find-best, inv
   })
 })
 
+test_that("a bundled example dataset ships and validates as binary continuous", {
+  ex <- system.file("extdata", "binary_ia_cpf_imi_continuous.csv", package = "mixdra")
+  skip_if_not(nzchar(ex) && file.exists(ex), "bundled example not installed")
+  df <- read_upload(ex)
+  expect_length(validate_upload(df, "binary", "continuous"), 0)
+  expect_true(all(c("C1", "C2", "Res") %in% names(df)))
+})
+
+test_that("binary_server falls back to the bundled example before any upload", {
+  skip_on_cran()
+  ex <- system.file("extdata", "binary_ia_cpf_imi_continuous.csv", package = "mixdra")
+  skip_if_not(nzchar(ex) && file.exists(ex), "bundled example not installed")
+  meta <- shiny::reactiveValues(chem1 = "CPF", chem2 = "IMI")
+  shiny::testServer(binary_server, args = list(meta = meta), {
+    session$setInputs(response = "continuous", reference = "CA")
+    expect_length(errs(), 0)                 # no upload, yet valid
+    expect_gt(nrow(engine_df()), 0)          # data is available
+  })
+})
+
 test_that("binary_ui: auto-reveal (no Freeze button) + Stage 2 workspace", {
   html <- as.character(binary_ui("binary"))
   # the manual Freeze checkpoint is gone -- Stage 2/3 auto-reveal

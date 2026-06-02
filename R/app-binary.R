@@ -86,6 +86,8 @@ binary_ui <- function(id) {
                             "Independent action (IA)" = "IA")),
       shiny::downloadButton(ns("template"), "Download template"),
       shiny::fileInput(ns("file"), "Upload CSV", accept = ".csv"),
+      shiny::helpText(shiny::tags$small(
+        "An example dataset (CPF + IMI, continuous) is loaded until you upload your own.")),
       shiny::uiOutput(ns("errors")),
       # Optimizer-tuning knobs apply to EVERY fit on this tab (Autofit, Find
       # best, Optimize all). They are advanced/rarely-changed, so they live in a
@@ -218,9 +220,9 @@ binary_ui <- function(id) {
         bslib::card_header("Stage 3 · Diagnostics"),
         bslib::layout_columns(
           bslib::card(bslib::card_header("3-D response surface"),
-                      plotly::plotlyOutput(ns("surface"))),
+                      plotly::plotlyOutput(ns("surface"), height = "520px")),
           bslib::card(bslib::card_header("2-D isobole (vs reference)"),
-                      plotly::plotlyOutput(ns("isobole")))
+                      plotly::plotlyOutput(ns("isobole"), height = "520px"))
         ),
         bslib::card(bslib::card_header("Observed vs predicted"),
                     plotly::plotlyOutput(ns("op"))),
@@ -264,11 +266,19 @@ binary_server <- function(id, meta) {
       nm <- meta$chem2; if (!is.null(nm) && nzchar(nm)) nm else "Chemical 2"
     })
 
+    # Data source: the user's upload, or -- before any upload -- a bundled
+    # example dataset (continuous IA binary mixture) so the tab is usable on
+    # open. `system.file` resolves under inst/ in dev and the install tree.
+    upload_path <- shiny::reactive({
+      if (!is.null(input$file)) return(input$file$datapath)
+      ex <- system.file("extdata", "binary_ia_cpf_imi_continuous.csv", package = "mixdra")
+      if (nzchar(ex)) ex else NULL
+    })
     parsed <- shiny::reactive({
-      shiny::req(input$file); read_upload(input$file$datapath)
+      shiny::req(upload_path()); read_upload(upload_path())
     })
     errs <- shiny::reactive({
-      shiny::req(input$file); validate_upload(parsed(), "binary", input$response)
+      shiny::req(upload_path()); validate_upload(parsed(), "binary", input$response)
     })
     output$errors <- shiny::renderUI({
       e <- errs()
@@ -277,7 +287,7 @@ binary_server <- function(id, meta) {
     })
 
     engine_df <- shiny::reactive({
-      shiny::req(input$file, length(errs()) == 0)
+      shiny::req(upload_path(), length(errs()) == 0)
       to_engine_df(parsed(), "binary")
     })
     m1 <- shiny::reactive(marginal_df(engine_df(), 1))
