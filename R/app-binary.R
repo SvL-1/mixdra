@@ -332,6 +332,10 @@ binary_server <- function(id, meta) {
           last_compare(NULL)
           optimize_pre(NULL)
           optimize_post(NULL)
+          for (p in c("max", "slope1", "slope2", "ec501", "ec502", "a", "b")) {
+            shiny::updateNumericInput(session, paste0("olo_", p), value = NA)
+            shiny::updateNumericInput(session, paste0("ohi_", p), value = NA)
+          }
         }
       },
       ignoreInit = TRUE)
@@ -424,6 +428,10 @@ binary_server <- function(id, meta) {
       shiny::updateNumericInput(session, "val_b",
         value = if (!is.null(f) && "b" %in% names(f$par)) round(f$par[["b"]], 4) else NA)
       optimize_pre(NULL); optimize_post(NULL)
+      for (p in c("max", "slope1", "slope2", "ec501", "ec502", "a", "b")) {
+        shiny::updateNumericInput(session, paste0("olo_", p), value = NA)
+        shiny::updateNumericInput(session, paste0("ohi_", p), value = NA)
+      }
     }, ignoreInit = TRUE)
 
     # Keep the Optimize-all start column in sync with the displayed fit.
