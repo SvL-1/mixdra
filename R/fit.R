@@ -45,7 +45,8 @@ init_start_par <- function(params, extra, start) {
 #'   sensible starts/bounds.
 #' @return A list with `par` (named fitted parameters), `objective`
 #'   (residual SS or deviance), `pred` (fitted values), `residuals`, `df`
-#'   (number of free parameters), `n`, and `convergence`.
+#'   (number of free parameters), `n`, `convergence`, and `fixed` (character
+#'   vector of parameter names held fixed at their `start` values).
 #' @export
 fit_model <- function(df, reference, deviation = "reference",
                       response = c("continuous", "binary"),
@@ -74,14 +75,11 @@ fit_model <- function(df, reference, deviation = "reference",
     }
   }
 
-  # Only base curve parameters may be bounded. Deviation params (a, b, ...) are
-  # left unconstrained because downstream analysis (e.g. the concentration at
-  # which an interaction switches synergistic <-> antagonistic) relies on their
-  # unconstrained values. Validate here -- before the all-fixed fast path -- so an
-  # illegal bound name is rejected consistently regardless of how many params are
-  # free (otherwise the staged reference fit would silently ignore it).
-  # Any model parameter may be bounded now -- including the interaction params
-  # (a, b), which the final joint "Optimize all" stage constrains/pins.
+  # Any model parameter may be bounded, including the interaction params (a, b),
+  # which the final joint "Optimize all" stage constrains/pins. Validate names
+  # here -- before the all-fixed fast path -- so an illegal bound name is rejected
+  # consistently regardless of how many params are free (otherwise the staged
+  # reference fit would silently ignore it).
   bad <- setdiff(c(names(lower), names(upper)), spec$params)
   if (length(bad))
     stop("`lower`/`upper` may only name a model parameter (",
@@ -105,7 +103,8 @@ fit_model <- function(df, reference, deviation = "reference",
   theta0 <- par[free]
   base <- setdiff(free, spec$extra)             # positively-bounded curve params
 
-  # Defaults: base params get positivity; deviation params stay +/-Inf.
+  # Defaults: base params get positivity; deviation params stay +/-Inf unless
+  # the caller bounds them.
   lo <- stats::setNames(rep(-Inf, length(free)), free)
   hi <- stats::setNames(rep(Inf, length(free)), free)
   lo[base] <- 1e-8

@@ -57,7 +57,8 @@ sensible starts/bounds.}
 \value{
 A list with \code{par} (named fitted parameters), \code{objective}
 (residual SS or deviance), \code{pred} (fitted values), \code{residuals}, \code{df}
-(number of free parameters), \code{n}, and \code{convergence}.
+(number of free parameters), \code{n}, \code{convergence}, and \code{fixed} (character
+vector of parameter names held fixed at their \code{start} values).
 }
 \description{
 Fit one mixture model to a dataset
