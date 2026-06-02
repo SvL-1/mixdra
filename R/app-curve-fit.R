@@ -1,8 +1,8 @@
 # Reusable interactive curve-fit panel. Given an injected reactive `fit_df`
 # (a single chemical's `C1` + response columns), it fits a 3-parameter
 # log-logistic curve via analyse_single() (Autofit) or evaluates caller-entered
-# values via eval_single() (Simulate), and shows the curve, observed-vs-predicted,
-# an editable parameter grid with bounds, and a live SSR/n readout. It returns a
+# values via eval_single() (Simulate), and shows the dose-response curve, an
+# editable parameter grid with bounds, and a live SSR/n readout. It returns a
 # reactive of the current fit so a parent (Single or Binary tab) can read it.
 # The panel owns no data source and knows nothing about upload validation.
 
@@ -82,9 +82,12 @@ optimize_param_row <- function(ns, param, label, meaning) {
 #' @keywords internal
 curve_fit_ui <- function(id) {
   ns <- shiny::NS(id)
-  # Settings (parameter grid + actions) on the left; the two plots stacked on
+  # Settings (parameter grid + actions) on the left; the dose-response plot on
   # the right. One self-contained row per chemical, reused by the Single tab and
-  # by each chemical in the Binary tab.
+  # by each chemical in the Binary tab. (No observed-vs-predicted plot here: the
+  # dose-response curve already shows fit quality along the dose axis, so it
+  # would be redundant -- that diagnostic is kept for the binary mixture, whose
+  # 3-D surface makes residuals hard to read.)
   bslib::layout_columns(
     col_widths = c(5, 7),
     bslib::card(
@@ -109,12 +112,8 @@ curve_fit_ui <- function(id) {
         shiny::actionButton(ns("simulate"), "Simulate")
       )
     ),
-    shiny::tagList(
-      bslib::card(bslib::card_header("Dose-response curve"),
-                  plotly::plotlyOutput(ns("dr"))),
-      bslib::card(bslib::card_header("Observed vs predicted"),
-                  plotly::plotlyOutput(ns("op")))
-    )
+    bslib::card(bslib::card_header("Dose-response curve"),
+                plotly::plotlyOutput(ns("dr")))
   )
 }
 
@@ -190,11 +189,6 @@ curve_fit_server <- function(id, fit_df, meta, chem_field = NULL) {
       plotly::layout(p, xaxis = list(title = axis_label(meta, chem_field)),
                      yaxis = list(title = if (!is.null(meta$endpoint) && nzchar(meta$endpoint))
                                             meta$endpoint else "Response"))
-    })
-    # Observed-vs-predicted needs model predictions, so it stays empty until a fit.
-    output$op <- plotly::renderPlotly({
-      shiny::req(current_fit())
-      plot_obs_pred(current_fit(), fit_df())
     })
     output$diagnostics <- shiny::renderUI({
       shiny::req(current_fit())
