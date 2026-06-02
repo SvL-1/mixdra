@@ -10,6 +10,12 @@
 
 **Spec:** `docs/superpowers/specs/2026-06-02-model-unification-migration-design.md`
 
+> **Update (2026-06-02, later):** DR/DL deviations are now **binary-only** —
+> `model_spec()` rejects them for ternary and `analyse_mixture()` fits only
+> `reference`/`SA` for `n_chem = 3` (ternary interactions use Advanced S/A). The
+> "16 models" framing and the ternary-DR `b1, b2, b3` mapping in this plan predate
+> that restriction and are no longer reachable in production.
+
 > **✅ STATUS: COMPLETED (2026-06-02).** Implemented on branch `model-unification-migration`
 > (7 commits `20be962`..`033cc9d`), merged fast-forward into `main`. Net **−1,539 lines** in `R/`.
 > All 10 relevant test groups green on merged `main` (764 assertions, 0 failures), incl. the

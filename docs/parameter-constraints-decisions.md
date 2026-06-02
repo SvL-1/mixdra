@@ -46,10 +46,11 @@ costly to optimise), not be inferred from the seed value.
 - Constraints are **manual** — the user supplies them per parameter.
 - Default for base curve params (`max`, `slope*`, `ec50*`): **positivity only**
   (lower `~1e-8`, upper `Inf`). The old seed-multiplier scheme is removed.
-- Deviation parameters `a` / `b` (and `b1/b2/b3`) stay **unconstrained**, because
-  they feed downstream interaction analysis (e.g. the concentration at which the
+- Deviation parameters `a` / `b` stay **unconstrained**, because they feed
+  downstream interaction analysis (e.g. the concentration at which the
   interaction switches from synergistic to antagonistic). Bounding them would
-  distort that analysis.
+  distort that analysis. (The ternary per-chemical `b1/b2/b3` of dose-ratio were
+  removed on 2026-06-02 when DR/DL were restricted to binary mixtures only.)
 
 ### Correctness exception (raised in design, pending confirmation)
 

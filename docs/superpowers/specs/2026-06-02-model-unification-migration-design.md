@@ -7,6 +7,15 @@ equivalence contract; one ~5e-8 tolerance re-baseline; ASA kept separate. See pl
 `docs/superpowers/plans/2026-06-02-model-unification-migration.md`.
 Supersedes the "Step 2" left undone by `2026-06-01-model-unification-design.md`.
 
+> **Update (2026-06-02, later):** dose-ratio (DR) and dose-level (DL) deviations
+> were subsequently restricted to **binary mixtures only**. `registry.R::model_spec()`
+> now rejects DR/DL for `n_chem = 3`, and `analyse_mixture()` fits only
+> `reference`/`SA` for ternary data (ternary interactions use Advanced S/A via
+> `analyse_ternary()`). `mix_response()` still computes the DR/DL maths for any `n`,
+> but production no longer dispatches ternary DR/DL — so the ternary-DR
+> `b1, b2, b3` row in the b-mapping table below is obsolete (the binary DR/DL `b`
+> mapping is unaffected, and the migration itself is unchanged).
+
 ## Problem
 
 Commit `cd10b00` introduced `R/mix-response.R`, a single n-agnostic predictor that
