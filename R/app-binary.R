@@ -511,13 +511,21 @@ binary_server <- function(id, meta) {
     })
     # CIs for a fitted model; a simulated (hand-entered) set has no CIs, so show
     # its entered values instead (honest -- those are the numbers you set).
+    # For a joint fit, parameters that were pinned (Lower == Upper) were not
+    # estimated, so their CI is meaningless -- blank those rows.
     output$cis <- DT::renderDT({
       shiny::req(current_fit())
       f <- current_fit()
-      tab <- if (isTRUE(f$simulated))
+      tab <- if (isTRUE(f$simulated)) {
         data.frame(parameter = names(f$par), value = round(unname(f$par), 4))
-      else
-        param_ci(f, engine_df(), f$reference, f$deviation, f$response)
+      } else {
+        ci <- param_ci(f, engine_df(), f$reference, f$deviation, f$response)
+        if (isTRUE(f$joint) && length(f$fixed)) {
+          ci$lower[ci$parameter %in% f$fixed] <- NA
+          ci$upper[ci$parameter %in% f$fixed] <- NA
+        }
+        ci
+      }
       DT::datatable(tab, rownames = FALSE, options = list(dom = "t"))
     })
 
