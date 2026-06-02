@@ -86,7 +86,22 @@ binary_ui <- function(id) {
                             "Independent action (IA)" = "IA")),
       shiny::downloadButton(ns("template"), "Download template"),
       shiny::fileInput(ns("file"), "Upload CSV", accept = ".csv"),
-      shiny::uiOutput(ns("errors"))
+      shiny::uiOutput(ns("errors")),
+      # Optimizer-tuning knobs apply to EVERY fit on this tab (Autofit, Find
+      # best, Optimize all). They are advanced/rarely-changed, so they live in a
+      # collapsed accordion at the bottom of the sidebar -- grouped with the
+      # other tab-wide settings, out of the Stage 1->2->3 flow.
+      bslib::accordion(
+        open = FALSE,
+        bslib::accordion_panel(
+          "Advanced fitting options",
+          shiny::helpText("Apply to Autofit, Find best model, and Optimize all params."),
+          shiny::numericInput(ns("n_starts"), "n_starts", value = 1, min = 1),
+          shiny::numericInput(ns("time_limit"), "time_limit (s/model)", value = 30, min = 1),
+          shiny::checkboxInput(ns("thorough"), "Thorough fit (multi-start, slower)", FALSE),
+          shiny::uiOutput(ns("thorough_note"))
+        )
+      )
     ),
 
     # Stage 1 -- two single-chemical curve panels. The interaction workspace
@@ -131,17 +146,6 @@ binary_ui <- function(id) {
           "alpha (α) is the significance threshold for the model comparison: ",
           "Find best model keeps a more complex model only if it improves the fit ",
           "at p < α (default 0.05)."),
-
-        # Shared fitting controls -- they apply to EVERY fit on this tab (Autofit,
-        # Find best, and Optimize all), so they sit here at the top of the stage.
-        shiny::tags$b("Fit options"),
-        shiny::helpText("Apply to Autofit, Find best model, and Optimize all params."),
-        bslib::layout_columns(
-          shiny::numericInput(ns("n_starts"), "n_starts", value = 1, min = 1),
-          shiny::numericInput(ns("time_limit"), "time_limit (s/model)", value = 30, min = 1)
-        ),
-        shiny::checkboxInput(ns("thorough"), "Thorough fit (multi-start, slower)", FALSE),
-        shiny::uiOutput(ns("thorough_note")),
 
         shiny::uiOutput(ns("interaction_help")),
 
