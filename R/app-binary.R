@@ -89,10 +89,10 @@ binary_ui <- function(id) {
       shiny::helpText(shiny::tags$small(
         "An example dataset (CPF + IMI, continuous) is loaded until you upload your own.")),
       shiny::uiOutput(ns("errors")),
-      # Optimizer-tuning knobs apply to EVERY fit on this tab (Autofit, Find
-      # best, Optimize all). They are advanced/rarely-changed, so they live in a
-      # collapsed accordion at the bottom of the sidebar -- grouped with the
-      # other tab-wide settings, out of the Stage 1->2->3 flow.
+      # Optimizer-tuning knobs apply to EVERY fit on this tab (Autofit,
+      # Simulate, and the compare-all loop). They are advanced/rarely-changed,
+      # so they live in a collapsed accordion at the bottom of the sidebar --
+      # grouped with the other tab-wide settings, out of the Stage 1->2->3 flow.
       bslib::accordion(
         open = FALSE,
         bslib::accordion_panel(
@@ -134,7 +134,7 @@ binary_ui <- function(id) {
                  "model is highlighted."),
         bslib::layout_columns(
           col_widths = c(7, 5),
-          shiny::div(class = "mt-2",
+          shiny::div(class = "mt-4",
                      shiny::actionButton(ns("compare_all"),
                                          "Fit & compare all models",
                                          class = "btn-primary")),

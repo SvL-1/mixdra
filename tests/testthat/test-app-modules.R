@@ -128,6 +128,9 @@ test_that("binary_ui: 3-stage layout with compare-all hero and explore accordion
   expect_match(html, "binary-interaction_help", fixed = TRUE)
   expect_match(html, "binary-surface", fixed = TRUE)
   expect_match(html, "binary-cis", fixed = TRUE)
+  expect_match(html, "binary-isobole", fixed = TRUE)
+  expect_match(html, "binary-op", fixed = TRUE)
+  expect_match(html, "binary-n_starts", fixed = TRUE)
   # "explore by hand" demoted: manual a/b value + Autofit/Simulate still present
   expect_match(html, "binary-val_a", fixed = TRUE)
   expect_match(html, "Autofit (a, b)", fixed = TRUE)
