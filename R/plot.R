@@ -51,8 +51,11 @@ plot_obs_pred <- function(fit, df) {
                            marker = list(color = "black", size = 6))
   p <- plotly::add_lines(p, x = lim, y = lim, name = "1:1",
                          line = list(color = "grey", dash = "dash"))
-  plotly::layout(p, xaxis = list(title = "observed"),
-                 yaxis = list(title = "predicted"))
+  # Axis labels echo the SSR readout's notation (SSR = sum (y - yhat)^2,
+  # yhat = model prediction) so the plot maps directly onto the fitted
+  # objective. "ŷ" is y-hat.
+  plotly::layout(p, xaxis = list(title = "observed (y)"),
+                 yaxis = list(title = "predicted (ŷ)"))
 }
 
 #' Plot the fitted 3-D response surface of a binary mixture
