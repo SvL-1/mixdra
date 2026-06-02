@@ -1,7 +1,10 @@
 # Model-unification migration: wire production through `mix_response()`
 
 Date: 2026-06-02
-Status: approved (design)
+Status: ✅ IMPLEMENTED (2026-06-02) — merged to `main` (branch `model-unification-migration`,
+commits `20be962`..`033cc9d`). Net −1,539 lines in `R/`; 764 assertions green incl. the 576
+equivalence contract; one ~5e-8 tolerance re-baseline; ASA kept separate. See plan
+`docs/superpowers/plans/2026-06-02-model-unification-migration.md`.
 Supersedes the "Step 2" left undone by `2026-06-01-model-unification-design.md`.
 
 ## Problem

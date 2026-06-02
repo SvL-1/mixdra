@@ -10,6 +10,13 @@
 
 **Spec:** `docs/superpowers/specs/2026-06-02-model-unification-migration-design.md`
 
+> **✅ STATUS: COMPLETED (2026-06-02).** Implemented on branch `model-unification-migration`
+> (7 commits `20be962`..`033cc9d`), merged fast-forward into `main`. Net **−1,539 lines** in `R/`.
+> All 10 relevant test groups green on merged `main` (764 assertions, 0 failures), incl. the
+> 576-assertion equivalence contract. One ~5e-8 tolerance re-baseline (`test-predict-mixture.R`).
+> ASA left separate as planned. Each task passed spec + code-quality review plus a final
+> holistic review ("ready to merge").
+
 ---
 
 ## Prerequisites (read before starting)
@@ -45,7 +52,7 @@ Add the production adapter to `R/mix-response.R` (co-located with the predictor 
 - Modify: `R/mix-response.R` (append after the `mix_response` definition)
 - Test: `tests/testthat/test-adapter.R` (create)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/testthat/test-adapter.R`:
 
@@ -100,12 +107,12 @@ test_that("make_adapter reproduces ternary reference/SA", {
 })
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `Rscript -e 'devtools::test(filter="adapter")'`
 Expected: FAIL — `could not find function "make_adapter"`.
 
-- [ ] **Step 3: Implement `make_adapter` + `.adapter_bmap`**
+- [x] **Step 3: Implement `make_adapter` + `.adapter_bmap`**
 
 Append to `R/mix-response.R`:
 
@@ -164,12 +171,12 @@ make_adapter <- function(reference, deviation, n_chem) {
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `Rscript -e 'devtools::test(filter="adapter")'`
 Expected: PASS (3 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add R/mix-response.R tests/testthat/test-adapter.R
@@ -186,7 +193,7 @@ Switch `model_spec()` so the 16 models resolve through `make_adapter`; ASA keeps
 - Modify: `R/registry.R` (the `dev_key` / `key` / `list(fn = ...)` block)
 - Test: `tests/testthat/test-model-spec-dispatch.R` (create)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/testthat/test-model-spec-dispatch.R`:
 
@@ -239,14 +246,14 @@ test_that("dispatched params are unchanged", {
 })
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `Rscript -e 'devtools::test(filter="model-spec-dispatch")'`
 Expected: FAIL — the binary/ternary `expect_identical`/`expect_equal` for the adapter path fail because `$fn` is still the legacy `get()` result (the ASA and params tests pass, the reproduce tests fail only if numerics differ — if they already pass, proceed; the meaningful assertion is the post-change green run plus `expect_identical(fn, ca_asa_tri_vec)` which must stay true).
 
 > Note: the "reproduce" assertions may already pass against the legacy `$fn` (it *is* the legacy fn). That is fine — this test's job is to lock the contract so Step 3's swap cannot regress it. Treat a green Step 2 as an acceptable starting state; the gate is Step 4.
 
-- [ ] **Step 3: Swap the dispatch in `model_spec()`**
+- [x] **Step 3: Swap the dispatch in `model_spec()`**
 
 In `R/registry.R`, replace the `dev_key` / `key` / `list(...)` tail of `model_spec()` (currently building a `_vec` key and calling `get(key, mode = "function")` for every deviation) with ASA-only `get()` plus the adapter for everything else:
 
@@ -272,7 +279,7 @@ In `R/registry.R`, replace the `dev_key` / `key` / `list(...)` tail of `model_sp
 
 Delete the now-unused `dev_key <- switch(...)` and `key <- paste0(...)` lines.
 
-- [ ] **Step 4: Run dispatch + equivalence tests**
+- [x] **Step 4: Run dispatch + equivalence tests**
 
 Run: `Rscript -e 'devtools::test(filter="model-spec-dispatch")'`
 Expected: PASS (4 tests), including `expect_identical(fn, ca_asa_tri_vec)`.
@@ -283,7 +290,7 @@ Expected: PASS (the equivalence test is unaffected — it calls `mix_response()`
 Run: `Rscript -e 'devtools::test(filter="registry")'`
 Expected: PASS (existing registry tests; if any asserted the old `$fn` identity against a `*_vec`, update it to the new contract — adapter for the 16, `ca_asa_tri_vec` for ASA).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add R/registry.R tests/testthat/test-model-spec-dispatch.R
@@ -300,7 +307,7 @@ Production no longer references the legacy functions — only the equivalence an
 - Create: `tests/testthat/helper-legacy-models.R`
 - Delete: `R/models-binary.R`, `R/models-ternary.R`
 
-- [ ] **Step 1: Create the helper from the existing sources**
+- [x] **Step 1: Create the helper from the existing sources**
 
 ```bash
 {
@@ -319,13 +326,13 @@ Production no longer references the legacy functions — only the equivalence an
 
 (The roxygen `#'` lines come along harmlessly as comments; roxygen only scans `R/`, so they generate no `.Rd`.)
 
-- [ ] **Step 2: Delete the package copies**
+- [x] **Step 2: Delete the package copies**
 
 ```bash
 git rm R/models-binary.R R/models-ternary.R
 ```
 
-- [ ] **Step 3: Run the oracle-dependent tests**
+- [x] **Step 3: Run the oracle-dependent tests**
 
 Run: `Rscript -e 'devtools::test(filter="mixture-predict")'`
 Expected: PASS — `mix_response()` (package) vs the legacy functions (helper) still 576/576.
@@ -338,7 +345,7 @@ Run: `Rscript -e 'devtools::test(filter="adapter")'`
 Run: `Rscript -e 'devtools::test(filter="model-spec-dispatch")'`
 Expected: PASS — the adapter/dispatch tests also reference the legacy `*_vec` as oracle (now from the helper).
 
-- [ ] **Step 4: Verify no package code still references the legacy names**
+- [x] **Step 4: Verify no package code still references the legacy names**
 
 Run: `Rscript -e 'devtools::load_all(); cat("loaded OK\n")'`
 Expected: `loaded OK` with no "object not found" errors.
@@ -346,7 +353,7 @@ Expected: `loaded OK` with no "object not found" errors.
 Run (must return nothing): `grep -rnE "\b(ca|ia)_(bi|tri|sa_bi|dr_bi|dl_bi|sa_tri|dr_tri|dl_tri)(_vec)?\b" R/`
 Expected: empty output (only `ca_asa_tri`/`ca_asa_tri_vec` remain in `R/`, which this pattern excludes).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/testthat/helper-legacy-models.R
@@ -363,17 +370,17 @@ The 16 deleted functions had `@keywords internal` `.Rd` pages. Regenerate so `ma
 - Delete (auto): `man/ca_bi.Rd`, `man/ia_bi.Rd`, `man/ca_sa_bi.Rd`, `man/ca_dr_bi.Rd`, `man/ca_dl_bi.Rd`, `man/ia_sa_bi.Rd`, `man/ia_dr_bi.Rd`, `man/ia_dl_bi.Rd`, `man/ca_tri.Rd`, `man/ia_tri.Rd`, `man/ca_sa_tri.Rd`, `man/ca_dr_tri.Rd`, `man/ca_dl_tri.Rd`, `man/ia_sa_tri.Rd`, `man/ia_dr_tri.Rd`, `man/ia_dl_tri.Rd`
 - Possibly create: `man/make_adapter.Rd` (from the new roxygen block)
 
-- [ ] **Step 1: Regenerate**
+- [x] **Step 1: Regenerate**
 
 Run: `Rscript -e 'devtools::document()'`
 Expected: roxygen removes the 16 internal `.Rd` files and writes `man/make_adapter.Rd`. `NAMESPACE` is unchanged (none of these were exported — confirm the diff shows no `NAMESPACE` change).
 
-- [ ] **Step 2: Confirm the man/ delta is exactly the 16 removals + make_adapter**
+- [x] **Step 2: Confirm the man/ delta is exactly the 16 removals + make_adapter**
 
 Run: `git status --short man/`
 Expected: 16 `D man/<legacy>.Rd` and one `?? man/make_adapter.Rd` (or `A` after add). No other `.Rd` touched.
 
-- [ ] **Step 3: Stage and commit**
+- [x] **Step 3: Stage and commit**
 
 ```bash
 git add -A man/ NAMESPACE
@@ -389,7 +396,7 @@ git commit -m "docs: regenerate man/ after removing the 16 legacy model function
 **Files:**
 - Modify (only where a numeric expectation shifts): likely `tests/testthat/test-fit.R`, `test-staged.R`, `test-validation-binary.R`, `test-validation-ternary.R`, `test-recovery.R`, `test-summary.R`, `test-fit-bounds.R`, `test-predict-mixture.R`
 
-- [ ] **Step 1: Run each broad group and record failures**
+- [x] **Step 1: Run each broad group and record failures**
 
 Run, one at a time:
 ```
@@ -404,19 +411,19 @@ Rscript -e 'devtools::test(filter="fit-bounds")'
 ```
 Expected: mostly PASS. For any FAIL, note the file, the expectation, the expected-vs-actual numbers.
 
-- [ ] **Step 2: Triage each failure with the decision rule**
+- [x] **Step 2: Triage each failure with the decision rule**
 
 For every failing expectation:
 - Compute the relative difference `abs(actual - expected) / max(abs(expected), 1e-8)`.
 - **If `< 1e-3`** (a last-digit convergence shift): this is the expected re-baseline. Update the literal expected value in the test to `actual`, and/or widen an over-tight `tolerance =` to a documented value (e.g. `1e-3`). Add a one-line comment: `# re-baselined for mix_response() 200-iter bisection (was legacy 50-iter)`.
 - **If `>= 1e-3` or a structural/logic error** (NaN, wrong length, wrong sign): STOP — this is not a re-baseline. Investigate via the systematic-debugging skill; do not paper over it by loosening tolerance.
 
-- [ ] **Step 3: Re-run the edited groups to green**
+- [x] **Step 3: Re-run the edited groups to green**
 
 Re-run each `devtools::test(filter=...)` you edited.
 Expected: PASS.
 
-- [ ] **Step 4: Smoke-check dispatch across every reachable combo**
+- [x] **Step 4: Smoke-check dispatch across every reachable combo**
 
 Run:
 ```bash
@@ -445,7 +452,7 @@ cat("all dispatch combos finite OK\n")
 ```
 Expected: `all dispatch combos finite OK`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/
@@ -456,7 +463,7 @@ git commit -m "test: re-baseline numerics for the unified mix_response() bisecti
 
 ## Task 6: Final sweep and memory update
 
-- [ ] **Step 1: Run the app-layer and remaining model tests to catch indirect breakage**
+- [x] **Step 1: Run the app-layer and remaining model tests to catch indirect breakage**
 
 ```
 Rscript -e 'devtools::test(filter="app-modules")'
@@ -467,16 +474,16 @@ Rscript -e 'devtools::test(filter="models-ternary-asa")'
 ```
 Expected: PASS. (These exercise `model_spec` indirectly via fitting/plotting/simulation.)
 
-- [ ] **Step 2: Confirm the line-count win**
+- [x] **Step 2: Confirm the line-count win**
 
 Run: `git diff --stat main -- R/`
 Expected: `R/models-binary.R` (−408) and `R/models-ternary.R` (−1184) deleted; `R/mix-response.R` and `R/registry.R` net small additions. Net ≈ −1,500 lines in `R/`.
 
-- [ ] **Step 3: Update the project memory**
+- [x] **Step 3: Update the project memory**
 
 Edit `C:\Users\jelle\.claude\projects\D--sam\memory\mixdra-model-unification.md` to record that the migration is complete: production dispatches through `mix_response()` via a `make_adapter()` closure in `model_spec()`; the 16 legacy functions now live only in `tests/testthat/helper-legacy-models.R` as the equivalence oracle; ASA remains separate. Keep the `MEMORY.md` pointer line in sync.
 
-- [ ] **Step 4: Final commit**
+- [x] **Step 4: Final commit**
 
 ```bash
 git add C:/Users/jelle/.claude/projects/D--sam/memory/

@@ -1,12 +1,13 @@
 # Mixture-model unification — design & findings
 
 **Date:** 2026-06-01
-**Status:** 🚧 IN PROGRESS on branch `mixdra-unify-models`.
-Step 1 DONE — a single unified predictor (`mix_response()`) is proven equivalent
-to all 16 ported model functions (576/576 equivalence assertions), and the work
-uncovered + fixed a real bug in the ternary IA-DL model. Step 2 (rewire
-`registry.R` to dispatch through `mix_response()` and delete the 16 originals)
-NOT yet done. Builds on the validated engine
+**Status:** ✅ COMPLETE. Step 1 DONE — a single unified predictor (`mix_response()`)
+is proven equivalent to all 16 ported model functions (576/576 equivalence
+assertions), and the work uncovered + fixed a real bug in the ternary IA-DL model.
+Step 2 DONE (2026-06-02) — `registry.R` now dispatches through `mix_response()` and
+the 16 originals were removed from the package (relocated to a test-only oracle). See
+`docs/superpowers/specs/2026-06-02-model-unification-migration-design.md` and its plan
+for the as-built migration. Builds on the validated engine
 (`docs/superpowers/specs/2026-05-30-mixdra-design.md`).
 
 ---
@@ -105,10 +106,10 @@ whether any published/in-progress results used ternary IA-DL specifically.
 - **The ternary-only ASA model** (`R/models-ternary-asa.R`, params `A1..A4`) is a
   genuinely different functional form, not a member of this family. It stays
   separate.
-- **Step 2 (not yet done):** rewire `R/registry.R` so `model_spec(...)$fn`
-  dispatches through `mix_response()` (assembling vector args from the per-name
-  parameters), then delete the 16 functions in `models-binary.R` /
-  `models-ternary.R`. The fitter, objectives, and LR tests call only through the
-  registry, so they need no changes. This is where the ~1,600 → ~120 line
-  reduction actually lands; it builds on the IA-DL fix, so it is gated on Sam's
-  sign-off.
+- **Step 2 (DONE 2026-06-02):** `R/registry.R` now has `model_spec(...)$fn` dispatch
+  through `mix_response()` via a `make_adapter()` closure that assembles the vector
+  args from the per-name parameters; the 16 functions in `models-binary.R` /
+  `models-ternary.R` were removed from the package (relocated verbatim to
+  `tests/testthat/helper-legacy-models.R` as the equivalence oracle). The fitter,
+  objectives, and LR tests call only through the registry, so they needed no changes.
+  The reduction landed at **−1,539 lines** in `R/`. Merged to `main`.
