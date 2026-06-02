@@ -1,5 +1,6 @@
 # make_adapter() must reproduce the legacy *_vec predictors exactly (same maths,
-# same by-name call contract). The legacy functions are still in R/ at this point.
+# same by-name call contract). The legacy functions are the equivalence oracle in
+# tests/testthat/helper-legacy-models.R (auto-sourced by testthat).
 
 test_that("make_adapter reproduces binary CA reference/SA over a grid", {
   m <- 800; sl <- c(6, 0.4); e <- c(0.08, 50); a <- 0.5
