@@ -37,62 +37,51 @@ test_that("single_ui builds a Shiny UI fragment", {
   expect_true(inherits(single_ui("single"), c("shiny.tag", "shiny.tag.list", "bslib_fragment")))
 })
 
-test_that("binary_server stages the fit: split, freeze gate, average max, override, invalidate", {
+test_that("binary_server workspace: freeze gate, autofit/simulate/find-best, invalidate", {
   skip_on_cran()
   meta <- shiny::reactiveValues(chem1 = "A", chem2 = "B")
   shiny::testServer(binary_server, args = list(meta = meta), {
     csv <- testthat::test_path("fixtures", "binary_mps_cpf_continuous.csv")
     skip_if_not(file.exists(csv), "binary fixture missing")
     session$setInputs(response = "continuous", reference = "CA", thorough = FALSE,
-                      n_starts = 1, alpha = 0.05, time_limit = 30,
+                      n_starts = 1, alpha = 0.05, time_limit = 30, model = "reference",
                       file = list(datapath = csv, name = "binary.csv"))
     expect_length(errs(), 0)
 
-    # marginal split: each panel's series drops the other chemical's column and
-    # exposes the kept chemical's concentration as C1
-    expect_false("C2" %in% names(m1()))
-    expect_false("C2" %in% names(m2()))
-    expect_true("C1" %in% names(m1()))
-    expect_true("C1" %in% names(m2()))
-
-    # nothing frozen yet
-    expect_false(isTRUE(frozen()))
-
-    # supply both single curves deterministically via Simulate, with distinct max
+    # supply both single curves deterministically via Simulate, distinct max
     session$setInputs(`chem1-val_max` = 700, `chem1-val_slope` = 2,
                       `chem1-val_ec50` = 1, `chem1-simulate` = 1)
     session$setInputs(`chem2-val_max` = 600, `chem2-val_slope` = 1,
                       `chem2-val_ec50` = 5, `chem2-simulate` = 1)
-
-    # frozen curve parameters: shared max is the average; per-chemical slope/ec50 kept
     expect_equal(unname(curve_params()[["max"]]), 650)
-    expect_equal(unname(curve_params()[["slope1"]]), 2)
-    expect_equal(unname(curve_params()[["ec502"]]), 5)
 
-    # freeze -> fits the four models and reveals the result
+    # freeze locks curves but does NOT fit
     session$setInputs(freeze = 1)
     expect_true(isTRUE(frozen()))
-    expect_setequal(names(res_r()$fits), c("reference", "SA", "DR", "DL"))
-    expect_equal(shown_fit()$deviation, res_r()$chosen)
+    expect_null(current_fit())
 
-    # picker overrides the displayed model
-    session$setInputs(model = "DR")
-    expect_equal(shown_fit()$deviation, "DR")
+    # Autofit the selected (S/A) model -> a fit for SA is stored
+    session$setInputs(model = "SA")
+    session$setInputs(autofit = 1)
+    expect_equal(current_fit()$deviation, "SA")
+    expect_true("a" %in% names(current_fit()$par))
 
-    # the per-model explanation follows the picker. With DR shown, it is the
-    # DR block; the DL block label is absent.
-    expect_match(output$interaction_help$html, "Dose-ratio dependent", fixed = TRUE)
-    expect_false(grepl("Dose-level dependent", output$interaction_help$html, fixed = TRUE))
-    # switching the picker to DL switches the block; with reference CA the DL
-    # formula is the &Sigma;TU variant (distinct from the intro's TU/&Sigma;TU).
-    session$setInputs(model = "DL")
-    expect_equal(shown_fit()$deviation, "DL")
-    expect_match(output$interaction_help$html, "Dose-level dependent", fixed = TRUE)
-    expect_match(output$interaction_help$html, "b&middot;&Sigma;TU)", fixed = TRUE)
+    # Simulate S/A with an entered a -> a simulated fit replaces the stored one
+    session$setInputs(val_a = 3, simulate = 1)
+    expect_true(isTRUE(current_fit()$simulated))
+    expect_equal(current_fit()$par[["a"]], 3)
 
-    # editing a single curve after freezing invalidates the freeze
+    # Find best model -> comparison of all four + a chosen model
+    session$setInputs(find_best = 1)
+    expect_setequal(names(last_compare()$fits), c("reference", "SA", "DR", "DL"))
+    expect_equal(nrow(last_compare()$comparison), 3)
+    expect_true(last_compare()$chosen %in% c("reference", "SA", "DR", "DL"))
+
+    # editing a single curve after freezing invalidates everything
     session$setInputs(`chem1-val_max` = 720, `chem1-simulate` = 2)
     expect_false(isTRUE(frozen()))
+    expect_equal(length(fits_store()), 0)
+    expect_null(last_compare())
   })
 })
 

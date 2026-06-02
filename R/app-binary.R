@@ -247,6 +247,24 @@ binary_server <- function(id, meta) {
       assemble_curve_params(fit1(), fit2())
     })
 
+    # Per-model interaction fits, keyed by model name. Autofit/Simulate write one
+    # entry; Find best writes all four. `current_fit` is whatever is stored for the
+    # selected model (NULL if none yet). Keeping a store -- rather than a single
+    # reactiveVal that Find best would stomp when it switches the picker -- means
+    # the programmatic picker switch never re-triggers or clears a fit.
+    fits_store   <- shiny::reactiveVal(list())
+    last_compare <- shiny::reactiveVal(NULL)
+    current_fit  <- shiny::reactive({
+      m <- input$model
+      if (is.null(m)) return(NULL)
+      fits_store()[[m]]
+    })
+
+    engine_response <- shiny::reactive(
+      if (input$response == "quantal") "binary" else "continuous")
+    n_starts_eff <- shiny::reactive(
+      if (isTRUE(input$thorough)) max(input$n_starts, 20) else input$n_starts)
+
     output$freeze_note <- shiny::renderUI({
       if (is.null(fit1()) || is.null(fit2()))
         shiny::div(class = "text-muted",
@@ -254,7 +272,7 @@ binary_server <- function(id, meta) {
                      "Fit both single curves (Autofit or Simulate) before freezing."))
     })
 
-    # Freeze requires both curves; marking frozen triggers the interaction fit.
+    # Freeze only locks the curves and reveals Stage 2 -- it does not fit.
     shiny::observeEvent(input$freeze, {
       if (is.null(fit1()) || is.null(fit2())) {
         shiny::showNotification("Fit both single curves before freezing.", type = "warning")
@@ -263,78 +281,158 @@ binary_server <- function(id, meta) {
       frozen(TRUE)
     })
 
-    # A changed curve or header model invalidates the freeze (result can't go stale).
+    # A changed curve or header model invalidates the freeze and clears all fits.
     shiny::observeEvent(
       list(fit1(), fit2(), input$reference, input$response),
-      { if (isTRUE(frozen())) frozen(FALSE) },
+      {
+        if (isTRUE(frozen())) {
+          frozen(FALSE)
+          fits_store(list())
+          last_compare(NULL)
+        }
+      },
       ignoreInit = TRUE)
 
-    # Stage 2/3: fit reference + deviations with the frozen curve params fixed.
-    res_r <- shiny::eventReactive(frozen(), {
-      shiny::req(isTRUE(frozen()), fit1(), fit2())
-      df <- engine_df()
-      engine_response <- if (input$response == "quantal") "binary" else "continuous"
-      n_starts <- if (isTRUE(input$thorough)) max(input$n_starts, 20) else input$n_starts
-      start <- curve_params()
-      shiny::withProgress(message = "Fitting interaction models...", value = 0.5, {
-        tryCatch(
-          analyse_mixture(df, reference = input$reference, response = engine_response,
-                          start = start, alpha = input$alpha,
-                          n_starts = n_starts, time_limit = input$time_limit),
-          error = function(e) {
-            shiny::showNotification(paste("Fit failed:", conditionMessage(e)), type = "error")
-            NULL
-          })
-      })
+    # Read the entered a/b as a named numeric (blank -> NA).
+    read_ab <- function() {
+      raw <- list(a = input$val_a, b = input$val_b)
+      vapply(raw, function(x)
+        if (is.null(x) || length(x) == 0) NA_real_ else as.numeric(x), numeric(1))
+    }
+
+    # Autofit: fit only the selected model's interaction params, curves fixed.
+    shiny::observeEvent(input$autofit, {
+      shiny::req(frozen(), curve_params())
+      dev <- input$model
+      fit <- tryCatch(
+        shiny::withProgress(message = "Fitting interaction...", value = 0.5,
+          fit_model(engine_df(), input$reference, dev, engine_response(),
+                    start = curve_params(), fixed = names(curve_params()),
+                    n_starts = n_starts_eff(), time_limit = input$time_limit)),
+        error = function(e) {
+          shiny::showNotification(paste("Fit failed:", conditionMessage(e)), type = "error")
+          NULL
+        })
+      if (is.null(fit)) return()
+      if ("a" %in% names(fit$par))
+        shiny::updateNumericInput(session, "val_a", value = round(fit$par[["a"]], 4))
+      if ("b" %in% names(fit$par))
+        shiny::updateNumericInput(session, "val_b", value = round(fit$par[["b"]], 4))
+      s <- fits_store(); s[[dev]] <- fit; fits_store(s)
     })
 
-    # Refresh the model picker after each fit, defaulting to the chosen model.
-    shiny::observeEvent(res_r(), {
-      shiny::updateSelectInput(session, "model",
-                               choices = names(res_r()$fits), selected = res_r()$chosen)
+    # Simulate: evaluate the selected model with the entered a/b (no refit).
+    shiny::observeEvent(input$simulate, {
+      shiny::req(frozen(), curve_params())
+      dev <- input$model
+      if (dev == "reference") {
+        shiny::showNotification(
+          "The reference model has no interaction parameters to simulate.", type = "message")
+        return()
+      }
+      ab <- read_ab()
+      need <- if (dev == "SA") "a" else c("a", "b")
+      if (any(is.na(ab[need]))) {
+        shiny::showNotification("Enter a (and b) to simulate.", type = "warning")
+        return()
+      }
+      fit <- tryCatch(
+        eval_mixture(engine_df(), input$reference, dev, engine_response(),
+                     curve_params(), interaction = ab[need]),
+        error = function(e) {
+          shiny::showNotification(paste("Simulate failed:", conditionMessage(e)), type = "error")
+          NULL
+        })
+      if (is.null(fit)) return()
+      s <- fits_store(); s[[dev]] <- fit; fits_store(s)
     })
 
-    # Fall back to the chosen model until the picker's input has populated.
-    shown_fit <- shiny::reactive({
-      shiny::req(res_r())
-      m <- input$model
-      if (is.null(m) || !m %in% names(res_r()$fits)) m <- res_r()$chosen
-      res_r()$fits[[m]]
+    # Find best model: fit all four + select; store every fit, land on the chosen.
+    shiny::observeEvent(input$find_best, {
+      shiny::req(frozen(), curve_params())
+      res <- tryCatch(
+        shiny::withProgress(message = "Comparing interaction models...", value = 0.5,
+          analyse_mixture(engine_df(), reference = input$reference,
+                          response = engine_response(), start = curve_params(),
+                          alpha = input$alpha, n_starts = n_starts_eff(),
+                          time_limit = input$time_limit)),
+        error = function(e) {
+          shiny::showNotification(paste("Fit failed:", conditionMessage(e)), type = "error")
+          NULL
+        })
+      if (is.null(res)) return()
+      last_compare(res)
+      s <- fits_store()
+      for (m in names(res$fits)) s[[m]] <- res$fits[[m]]
+      fits_store(s)
+      shiny::updateSelectInput(session, "model", selected = res$chosen)
+      ch <- res$fits[[res$chosen]]
+      shiny::updateNumericInput(session, "val_a",
+        value = if ("a" %in% names(ch$par)) round(ch$par[["a"]], 4) else NA)
+      shiny::updateNumericInput(session, "val_b",
+        value = if ("b" %in% names(ch$par)) round(ch$par[["b"]], 4) else NA)
     })
 
-    # Per-model explanation: tracks the header reference and the displayed model.
+    # Switching the picker syncs the grid to that model's stored a/b (blank if none).
+    shiny::observeEvent(input$model, {
+      f <- fits_store()[[input$model]]
+      shiny::updateNumericInput(session, "val_a",
+        value = if (!is.null(f) && "a" %in% names(f$par)) round(f$par[["a"]], 4) else NA)
+      shiny::updateNumericInput(session, "val_b",
+        value = if (!is.null(f) && "b" %in% names(f$par)) round(f$par[["b"]], 4) else NA)
+    }, ignoreInit = TRUE)
+
+    # Per-model explanation: tracks the reference and the selected model.
     output$interaction_help <- shiny::renderUI({
-      shiny::req(frozen(), res_r())
-      interaction_help(input$reference, shown_fit()$deviation)
+      shiny::req(frozen())
+      interaction_help(input$reference, input$model)
+    })
+
+    # Fit-objective readout for the displayed model.
+    output$objective <- shiny::renderUI({
+      shiny::req(current_fit())
+      f <- current_fit()
+      lab <- if (identical(f$response, "binary")) "Deviance" else "SSR"
+      shiny::tags$p(
+        shiny::tags$b(paste0(lab, ": ")), round(f$objective, 2),
+        "   |   ", shiny::tags$b("n: "), f$n,
+        if (isTRUE(f$simulated)) shiny::tags$em(" (simulated)"))
     })
 
     output$surface <- plotly::renderPlotly({
-      shiny::req(frozen(), res_r()); plot_surface(shown_fit(), engine_df())
+      shiny::req(frozen(), current_fit()); plot_surface(current_fit(), engine_df())
     })
     output$isobole <- plotly::renderPlotly({
-      shiny::req(frozen(), res_r())
-      plot_isobole(shown_fit(), engine_df(), reference_fit = res_r()$fits$reference)
+      shiny::req(frozen(), current_fit())
+      ref <- if (!is.null(last_compare())) last_compare()$fits$reference else NULL
+      plot_isobole(current_fit(), engine_df(), reference_fit = ref)
     })
     output$op <- plotly::renderPlotly({
-      shiny::req(frozen(), res_r()); plot_obs_pred(shown_fit(), engine_df())
+      shiny::req(frozen(), current_fit()); plot_obs_pred(current_fit(), engine_df())
     })
 
+    # Table-2 style all-models matrix -- only meaningful after Find best.
     output$results <- DT::renderDT({
-      shiny::req(frozen(), res_r())
-      tab <- round(result_table(res_r()), 4)
+      shiny::req(last_compare())
+      tab <- round(result_table(last_compare()), 4)
       DT::datatable(as.data.frame(tab), options = list(dom = "t"))
     })
     output$comparison <- DT::renderDT({
-      shiny::req(frozen(), res_r())
-      DT::datatable(res_r()$comparison, rownames = FALSE, options = list(dom = "t"))
+      shiny::req(last_compare())
+      DT::datatable(last_compare()$comparison, rownames = FALSE, options = list(dom = "t"))
     })
+    # CIs for a fitted model; a simulated (hand-entered) set has no CIs, so show
+    # its entered values instead (honest -- those are the numbers you set).
     output$cis <- DT::renderDT({
-      shiny::req(frozen(), shown_fit())
-      f <- shown_fit()
-      DT::datatable(param_ci(f, engine_df(), f$reference, f$deviation, f$response),
-                    rownames = FALSE, options = list(dom = "t"))
+      shiny::req(current_fit())
+      f <- current_fit()
+      tab <- if (isTRUE(f$simulated))
+        data.frame(parameter = names(f$par), value = round(unname(f$par), 4))
+      else
+        param_ci(f, engine_df(), f$reference, f$deviation, f$response)
+      DT::datatable(tab, rownames = FALSE, options = list(dom = "t"))
     })
 
-    res_r   # return for testability
+    list(current_fit = current_fit, last_compare = last_compare)  # return for testability
   })
 }
