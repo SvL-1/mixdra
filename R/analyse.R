@@ -127,6 +127,10 @@ joint_fit_one <- function(df, reference, deviation, response,
 #' the engine entry point behind the binary tab's "Fit & compare all models"
 #' action; the Shiny layer drives the same chain step-by-step for live updates.
 #' @inheritParams analyse_mixture
+#' @param start Optional named vector of curve parameters (`max`, `slope*`,
+#'   `ec50*`) used as the joint fit's *starting point* — all parameters remain
+#'   free; nothing is held fixed (unlike the staged [analyse_mixture()]). When
+#'   `NULL` (default) the seed comes from [fit_curve_from_singles()].
 #' @return A list: `fits`, `comparison`, `chosen`, `reference`, `response`.
 #' @export
 analyse_mixture_joint <- function(df, reference,

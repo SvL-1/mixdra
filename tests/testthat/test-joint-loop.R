@@ -2,6 +2,16 @@
 # warm-started down the nesting chain. See
 # docs/superpowers/specs/2026-06-02-binary-model-selection-loop-ux-design.md
 
+# Mute ONLY the benign "time limit reached" warning that the slower 4x joint
+# multi-start fits emit; any other warning still surfaces so a real regression
+# is not hidden.
+mute_timeout <- function(expr) {
+  withCallingHandlers(expr, warning = function(w) {
+    if (grepl("time limit", conditionMessage(w)))
+      invokeRestart("muffleWarning")
+  })
+}
+
 test_that("joint_chain_order is reference->SA->DR->DL for binary, reference->SA for ternary", {
   expect_equal(joint_chain_order(2), c("reference", "SA", "DR", "DL"))
   expect_equal(joint_chain_order(3), c("reference", "SA"))
@@ -39,6 +49,7 @@ test_that("analyse_mixture_joint fits all four jointly and recovers a reference 
   expect_equal(res$fits$reference$df, 5L)
   expect_equal(res$fits$SA$df, 6L)
   expect_equal(res$fits$DR$df, 7L)
+  expect_equal(res$fits$DL$df, 7L)
   # curves recovered jointly from the full data
   expect_equal(unname(res$fits$reference$par[["max"]]), 800, tolerance = 1e-2)
   expect_equal(unname(res$fits$reference$par[["ec501"]]), 0.08, tolerance = 1e-2)
@@ -54,8 +65,8 @@ test_that("analyse_mixture_joint selects DR on DR-generated data", {
            a = 2.5, b = 1.5)
   df  <- simulate_mixture(par, "CA", "DR", "continuous")
   set.seed(1)
-  res <- analyse_mixture_joint(df, reference = "CA", response = "continuous",
-                               n_starts = 10)
+  res <- mute_timeout(analyse_mixture_joint(df, reference = "CA", response = "continuous",
+                                            n_starts = 10))
   expect_equal(unname(res$fits$DR$par[["a"]]), 2.5, tolerance = 0.1)
   expect_equal(unname(res$fits$DR$par[["b"]]), 1.5, tolerance = 0.1)
   expect_equal(res$chosen, "DR")

@@ -21,9 +21,10 @@ analyse_mixture_joint(
 
 \item{response}{"continuous" or "binary".}
 
-\item{start}{Optional named vector of the curve parameters (\code{max}, \verb{slope*},
-\verb{ec50*}) to hold fixed. When \code{NULL} (default) they are estimated from the
-single-compound data via \code{\link[=fit_curve_from_singles]{fit_curve_from_singles()}}.}
+\item{start}{Optional named vector of curve parameters (\code{max}, \verb{slope*},
+\verb{ec50*}) used as the joint fit's \emph{starting point} — all parameters remain
+free; nothing is held fixed (unlike the staged \code{\link[=analyse_mixture]{analyse_mixture()}}). When
+\code{NULL} (default) the seed comes from \code{\link[=fit_curve_from_singles]{fit_curve_from_singles()}}.}
 
 \item{alpha}{Significance threshold for model selection.}
 
