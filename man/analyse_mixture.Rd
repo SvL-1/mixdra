@@ -30,7 +30,7 @@ single-compound data via \code{\link[=fit_curve_from_singles]{fit_curve_from_sin
 \item{alpha}{Significance threshold for model selection.}
 
 \item{lower, upper}{Optional named numeric vectors of hard parameter bounds,
-forwarded to every \code{\link[=fit_model]{fit_model()}} call (the four models share the base
+forwarded to every \code{\link[=fit_model]{fit_model()}} call (all deviations share the base
 parameters). See \code{\link[=fit_model]{fit_model()}} for the bound semantics.}
 
 \item{n_starts}{Number of optimisation starts per model, forwarded to
@@ -39,8 +39,9 @@ raise it (e.g. 20) to multi-start and more reliably escape the local
 minima of the CA bisection surface at the cost of runtime.}
 
 \item{time_limit}{Per-model wall-clock budget in seconds, forwarded to
-\code{\link[=fit_model]{fit_model()}}. Applies to each of the four fits independently, so a full
-analysis can take up to \code{4 * time_limit}. \code{NULL} disables the limit.}
+\code{\link[=fit_model]{fit_model()}}. Applies to each fit independently (four for binary:
+reference/SA/DR/DL; two for ternary: reference/SA), so a full analysis can
+take up to \code{n_fits * time_limit}. \code{NULL} disables the limit.}
 }
 \value{
 A list: \code{fits} (named list of model fits), \code{comparison} (data frame of

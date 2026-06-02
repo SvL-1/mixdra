@@ -16,7 +16,8 @@ A list with \code{lower} and \code{upper} named numeric vectors (or NULL).
 }
 \description{
 Reads \verb{lo_<param>} / \verb{hi_<param>} values for \code{params}; blank/NA entries are
-dropped. To FIX a parameter, set its lower and upper to the same value. The
-default \code{params} is the binary base set; the single tab passes its own.
+dropped. To FIX a parameter, set its lower and upper to the same value.
+Callers pass the parameter set they need (the curve-fit panel passes
+\code{max}/\code{slope}/\code{ec50}); the default is the binary base set.
 }
 \keyword{internal}

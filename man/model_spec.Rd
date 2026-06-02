@@ -14,7 +14,9 @@ model_spec(reference, deviation, n_chem)
 \item{n_chem}{Number of chemicals (2 for binary, 3 for ternary).}
 }
 \value{
-A list: \code{fn} (vectorised predictor), \code{params} (all free parameter
+A list: \code{fn} (vectorised predictor; an adapter closure over
+\code{\link[=mix_response]{mix_response()}} for the reference/SA/DR/DL family, or the dedicated
+\code{ca_asa_tri_vec} for ASA), \code{params} (all free parameter
 names), \code{extra} (deviation parameters beyond the reference), \code{parent}
 (the deviation this one nests within, or NULL for the reference).
 }
