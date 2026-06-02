@@ -113,26 +113,30 @@ test_that("binary_server falls back to the bundled example before any upload", {
   })
 })
 
-test_that("binary_ui: auto-reveal (no Freeze button) + Stage 2 workspace", {
+test_that("binary_ui: 3-stage layout with compare-all hero and explore accordion", {
   html <- as.character(binary_ui("binary"))
-  # the manual Freeze checkpoint is gone -- Stage 2/3 auto-reveal
+  # no manual Freeze step
   expect_false(grepl("Freeze curves", html, fixed = TRUE))
-  expect_false(grepl("binary-freeze", html, fixed = TRUE))
-  # the Stage-2 LR comparison table moved down into the results section
-  expect_false(grepl("binary-comparison", html, fixed = TRUE))
+  # Stage 2 hero: the compare-all action + the promoted results table + alpha
+  expect_match(html, "binary-compare_all", fixed = TRUE)
+  expect_match(html, "Fit &amp; compare all models", fixed = TRUE)
   expect_match(html, "binary-results", fixed = TRUE)
-  # Stage 2 workspace: model picker, a/b value input, the three actions
+  expect_match(html, "binary-alpha", fixed = TRUE)
+  expect_match(html, "significance threshold for the model comparison", fixed = TRUE)
+  # Stage 3 inspect: model picker, per-model help, plots, CIs
   expect_match(html, "binary-model", fixed = TRUE)
+  expect_match(html, "binary-interaction_help", fixed = TRUE)
+  expect_match(html, "binary-surface", fixed = TRUE)
+  expect_match(html, "binary-cis", fixed = TRUE)
+  # "explore by hand" demoted: manual a/b value + Autofit/Simulate still present
   expect_match(html, "binary-val_a", fixed = TRUE)
   expect_match(html, "Autofit (a, b)", fixed = TRUE)
   expect_match(html, "Simulate", fixed = TRUE)
-  expect_match(html, "Find best model", fixed = TRUE)
-  # relocated fit options + the per-model explanation slot
-  expect_match(html, "binary-n_starts", fixed = TRUE)
-  expect_match(html, "binary-alpha", fixed = TRUE)
-  expect_match(html, "binary-interaction_help", fixed = TRUE)
-  # alpha now sits next to Find best model and carries an explanation
-  expect_match(html, "significance threshold for the model comparison", fixed = TRUE)
+  # the standalone Optimize-all stage is gone
+  expect_false(grepl("binary-optimize_all", html, fixed = TRUE))
+  expect_false(grepl("Optimize all params", html, fixed = TRUE))
+  # the old buried staged Find-best button is gone (replaced by compare_all)
+  expect_false(grepl("binary-find_best", html, fixed = TRUE))
 })
 
 test_that("single_ui shows the model equation and Autofit/Simulate buttons", {
@@ -152,12 +156,3 @@ test_that("interaction_param_row renders a value input with inert bound cells", 
   expect_false(grepl("binary-hi_a", html, fixed = TRUE))  # no Upper input
 })
 
-test_that("binary_ui: Optimize-all is a plain button + readout (no bounds grid)", {
-  html <- as.character(binary_ui("binary"))
-  expect_match(html, "Optimize all params", fixed = TRUE)     # button
-  expect_match(html, "binary-optimize_all", fixed = TRUE)     # action id
-  expect_match(html, "binary-optimize_readout", fixed = TRUE) # SSR before->after readout
-  # no per-parameter bounds/pin grid any more (bounds live in Stage 1; values too)
-  expect_false(grepl("binary-olo_max", html, fixed = TRUE))
-  expect_false(grepl("binary-ohi_ec502", html, fixed = TRUE))
-})

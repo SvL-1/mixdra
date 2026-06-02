@@ -97,7 +97,7 @@ binary_ui <- function(id) {
         open = FALSE,
         bslib::accordion_panel(
           "Advanced fitting options",
-          shiny::helpText("Apply to Autofit, Find best model, and Optimize all params."),
+          shiny::helpText("Apply to Autofit, Simulate, and the compare-all loop."),
           shiny::numericInput(ns("n_starts"), "n_starts", value = 1, min = 1),
           shiny::numericInput(ns("time_limit"), "time_limit (s/model)", value = 30, min = 1),
           shiny::checkboxInput(ns("thorough"), "Thorough fit (multi-start, slower)", FALSE),
@@ -111,9 +111,8 @@ binary_ui <- function(id) {
     bslib::card(
       bslib::card_header("Stage 1 · Single curves"),
       shiny::p("Fit each chemical's dose-response curve (Autofit or Simulate). ",
-               "The interaction workspace appears once both are fitted. The ",
-               "mixture model uses one shared ", shiny::tags$code("max"),
-               " (the average of the two fits)."),
+               "These seed the joint fits below — they are a starting point, ",
+               "not frozen. The comparison workspace appears once both are fitted."),
       # One row per chemical, stacked vertically (sets up the ternary case --
       # chemical 3 is simply another row). Each row is settings | plots.
       shiny::div(shiny::h5(shiny::textOutput(ns("chem1_title"))),
@@ -124,82 +123,46 @@ binary_ui <- function(id) {
       shiny::uiOutput(ns("reveal_note"))
     ),
 
-    # Stage 2 -- per-model interaction workspace (revealed once frozen).
+    # Stage 2 -- the hero: fit & compare ALL interaction models jointly, live.
     shiny::conditionalPanel(
       condition = "output.frozen", ns = ns,
       bslib::card(
-        bslib::card_header("Stage 2 · Interaction model"),
+        bslib::card_header("Stage 2 · Compare interaction models"),
+        shiny::p("Fits every interaction model jointly (curves + interaction ",
+                 "together), warm-started reference → S/A → DR/DL, and ",
+                 "compares them. Rows fill in as each model finishes; the best ",
+                 "model is highlighted."),
+        bslib::layout_columns(
+          col_widths = c(7, 5),
+          shiny::div(class = "mt-2",
+                     shiny::actionButton(ns("compare_all"),
+                                         "Fit & compare all models",
+                                         class = "btn-primary")),
+          shiny::numericInput(ns("alpha"), "alpha", value = 0.05,
+                              min = 0, max = 1, step = 0.01)),
+        shiny::helpText(
+          "alpha (α) is the significance threshold for the model comparison: ",
+          "a more complex model is kept only if it improves the fit at p < α ",
+          "(default 0.05). The table shows every fitted model and highlights the ",
+          "selected (best) one."),
+        DT::DTOutput(ns("results"))
+      )
+    ),
 
-        # Single-model picker: choose which interaction model to view / fit by
-        # hand. Model SELECTION (Find best + alpha) lives in the Results & model
-        # comparison card below, where the chosen model is highlighted.
+    # Stage 3 -- inspect the chosen (or any) model: diagnostics, CIs, and an
+    # optional by-hand explore panel.
+    shiny::conditionalPanel(
+      condition = "output.frozen", ns = ns,
+      bslib::card(
+        bslib::card_header("Stage 3 · Inspect a model"),
         shiny::selectInput(
           ns("model"), "Model",
           choices = c("No interaction (reference)" = "reference",
                       "Similar action (S/A)"       = "SA",
                       "Dose-ratio (DR)"            = "DR",
                       "Dose-level (DL)"            = "DL")),
-
         shiny::uiOutput(ns("interaction_help")),
-
-        # a/b parameter grid (hidden for the reference model; b shown for DR/DL).
-        shiny::conditionalPanel(
-          condition = "input.model != 'reference'", ns = ns,
-          bslib::card(
-            bslib::card_header("Parameters"),
-            shiny::fluidRow(
-              shiny::column(2, shiny::tags$small(shiny::tags$b("Parameter"))),
-              shiny::column(4, shiny::tags$small(shiny::tags$b("Meaning"))),
-              shiny::column(2, shiny::tags$small(shiny::tags$b("Lower"))),
-              shiny::column(2, shiny::tags$small(shiny::tags$b("Upper"))),
-              shiny::column(2, shiny::tags$small(shiny::tags$b("Value")))
-            ),
-            interaction_param_row(ns, "a", "a",
-                                  "Overall strength & direction (a > 0 antagonism, a < 0 synergism)."),
-            shiny::conditionalPanel(
-              condition = "input.model == 'DR' || input.model == 'DL'", ns = ns,
-              interaction_param_row(ns, "b", "b",
-                                    "How the interaction shifts with the mixture ratio / dose level."))
-          )
-        ),
-
-        shiny::div(
-          shiny::actionButton(ns("autofit"), "Autofit (a, b)", class = "btn-primary"),
-          shiny::actionButton(ns("simulate"), "Simulate")
-        ),
-        shiny::uiOutput(ns("objective"))
-      )
-    ),
-
-    # Stage 3 -- joint refinement of the displayed model. It is an action that
-    # rewrites the fit, so it precedes the outputs it drives (Stage 4).
-    shiny::conditionalPanel(
-      condition = "output.frozen", ns = ns,
-      bslib::card(
-        bslib::card_header("Stage 3 · Optimize all parameters (joint)"),
-        shiny::conditionalPanel(
-          condition = "output.has_fit", ns = ns,
-          shiny::p("Refines the displayed model by fitting every parameter at ",
-                   "once (curves + interaction), seeded from the current values. ",
-                   "The refined curve parameters are written back into the ",
-                   "chemical panels above (both share one ",
-                   shiny::tags$code("max"), ")."),
-          shiny::actionButton(ns("optimize_all"), "Optimize all params",
-                              class = "btn-primary"),
-          shiny::uiOutput(ns("optimize_readout"))
-        ),
-        shiny::conditionalPanel(
-          condition = "!output.has_fit", ns = ns,
-          shiny::helpText("Fit an interaction model in Stage 2 first."))
-      )
-    ),
-
-    # Stage 4 -- results & diagnostics for the displayed model (revealed once
-    # frozen).
-    shiny::conditionalPanel(
-      condition = "output.frozen", ns = ns,
-      bslib::card(
-        bslib::card_header("Stage 4 · Results & diagnostics"),
+        shiny::uiOutput(ns("objective")),
         bslib::layout_columns(
           bslib::card(bslib::card_header("3-D response surface"),
                       plotly::plotlyOutput(ns("surface"), height = "520px")),
@@ -208,24 +171,41 @@ binary_ui <- function(id) {
         ),
         bslib::card(bslib::card_header("Observed vs predicted"),
                     plotly::plotlyOutput(ns("op"))),
-        bslib::layout_columns(
-          bslib::card(bslib::card_header("Results & model comparison"),
-                      bslib::layout_columns(
-                        col_widths = c(7, 5),
-                        shiny::div(class = "mt-4",
-                                   shiny::actionButton(ns("find_best"), "Find best model",
-                                                       class = "btn-primary")),
-                        shiny::numericInput(ns("alpha"), "alpha", value = 0.05,
-                                            min = 0, max = 1, step = 0.01)),
-                      shiny::helpText(
-                        "alpha (α) is the significance threshold for the model comparison: ",
-                        "Find best model keeps a more complex model only if it improves the ",
-                        "fit at p < α (default 0.05). The table shows every model you've ",
-                        "fitted; Find best fills all four and highlights the selected (best) ",
-                        "model."),
-                      DT::DTOutput(ns("results"))),
-          bslib::card(bslib::card_header("Confidence intervals (displayed model)"),
-                      DT::DTOutput(ns("cis")))
+        bslib::card(bslib::card_header("Confidence intervals (displayed model)"),
+                    DT::DTOutput(ns("cis"))),
+
+        # Explore by hand: fit/enter the displayed model's a/b at the current
+        # curves (staged) -- optional, off the main compare-all path.
+        bslib::accordion(
+          open = FALSE,
+          bslib::accordion_panel(
+            "Explore by hand",
+            shiny::helpText("Fit or enter this model's interaction params at the ",
+                            "current curves, without re-running the comparison."),
+            shiny::conditionalPanel(
+              condition = "input.model != 'reference'", ns = ns,
+              bslib::card(
+                bslib::card_header("Parameters"),
+                shiny::fluidRow(
+                  shiny::column(2, shiny::tags$small(shiny::tags$b("Parameter"))),
+                  shiny::column(4, shiny::tags$small(shiny::tags$b("Meaning"))),
+                  shiny::column(2, shiny::tags$small(shiny::tags$b("Lower"))),
+                  shiny::column(2, shiny::tags$small(shiny::tags$b("Upper"))),
+                  shiny::column(2, shiny::tags$small(shiny::tags$b("Value")))
+                ),
+                interaction_param_row(ns, "a", "a",
+                  "Overall strength & direction (a > 0 antagonism, a < 0 synergism)."),
+                shiny::conditionalPanel(
+                  condition = "input.model == 'DR' || input.model == 'DL'", ns = ns,
+                  interaction_param_row(ns, "b", "b",
+                    "How the interaction shifts with the mixture ratio / dose level."))
+              )
+            ),
+            shiny::div(
+              shiny::actionButton(ns("autofit"), "Autofit (a, b)", class = "btn-primary"),
+              shiny::actionButton(ns("simulate"), "Simulate")
+            )
+          )
         )
       )
     )
