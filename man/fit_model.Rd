@@ -33,15 +33,14 @@ fit_model(
 
 \item{fixed}{Character vector of parameter names to hold fixed at \code{start}.}
 
-\item{lower, upper}{Optional named numeric vectors of hard bounds keyed by
-base curve parameter (\code{max}, \verb{slope*}, \verb{ec50*}). Any parameter not named
-falls back to the default: base params get positivity (\code{lower = 1e-8},
+\item{lower, upper}{Optional named numeric vectors of hard bounds. Any model
+parameter may be named here, including interaction parameters (\code{a}, \code{b},
+\code{b1/b2/b3}). Parameters not named fall back to defaults: base curve params
+(\code{max}, \verb{slope*}, \verb{ec50*}) default to positivity (\code{lower = 1e-8},
 \code{upper = Inf}); binary \code{max} additionally defaults to \code{upper = 1} (a value
-above 1 is capped, with a warning, since it is a probability). Deviation
-parameters (\code{a}, \code{b}, \code{b1/b2/b3}) are always left unconstrained and may not
-be named here, because downstream interaction analysis relies on their
-unconstrained values. A start value outside its bounds is clamped into
-range with a warning.}
+above 1 is capped, with a warning, since it is a probability); interaction
+params default to unconstrained (\code{-Inf}/\code{Inf}) when not named. A start
+value outside its bounds is clamped into range with a warning.}
 
 \item{n_starts}{Number of optimisation starts. The first uses \code{start}; each
 additional start log-uniformly perturbs \code{start} (clamped to the bounds) to

@@ -25,15 +25,14 @@ init_start_par <- function(params, extra, start) {
 #'   (max, slope*, ec50*). Deviation parameters default to their solver origin:
 #'   `a` at 0 and `b`/`b1`/`b2`/`b3` at 1; any other deviation parameter at 0.
 #' @param fixed Character vector of parameter names to hold fixed at `start`.
-#' @param lower,upper Optional named numeric vectors of hard bounds keyed by
-#'   base curve parameter (`max`, `slope*`, `ec50*`). Any parameter not named
-#'   falls back to the default: base params get positivity (`lower = 1e-8`,
+#' @param lower,upper Optional named numeric vectors of hard bounds. Any model
+#'   parameter may be named here, including interaction parameters (`a`, `b`,
+#'   `b1/b2/b3`). Parameters not named fall back to defaults: base curve params
+#'   (`max`, `slope*`, `ec50*`) default to positivity (`lower = 1e-8`,
 #'   `upper = Inf`); binary `max` additionally defaults to `upper = 1` (a value
-#'   above 1 is capped, with a warning, since it is a probability). Deviation
-#'   parameters (`a`, `b`, `b1/b2/b3`) are always left unconstrained and may not
-#'   be named here, because downstream interaction analysis relies on their
-#'   unconstrained values. A start value outside its bounds is clamped into
-#'   range with a warning.
+#'   above 1 is capped, with a warning, since it is a probability); interaction
+#'   params default to unconstrained (`-Inf`/`Inf`) when not named. A start
+#'   value outside its bounds is clamped into range with a warning.
 #' @param n_starts Number of optimisation starts. The first uses `start`; each
 #'   additional start log-uniformly perturbs `start` (clamped to the bounds) to
 #'   escape the local minima of the non-smooth CA bisection surface. The best
@@ -81,11 +80,12 @@ fit_model <- function(df, reference, deviation = "reference",
   # unconstrained values. Validate here -- before the all-fixed fast path -- so an
   # illegal bound name is rejected consistently regardless of how many params are
   # free (otherwise the staged reference fit would silently ignore it).
-  base_all <- setdiff(spec$params, spec$extra)  # all curve params, incl. fixed
-  bad <- setdiff(c(names(lower), names(upper)), base_all)
+  # Any model parameter may be bounded now -- including the interaction params
+  # (a, b), which the final joint "Optimize all" stage constrains/pins.
+  bad <- setdiff(c(names(lower), names(upper)), spec$params)
   if (length(bad))
-    stop("`lower`/`upper` may only name a base parameter (",
-         paste(base_all, collapse = ", "), "); got: ",
+    stop("`lower`/`upper` may only name a model parameter (",
+         paste(spec$params, collapse = ", "), "); got: ",
          paste(unique(bad), collapse = ", "))
 
   # When every parameter is fixed (the staged reference fit: curve params held at
@@ -99,7 +99,7 @@ fit_model <- function(df, reference, deviation = "reference",
                 residuals = obs - pred, df = 0L, n = nrow(df),
                 convergence = 0L, reference = reference, deviation = deviation,
                 response = response, conc_cols = conc_cols, n_chem = n_chem,
-                kind = "mixture"))
+                fixed = fixed, kind = "mixture"))
   }
 
   theta0 <- par[free]
@@ -115,26 +115,26 @@ fit_model <- function(df, reference, deviation = "reference",
   bin_max <- response == "binary" && "max" %in% base
   if (bin_max) hi[["max"]] <- 1
 
-  # Apply user-supplied bounds (base, free params only; names validated above).
-  for (p in intersect(names(lower), base)) lo[[p]] <- lower[[p]]
-  for (p in intersect(names(upper), base)) hi[[p]] <- upper[[p]]
+  # Apply user-supplied bounds to any free parameter (incl. interaction a/b).
+  for (p in intersect(names(lower), free)) lo[[p]] <- lower[[p]]
+  for (p in intersect(names(upper), free)) hi[[p]] <- upper[[p]]
   if (bin_max && hi[["max"]] > 1) {
     warning("binary `max` upper bound capped at 1 (requested ", upper[["max"]], ")")
     hi[["max"]] <- 1
   }
 
-  if (length(base) && any(lo[base] >= hi[base]))
+  if (length(free) && any(lo[free] >= hi[free]))
     stop("each parameter's lower bound must be below its upper bound; check: ",
-         paste(base[lo[base] >= hi[base]], collapse = ", "))
+         paste(free[lo[free] >= hi[free]], collapse = ", "))
 
   # Keep the optimiser's starting point feasible.
-  if (length(base)) {
-    clamped <- pmin(pmax(theta0[base], lo[base]), hi[base])
-    if (any(clamped != theta0[base])) {
-      off <- base[clamped != theta0[base]]
+  if (length(free)) {
+    clamped <- pmin(pmax(theta0[free], lo[free]), hi[free])
+    if (any(clamped != theta0[free])) {
+      off <- free[clamped != theta0[free]]
       warning("start value(s) outside bounds, clamped: ",
               paste(off, collapse = ", "))
-      theta0[base] <- clamped
+      theta0[free] <- clamped
     }
   }
   lower <- lo
@@ -229,7 +229,7 @@ fit_model <- function(df, reference, deviation = "reference",
        residuals = obs - pred, df = length(free), n = nrow(df),
        convergence = best$convergence,
        reference = reference, deviation = deviation, response = response,
-       conc_cols = conc_cols, n_chem = n_chem, kind = "mixture")
+       conc_cols = conc_cols, n_chem = n_chem, fixed = fixed, kind = "mixture")
 }
 
 #' Forward-evaluate a mixture model at fixed parameters (Simulate)

@@ -38,16 +38,17 @@ test_that("an unknown bound name raises an error", {
   expect_error(
     fit_model(df, "CA", "reference", "continuous", start = start,
               upper = c(nonsense = 1)),
-    "base parameter")
+    "model parameter")
 })
 
-test_that("naming a deviation parameter in bounds raises an error", {
+test_that("an interaction parameter can be bounded", {
   df <- bounds_cont_df()
   start <- c(max = 800, slope1 = 4, slope2 = 1.5, ec501 = 0.08, ec502 = 1)
-  expect_error(
-    fit_model(df, "CA", "SA", "continuous", start = start,
-              lower = c(a = 0)),
-    "base parameter")
+  # Constrain `a` to a positive band; the fit must keep it in range and not error.
+  fit <- fit_model(df, "CA", "SA", "continuous", start = start,
+                   lower = c(a = 0.5), upper = c(a = 5))
+  expect_gte(unname(fit$par["a"]), 0.5 - 1e-6)
+  expect_lte(unname(fit$par["a"]),  5 + 1e-6)
 })
 
 test_that("binary max defaults to an upper bound of 1", {
@@ -96,14 +97,12 @@ test_that("deviation parameters stay unconstrained (free to go negative)", {
 })
 
 test_that("an illegal bound name errors even when all params are fixed", {
-  # The all-fixed fast path must still validate bound names; otherwise the staged
-  # reference fit would silently ignore an illegal bound that the other fits reject.
   df <- bounds_cont_df()
   start <- c(max = 800, slope1 = 4, slope2 = 1.5, ec501 = 0.08, ec502 = 1)
   expect_error(
     fit_model(df, "CA", "reference", "continuous", start = start,
-              fixed = names(start), upper = c(a = 1)),
-    "base parameter")
+              fixed = names(start), upper = c(nonsense = 1)),
+    "model parameter")
 })
 
 test_that("analyse_mixture forwards bounds to every fit", {
