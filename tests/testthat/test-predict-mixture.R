@@ -12,7 +12,9 @@ test_that("mixture_predict matches the verbatim ternary predictor", {
            ec50_1 = 0.1, ec50_2 = 0.5, ec50_3 = 2)
   got <- mixture_predict(df, par, "CA", "reference")
   want <- ca_tri_vec(df$C1, df$C2, df$C3, 100, 2, 1.5, 3, 0.1, 0.5, 2)
-  expect_equal(unname(got), unname(want))
+  # re-baselined for mix_response() 200-iter bisection (was legacy 50-iter):
+  # the unified predictor's tighter CA root-find differs from ca_tri_vec at ~1e-8
+  expect_equal(unname(got), unname(want), tolerance = 1e-6)
 })
 
 test_that("mixture_predict errors on a missing parameter", {
