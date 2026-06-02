@@ -119,3 +119,12 @@ test_that("single_ui shows the model equation and Autofit/Simulate buttons", {
   expect_match(html, "Simulate", fixed = TRUE)
   expect_match(html, "the curve is fit to the proportion", fixed = TRUE)
 })
+
+test_that("interaction_param_row renders a value input with inert bound cells", {
+  ns <- shiny::NS("binary")
+  html <- as.character(interaction_param_row(ns, "a", "a", "overall strength"))
+  expect_match(html, "binary-val_a", fixed = TRUE)   # editable Value input present
+  expect_match(html, "—", fixed = TRUE)          # em-dash placeholder present
+  expect_false(grepl("binary-lo_a", html, fixed = TRUE))  # no Lower input
+  expect_false(grepl("binary-hi_a", html, fixed = TRUE))  # no Upper input
+})

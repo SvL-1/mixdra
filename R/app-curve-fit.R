@@ -33,6 +33,26 @@ param_row <- function(ns, param, label, meaning, hi_default = NA) {
   )
 }
 
+#' One interaction-parameter row: label, meaning, inert bound cells, value input
+#'
+#' Same five-column layout as [param_row()] for visual consistency with the
+#' curve grid, but `a`/`b` are unconstrained by the engine, so the Lower/Upper
+#' columns are inert "—" placeholders and only the Value input is editable.
+#' @param ns Module namespace function.
+#' @param param Parameter key (`a`/`b`); drives the `val_<param>` input id.
+#' @param label Display label.
+#' @param meaning One-line explanation.
+#' @keywords internal
+interaction_param_row <- function(ns, param, label, meaning) {
+  shiny::fluidRow(
+    shiny::column(2, shiny::tags$b(label)),
+    shiny::column(4, shiny::tags$small(meaning)),
+    shiny::column(2, shiny::tags$small("—")),
+    shiny::column(2, shiny::tags$small("—")),
+    shiny::column(2, shiny::numericInput(ns(paste0("val_", param)), NULL, value = NA))
+  )
+}
+
 #' Curve-fit panel UI (plots + parameter grid + Autofit/Simulate)
 #' @param id Module id.
 #' @keywords internal
