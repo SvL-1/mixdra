@@ -12,6 +12,9 @@ model_spec <- function(reference, deviation, n_chem) {
   deviation <- match.arg(deviation, c("reference", "SA", "DR", "DL", "ASA"))
   if (deviation == "ASA" && n_chem != 3)
     stop("model_spec: deviation 'ASA' (Advanced S/A) is ternary-only (n_chem = 3)")
+  if (deviation %in% c("DR", "DL") && n_chem != 2)
+    stop("model_spec: dose-ratio (DR) and dose-level (DL) deviations are ",
+         "binary-only (n_chem = 2); ternary mixtures use 'SA' / 'ASA'")
   if (!n_chem %in% c(2, 3))
     stop("model_spec: only n_chem = 2 or 3 are implemented")
 
@@ -27,13 +30,11 @@ model_spec <- function(reference, deviation, n_chem) {
     base_params <- c("max", "slope1", "slope2", "slope3",
                      "ec50_1", "ec50_2", "ec50_3")
     suffix <- "tri"
-    # Ternary deviation parameters differ from binary (see model_functions.R):
-    # DR carries per-chemical b1/b2/b3 in addition to a; DL carries a/b.
+    # Ternary mixtures support only reference / S/A / Advanced S/A. DR and DL are
+    # binary-only (rejected above), so they have no ternary entry here.
     extra <- switch(deviation,
                     reference = character(0),
                     SA = "a",
-                    DR = c("a", "b1", "b2", "b3"),
-                    DL = c("a", "b"),
                     ASA = c("A1", "A2", "A3", "A4"))
   }
 

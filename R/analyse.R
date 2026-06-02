@@ -89,15 +89,16 @@ fit_curve_from_singles <- function(df, reference, response,
 #'   single-compound data via [fit_curve_from_singles()].
 #' @param alpha Significance threshold for model selection.
 #' @param lower,upper Optional named numeric vectors of hard parameter bounds,
-#'   forwarded to every [fit_model()] call (the four models share the base
+#'   forwarded to every [fit_model()] call (all deviations share the base
 #'   parameters). See [fit_model()] for the bound semantics.
 #' @param n_starts Number of optimisation starts per model, forwarded to
 #'   [fit_model()]. Defaults to 1 (single start) for speed during testing;
 #'   raise it (e.g. 20) to multi-start and more reliably escape the local
 #'   minima of the CA bisection surface at the cost of runtime.
 #' @param time_limit Per-model wall-clock budget in seconds, forwarded to
-#'   [fit_model()]. Applies to each of the four fits independently, so a full
-#'   analysis can take up to `4 * time_limit`. `NULL` disables the limit.
+#'   [fit_model()]. Applies to each fit independently (four for binary:
+#'   reference/SA/DR/DL; two for ternary: reference/SA), so a full analysis can
+#'   take up to `n_fits * time_limit`. `NULL` disables the limit.
 #' @return A list: `fits` (named list of model fits), `comparison` (data frame of
 #'   LR tests vs each model's parent), `chosen` (selected model name),
 #'   `reference`, `response`.
@@ -122,7 +123,10 @@ analyse_mixture <- function(df, reference, response = c("continuous", "binary"),
 
   # Stage 2: with the curve parameters fixed, fit only the interaction
   # parameters (a, b, ...) to the full mixture data, once per deviation.
-  devs <- c("reference", "SA", "DR", "DL")
+  # DR and DL are binary-only; ternary mixtures use reference / S/A only here
+  # (Advanced S/A is fitted separately via analyse_ternary()).
+  n_chem <- length(intersect(c("C1", "C2", "C3"), names(df)))
+  devs <- if (n_chem == 2) c("reference", "SA", "DR", "DL") else c("reference", "SA")
   fits <- lapply(devs, function(d)
     fit_model(df, reference, d, response, start = base, fixed = base_names,
               lower = lower, upper = upper, n_starts = n_starts,
@@ -130,7 +134,8 @@ analyse_mixture <- function(df, reference, response = c("continuous", "binary"),
   names(fits) <- devs
 
   n <- nrow(df)
-  parent_of <- c(SA = "reference", DR = "SA", DL = "SA")
+  parent_of <- c(SA = "reference", DR = "SA", DL = "SA")[
+    if (n_chem == 2) c("SA", "DR", "DL") else "SA"]
   comparison <- do.call(rbind, lapply(names(parent_of), function(m) {
     p <- parent_of[[m]]
     t <- lr_test(fits[[p]]$objective, fits[[m]]$objective,

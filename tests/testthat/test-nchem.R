@@ -25,18 +25,26 @@ make_staged_ternary_df <- function() {
 test_that("analyse_mixture runs end-to-end (staged) on a ternary dataset", {
   g <- make_staged_ternary_df()
   res <- analyse_mixture(g, reference = "CA", response = "continuous")
-  expect_setequal(names(res$fits), c("reference", "SA", "DR", "DL"))
-  # Curve params are fixed (from the single-compound rows) across all four fits:
+  # DR / DL are binary-only: ternary fits only reference + S/A here.
+  expect_setequal(names(res$fits), c("reference", "SA"))
+  # Curve params are fixed (from the single-compound rows) across both fits:
   base <- c("max", "slope1", "slope2", "slope3", "ec50_1", "ec50_2", "ec50_3")
   expect_equal(res$fits$SA$par[base], res$fits$reference$par[base])
-  # df counts only the free interaction params (ternary DR carries a,b1,b2,b3).
+  # df counts only the free interaction params (S/A carries a single `a`).
   expect_equal(unname(res$fits$reference$df), 0)
-  expect_equal(unname(res$fits$DR$df), 4)
+  expect_equal(unname(res$fits$SA$df), 1)
   # No real interaction in this reference-only data: `a` stays ~0. We assert the
   # parameter rather than model SELECTION because on noiseless data the
   # reference/SA objectives are ~1e-15 and the LR test on them is numerically
   # degenerate (it would otherwise pick a spurious deviation with a ~ -1e-8).
   expect_equal(unname(res$fits$SA$par[["a"]]), 0, tolerance = 1e-2)
+})
+
+test_that("ternary DR/DL deviations are rejected (binary-only)", {
+  expect_error(model_spec("CA", "DR", 3), "binary-only")
+  expect_error(model_spec("IA", "DL", 3), "binary-only")
+  # ...but they remain available for binary mixtures.
+  expect_equal(model_spec("CA", "DR", 2)$extra, c("a", "b"))
 })
 
 test_that("single-chemical analysis returns just the dose-response fit", {
