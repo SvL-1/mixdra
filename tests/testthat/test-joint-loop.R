@@ -28,3 +28,35 @@ test_that("joint_fit_one frees the curves and (warm-started) never worsens the p
   expect_equal(dr$df, 7L)                         # + b
   expect_lte(dr$objective, sa$objective + 1e-6)
 })
+
+test_that("analyse_mixture_joint fits all four jointly and recovers a reference truth", {
+  par <- c(max = 800, slope1 = 4, slope2 = 1.5, ec501 = 0.08, ec502 = 1)
+  df  <- simulate_mixture(par, "CA", "reference", "continuous")
+  res <- analyse_mixture_joint(df, reference = "CA", response = "continuous",
+                               n_starts = 1)
+  expect_setequal(names(res$fits), c("reference", "SA", "DR", "DL"))
+  # joint fits free the curves, so df are the FULL counts (5/6/7), not 0/1/2
+  expect_equal(res$fits$reference$df, 5L)
+  expect_equal(res$fits$SA$df, 6L)
+  expect_equal(res$fits$DR$df, 7L)
+  # curves recovered jointly from the full data
+  expect_equal(unname(res$fits$reference$par[["max"]]), 800, tolerance = 1e-2)
+  expect_equal(unname(res$fits$reference$par[["ec501"]]), 0.08, tolerance = 1e-2)
+  # noiseless reference truth -> no invented interaction
+  expect_equal(unname(res$fits$SA$par[["a"]]), 0, tolerance = 1e-2)
+  expect_equal(nrow(res$comparison), 3)
+  expect_true(res$chosen %in% c("reference", "SA", "DR", "DL"))
+})
+
+test_that("analyse_mixture_joint selects DR on DR-generated data", {
+  skip_on_cran()
+  par <- c(max = 800, slope1 = 4, slope2 = 1.5, ec501 = 0.08, ec502 = 1,
+           a = 2.5, b = 1.5)
+  df  <- simulate_mixture(par, "CA", "DR", "continuous")
+  set.seed(1)
+  res <- analyse_mixture_joint(df, reference = "CA", response = "continuous",
+                               n_starts = 10)
+  expect_equal(unname(res$fits$DR$par[["a"]]), 2.5, tolerance = 0.1)
+  expect_equal(unname(res$fits$DR$par[["b"]]), 1.5, tolerance = 0.1)
+  expect_equal(res$chosen, "DR")
+})

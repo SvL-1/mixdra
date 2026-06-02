@@ -118,6 +118,42 @@ joint_fit_one <- function(df, reference, deviation, response,
             n_starts = n_starts, time_limit = time_limit)
 }
 
+#' Analyse a mixture by fully-joint fits (model selection via the joint loop)
+#'
+#' The joint counterpart of [analyse_mixture()]. Seeds the curve parameters from
+#' the single-compound data (or a user-supplied `start`), then fits each model in
+#' the nesting chain JOINTLY (all parameters free) via [joint_fit_one()],
+#' warm-starting each from its parent. Selection reuses [compare_fits()]. This is
+#' the engine entry point behind the binary tab's "Fit & compare all models"
+#' action; the Shiny layer drives the same chain step-by-step for live updates.
+#' @inheritParams analyse_mixture
+#' @return A list: `fits`, `comparison`, `chosen`, `reference`, `response`.
+#' @export
+analyse_mixture_joint <- function(df, reference,
+                                  response = c("continuous", "binary"),
+                                  start = NULL, alpha = 0.05,
+                                  n_starts = 1, time_limit = 30) {
+  response <- match.arg(response)
+  n_chem <- length(intersect(c("C1", "C2", "C3"), names(df)))
+  seed <- if (is.null(start)) {
+    fit_curve_from_singles(df, reference, response,
+                           n_starts = n_starts, time_limit = time_limit)
+  } else {
+    start
+  }
+  fits <- list()
+  for (dev in joint_chain_order(n_chem)) {
+    parent_key <- model_spec(reference, dev, n_chem)$parent
+    parent <- if (is.null(parent_key)) NULL else fits[[parent_key]]
+    fits[[dev]] <- joint_fit_one(df, reference, dev, response, seed,
+                                 parent_fit = parent,
+                                 n_starts = n_starts, time_limit = time_limit)
+  }
+  cmp <- compare_fits(fits, nrow(df), response, alpha)
+  list(fits = fits, comparison = cmp$comparison, chosen = cmp$chosen,
+       reference = reference, response = response)
+}
+
 #' Analyse a mixture: fit reference + deviations and compare
 #'
 #' Fitting is staged: the curve parameters are fixed from the single-compound
