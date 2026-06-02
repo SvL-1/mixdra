@@ -79,13 +79,11 @@ optimize_param_row <- function(ns, param, label, meaning) {
 #' @keywords internal
 curve_fit_ui <- function(id) {
   ns <- shiny::NS(id)
-  shiny::tagList(
-    bslib::layout_columns(
-      bslib::card(bslib::card_header("Dose-response curve"),
-                  plotly::plotlyOutput(ns("dr"))),
-      bslib::card(bslib::card_header("Observed vs predicted"),
-                  plotly::plotlyOutput(ns("op")))
-    ),
+  # Settings (parameter grid + actions) on the left; the two plots stacked on
+  # the right. One self-contained row per chemical, reused by the Single tab and
+  # by each chemical in the Binary tab.
+  bslib::layout_columns(
+    col_widths = c(5, 7),
     bslib::card(
       bslib::card_header("Parameters"),
       single_model_equation(),
@@ -107,6 +105,12 @@ curve_fit_ui <- function(id) {
         shiny::actionButton(ns("autofit"), "Autofit parameters", class = "btn-primary"),
         shiny::actionButton(ns("simulate"), "Simulate")
       )
+    ),
+    shiny::tagList(
+      bslib::card(bslib::card_header("Dose-response curve"),
+                  plotly::plotlyOutput(ns("dr"))),
+      bslib::card(bslib::card_header("Observed vs predicted"),
+                  plotly::plotlyOutput(ns("op")))
     )
   )
 }
