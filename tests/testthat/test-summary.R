@@ -32,3 +32,15 @@ test_that("result_table folds in each model's LR p-value (vs its parent)", {
     expect_equal(tab["p (vs parent)", m],
                  res$comparison$p[res$comparison$model == m])
 })
+
+test_that("result_table handles a single fitted model with no comparison", {
+  # mirrors the Binary tab populating the bottom table from one Autofit, before
+  # Find best has run (so there is no $comparison and no chosen model).
+  g <- expand.grid(C1 = c(0, 0.05, 0.2), C2 = c(0, 0.5, 5))
+  g$Res <- ca_bi_vec(g$C1, g$C2, 800, 4, 1.5, 0.08, 1)
+  res <- analyse_mixture(g, "CA", "continuous")
+  one <- result_table(list(fits = res$fits["SA"], comparison = NULL))
+  expect_equal(colnames(one), "SA")
+  expect_true(is.na(one["p (vs parent)", "SA"]))  # no comparison -> no p-value
+  expect_false(is.na(one["objective", "SA"]))
+})

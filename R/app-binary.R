@@ -97,12 +97,13 @@ binary_ui <- function(id) {
                "The interaction workspace appears once both are fitted. The ",
                "mixture model uses one shared ", shiny::tags$code("max"),
                " (the average of the two fits)."),
-      bslib::layout_columns(
-        shiny::div(shiny::h5(shiny::textOutput(ns("chem1_title"))),
-                   curve_fit_ui(ns("chem1"))),
-        shiny::div(shiny::h5(shiny::textOutput(ns("chem2_title"))),
-                   curve_fit_ui(ns("chem2")))
-      ),
+      # One row per chemical, stacked vertically (sets up the ternary case --
+      # chemical 3 is simply another row). Each row is settings | plots.
+      shiny::div(shiny::h5(shiny::textOutput(ns("chem1_title"))),
+                 curve_fit_ui(ns("chem1"))),
+      shiny::div(class = "mt-4",
+                 shiny::h5(shiny::textOutput(ns("chem2_title"))),
+                 curve_fit_ui(ns("chem2"))),
       shiny::uiOutput(ns("reveal_note"))
     ),
 
@@ -214,8 +215,9 @@ binary_ui <- function(id) {
                     plotly::plotlyOutput(ns("op"))),
         bslib::layout_columns(
           bslib::card(bslib::card_header("Results & model comparison"),
-                      shiny::helpText("Run “Find best model” to populate. ",
-                                      "The selected (best) model is highlighted."),
+                      shiny::helpText("Shows every model you've fitted. ",
+                                      "Run “Find best model” to add the LR p-values ",
+                                      "and highlight the selected (best) model."),
                       DT::DTOutput(ns("results"))),
           bslib::card(bslib::card_header("Confidence intervals (displayed model)"),
                       DT::DTOutput(ns("cis")))
@@ -501,13 +503,18 @@ binary_server <- function(id, meta) {
       shiny::req(frozen(), current_fit()); plot_obs_pred(current_fit(), engine_df())
     })
 
-    # Table-2 style all-models matrix (params + objective/df + LR p-value), with
-    # the selected (best) model's column highlighted. Only meaningful after Find
-    # best, which is the sole writer of `last_compare()`.
+    # Table-2 style matrix (params + objective/df + LR p-value) over EVERY model
+    # the user has fitted so far -- a single Autofit/Simulate populates its own
+    # column; Find best fills all four. The LR p-value row and the highlighted
+    # "best" column only appear once Find best has run (it is the sole writer of
+    # `last_compare()`, which carries the parent comparison + chosen model).
     output$results <- DT::renderDT({
-      shiny::req(last_compare())
-      chosen <- last_compare()$chosen
-      tab <- round(result_table(last_compare()), 4)
+      fits <- fits_store()
+      shiny::req(length(fits) > 0)
+      ord    <- intersect(c("reference", "SA", "DR", "DL"), names(fits))
+      cmp    <- if (!is.null(last_compare())) last_compare()$comparison else NULL
+      chosen <- if (!is.null(last_compare())) last_compare()$chosen else NULL
+      tab <- round(result_table(list(fits = fits[ord], comparison = cmp)), 4)
       dt <- DT::datatable(as.data.frame(tab), options = list(dom = "t"))
       if (!is.null(chosen) && chosen %in% colnames(tab))
         dt <- DT::formatStyle(dt, columns = chosen, target = "cell",
