@@ -289,6 +289,8 @@ binary_server <- function(id, meta) {
     # the programmatic picker switch never re-triggers or clears a fit.
     fits_store   <- shiny::reactiveVal(list())
     last_compare <- shiny::reactiveVal(NULL)
+    optimize_pre  <- shiny::reactiveVal(NULL)
+    optimize_post <- shiny::reactiveVal(NULL)
     current_fit  <- shiny::reactive({
       m <- input$model
       if (is.null(m)) return(NULL)
@@ -328,6 +330,8 @@ binary_server <- function(id, meta) {
           frozen(FALSE)
           fits_store(list())
           last_compare(NULL)
+          optimize_pre(NULL)
+          optimize_post(NULL)
         }
       },
       ignoreInit = TRUE)
@@ -419,12 +423,57 @@ binary_server <- function(id, meta) {
         value = if (!is.null(f) && "a" %in% names(f$par)) round(f$par[["a"]], 4) else NA)
       shiny::updateNumericInput(session, "val_b",
         value = if (!is.null(f) && "b" %in% names(f$par)) round(f$par[["b"]], 4) else NA)
+      optimize_pre(NULL); optimize_post(NULL)
     }, ignoreInit = TRUE)
+
+    # Keep the Optimize-all start column in sync with the displayed fit.
+    shiny::observe({
+      f <- current_fit()
+      if (is.null(f)) return()
+      for (p in names(f$par))
+        shiny::updateNumericInput(session, paste0("oval_", p),
+                                  value = round(f$par[[p]], 4))
+    })
+
+    # Optimize all params: jointly refine the displayed model, seeded from it.
+    shiny::observeEvent(input$optimize_all, {
+      shiny::req(frozen(), current_fit())
+      f <- current_fit()
+      spec <- model_spec(input$reference, f$deviation, 2)
+      b <- collect_bounds_all(shiny::reactiveValuesToList(input), params = spec$params)
+      pre <- f$objective
+      newfit <- tryCatch(
+        shiny::withProgress(message = "Optimizing all parameters...", value = 0.5,
+          refine_joint(f, engine_df(), lower = b$lower, upper = b$upper,
+                       n_starts = n_starts_eff(), time_limit = input$time_limit)),
+        error = function(e) {
+          shiny::showNotification(paste("Optimize failed:", conditionMessage(e)),
+                                  type = "error")
+          NULL
+        })
+      if (is.null(newfit)) return()
+      s <- fits_store(); s[[f$deviation]] <- newfit; fits_store(s)
+      optimize_pre(pre); optimize_post(newfit$objective)
+      if ("a" %in% names(newfit$par))
+        shiny::updateNumericInput(session, "val_a", value = round(newfit$par[["a"]], 4))
+      if ("b" %in% names(newfit$par))
+        shiny::updateNumericInput(session, "val_b", value = round(newfit$par[["b"]], 4))
+    })
 
     # Per-model explanation: tracks the reference and the selected model.
     output$interaction_help <- shiny::renderUI({
       shiny::req(frozen())
       interaction_help(input$reference, input$model)
+    })
+
+    output$optimize_readout <- shiny::renderUI({
+      shiny::req(optimize_post())
+      lab <- if (identical(current_fit()$response, "binary")) "Deviance" else "SSR"
+      improved <- optimize_post() <= optimize_pre() + 1e-9
+      shiny::tags$p(
+        shiny::tags$b(paste0(lab, ": ")),
+        round(optimize_pre(), 2), shiny::HTML(" &rarr; "), round(optimize_post(), 2),
+        if (improved) shiny::tags$span(style = "color:green", " ✓ improved"))
     })
 
     # Fit-objective readout for the displayed model.

@@ -84,6 +84,20 @@ test_that("binary_server workspace: freeze gate, autofit/simulate/find-best, inv
     expect_equal(current_fit()$deviation, last_compare()$chosen)
     expect_false(isTRUE(current_fit()$simulated))
 
+    # Optimize-all: jointly refine the displayed model; objective must not worsen.
+    chosen <- last_compare()$chosen
+    pre_obj <- current_fit()$objective
+    session$setInputs(optimize_all = 1)
+    expect_true(isTRUE(current_fit()$joint))
+    expect_equal(current_fit()$deviation, chosen)
+    expect_lte(current_fit()$objective, pre_obj + 1e-6)
+
+    # Pinning max via equal bounds holds it across a re-optimize.
+    held <- unname(current_fit()$par[["max"]])
+    session$setInputs(olo_max = held, ohi_max = held, optimize_all = 2)
+    expect_equal(unname(current_fit()$par[["max"]]), held, tolerance = 1e-8)
+    expect_true("max" %in% current_fit()$fixed)
+
     # editing a single curve after freezing invalidates everything
     session$setInputs(`chem1-val_max` = 720, `chem1-simulate` = 2)
     expect_false(isTRUE(frozen()))
