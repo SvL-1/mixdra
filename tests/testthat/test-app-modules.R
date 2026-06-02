@@ -41,7 +41,7 @@ test_that("binary_server workspace: freeze gate, autofit/simulate/find-best, inv
   skip_on_cran()
   meta <- shiny::reactiveValues(chem1 = "A", chem2 = "B")
   shiny::testServer(binary_server, args = list(meta = meta), {
-    csv <- testthat::test_path("fixtures", "binary_ca_mps_cpf_imi_continuous.csv")
+    csv <- testthat::test_path("fixtures", "binary", "cpf_mps_imi", "binary_ca_mps_cpf_imi_continuous.csv")
     skip_if_not(file.exists(csv), "binary fixture missing")
     session$setInputs(response = "continuous", reference = "CA", thorough = FALSE,
                       n_starts = 1, alpha = 0.05, time_limit = 30, model = "reference",

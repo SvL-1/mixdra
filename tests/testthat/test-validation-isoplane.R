@@ -14,7 +14,7 @@
 # SLOW: analyse_ternary on 419 rows ~ 2 min. set.seed for stability.
 
 test_that("isoplane / markers / sigma-TU land on the fitted model's max/2 surface", {
-  fx <- testthat::test_path("fixtures", "ternary_fbsa_cpf_imi_continuous.csv")
+  fx <- testthat::test_path("fixtures", "ternary", "fbsa_cpf_imi", "ternary_fbsa_cpf_imi_continuous.csv")
   skip_if_not(file.exists(fx), "ternary fixture CSV missing")
 
   df <- read.csv(fx)

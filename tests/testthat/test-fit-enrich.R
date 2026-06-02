@@ -1,5 +1,5 @@
 test_that("fit_model records model descriptors on its result", {
-  df <- read.csv(testthat::test_path("fixtures", "binary_mps_cpf_quantal.csv"))
+  df <- read.csv(testthat::test_path("fixtures", "binary", "survival", "binary_mps_cpf_quantal.csv"))
   start <- seed_from_singles(df, "binary")
   set.seed(1)
   fit <- fit_model(df, "CA", "SA", "binary", start = start, n_starts = 1)

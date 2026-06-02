@@ -26,7 +26,7 @@
 # SLOW: 419 rows x multi-start x CA bisection ~= 2 min. set.seed for stability.
 
 test_that("ternary Advanced S/A engine reproduces the FBSA workbook", {
-  fixture <- testthat::test_path("fixtures", "ternary_fbsa_cpf_imi_continuous.csv")
+  fixture <- testthat::test_path("fixtures", "ternary", "fbsa_cpf_imi", "ternary_fbsa_cpf_imi_continuous.csv")
   skip_if_not(file.exists(fixture), "ternary fixture CSV missing")
 
   df <- read.csv(fixture)

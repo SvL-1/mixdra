@@ -1,7 +1,7 @@
 # One-off generator: extract the binary MPs+CPF/Imi workbook data into CSV
 # fixtures checked into the repo. Requires the workbook at the repo root and the
 # `readxl` package (a Suggested dependency). Run from the repo root:
-#   R -q -e 'source("tests/testthat/fixtures/extract_binary_fixture.R")'
+#   R -q -e 'source("tests/testthat/fixtures/binary/extract_binary_fixture.R")'
 #
 # Layout (verified against the workbook):
 #   "CA - continous data model (new)": header row "[CPF] [MPs] Data",
@@ -27,18 +27,17 @@ numeric_rows <- function(df, cols) {
   out[keep, , drop = FALSE]
 }
 
-cont_raw <- readxl::read_excel(wb, sheet = "CA - continous data model (new)",
-                               range = readxl::cell_cols("A:C"),
-                               col_names = c("C1", "C2", "Res"))
-cont <- numeric_rows(as.data.frame(cont_raw), 1:3)
-write.csv(cont, "tests/testthat/fixtures/binary_mps_cpf_continuous.csv",
-          row.names = FALSE)
-cat("wrote", nrow(cont), "continuous rows\n")
-
+# NOTE: the continuous fixture from this workbook (binary_mps_cpf_continuous.csv)
+# is superseded by binary_ca_mps_cpf_imi_continuous.csv (byte-identical), which
+# extract_binary_fixtures_all.R produces from Sam's newer workbook alongside the
+# other 10 binary pairs. Only the quantal fixture below is still generated here,
+# as it is unique to this (older) workbook.
 bin_raw <- readxl::read_excel(wb, sheet = "CA - binary data model (new)",
                               range = readxl::cell_cols("A:D"),
                               col_names = c("C1", "C2", "Affected", "Exposed"))
 bin <- numeric_rows(as.data.frame(bin_raw), 1:4)
-write.csv(bin, "tests/testthat/fixtures/binary_mps_cpf_quantal.csv",
+dir.create("tests/testthat/fixtures/binary/survival", recursive = TRUE,
+           showWarnings = FALSE)
+write.csv(bin, "tests/testthat/fixtures/binary/survival/binary_mps_cpf_quantal.csv",
           row.names = FALSE)
 cat("wrote", nrow(bin), "quantal rows\n")

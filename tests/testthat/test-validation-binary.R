@@ -11,7 +11,7 @@
 # workbook reported as 'reference'.
 
 test_that("staged engine: binary CA continuous analysis on MPs+CPF", {
-  csv <- testthat::test_path("fixtures", "binary_mps_cpf_continuous.csv")
+  csv <- testthat::test_path("fixtures", "binary", "cpf_mps_imi", "binary_ca_mps_cpf_imi_continuous.csv")
   skip_if_not(file.exists(csv), "fixture CSV not generated")
   df <- read.csv(csv)
 
@@ -32,7 +32,7 @@ test_that("staged engine: binary CA continuous analysis on MPs+CPF", {
 })
 
 test_that("staged engine: binary CA quantal analysis on MPs+CPF", {
-  csv <- testthat::test_path("fixtures", "binary_mps_cpf_quantal.csv")
+  csv <- testthat::test_path("fixtures", "binary", "survival", "binary_mps_cpf_quantal.csv")
   skip_if_not(file.exists(csv), "quantal fixture CSV not generated")
   df <- read.csv(csv)   # columns C1, C2, Affected, Exposed
 
