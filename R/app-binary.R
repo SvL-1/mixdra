@@ -110,12 +110,26 @@ binary_ui <- function(id) {
       condition = "output.frozen", ns = ns,
       bslib::card(
         bslib::card_header("Stage 2 · Interaction model"),
-        shiny::selectInput(
-          ns("model"), "Model",
-          choices = c("No interaction (reference)" = "reference",
-                      "Similar action (S/A)"       = "SA",
-                      "Dose-ratio (DR)"            = "DR",
-                      "Dose-level (DL)"            = "DL")),
+
+        # Model picker + the all-models comparison action (alpha drives the
+        # parsimony test) on one row.
+        bslib::layout_columns(
+          col_widths = c(5, 3, 4),
+          shiny::selectInput(
+            ns("model"), "Model",
+            choices = c("No interaction (reference)" = "reference",
+                        "Similar action (S/A)"       = "SA",
+                        "Dose-ratio (DR)"            = "DR",
+                        "Dose-level (DL)"            = "DL")),
+          shiny::div(class = "mt-4",
+                     shiny::actionButton(ns("find_best"), "Find best model")),
+          shiny::numericInput(ns("alpha"), "alpha", value = 0.05, min = 0, max = 1, step = 0.01)
+        ),
+        shiny::helpText(
+          "alpha (α) is the significance threshold for the model comparison: ",
+          "Find best model keeps a more complex model only if it improves the fit ",
+          "at p < α (default 0.05)."),
+
         shiny::uiOutput(ns("interaction_help")),
 
         # a/b parameter grid (hidden for the reference model; b shown for DR/DL).
@@ -144,6 +158,7 @@ binary_ui <- function(id) {
           shiny::actionButton(ns("simulate"), "Simulate")
         ),
         shiny::uiOutput(ns("objective")),
+        DT::DTOutput(ns("comparison")),
 
         shiny::tags$b("Fit options"),
         bslib::layout_columns(
@@ -151,16 +166,7 @@ binary_ui <- function(id) {
           shiny::numericInput(ns("time_limit"), "time_limit (s/model)", value = 30, min = 1)
         ),
         shiny::checkboxInput(ns("thorough"), "Thorough fit (multi-start, slower)", FALSE),
-        shiny::uiOutput(ns("thorough_note")),
-
-        shiny::hr(),
-        shiny::p(shiny::tags$b("Find best model"),
-                 shiny::tags$small(" — fit all four models and pick the most parsimonious.")),
-        bslib::layout_columns(
-          shiny::numericInput(ns("alpha"), "alpha", value = 0.05, min = 0, max = 1, step = 0.01),
-          shiny::actionButton(ns("find_best"), "Find best model")
-        ),
-        DT::DTOutput(ns("comparison"))
+        shiny::uiOutput(ns("thorough_note"))
       )
     ),
 

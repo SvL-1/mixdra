@@ -107,6 +107,8 @@ test_that("binary_ui: Freeze-only button + Stage 2 workspace", {
   expect_match(html, "binary-n_starts", fixed = TRUE)
   expect_match(html, "binary-alpha", fixed = TRUE)
   expect_match(html, "binary-interaction_help", fixed = TRUE)
+  # alpha now sits next to Find best model and carries an explanation
+  expect_match(html, "significance threshold for the model comparison", fixed = TRUE)
 })
 
 test_that("single_ui shows the model equation and Autofit/Simulate buttons", {
