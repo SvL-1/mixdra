@@ -19,18 +19,22 @@ test_that("result_table assembles one column per fitted model", {
   expect_true("objective" %in% rownames(tab))
 })
 
-test_that("result_table folds in each model's LR p-value (vs its parent)", {
+test_that("result_table folds in each model's LR test (chi-sq + p vs its parent)", {
   g <- expand.grid(C1 = c(0, 0.05, 0.2), C2 = c(0, 0.5, 5))
   g$Res <- ca_bi_vec(g$C1, g$C2, 800, 4, 1.5, 0.08, 1)
   res <- analyse_mixture(g, "CA", "continuous")
   tab <- result_table(res)
-  expect_true("p (vs parent)" %in% rownames(tab))
-  # the reference has no parent, so no p-value
+  expect_true(all(c("chi-sq (vs parent)", "p (vs parent)") %in% rownames(tab)))
+  # the reference has no parent, so no chi-sq / p-value
+  expect_true(is.na(tab["chi-sq (vs parent)", "reference"]))
   expect_true(is.na(tab["p (vs parent)", "reference"]))
-  # SA/DR/DL each carry the p-value from the comparison table
-  for (m in c("SA", "DR", "DL"))
+  # SA/DR/DL each carry the chi-sq and p-value from the comparison table
+  for (m in c("SA", "DR", "DL")) {
+    expect_equal(tab["chi-sq (vs parent)", m],
+                 res$comparison$chi[res$comparison$model == m])
     expect_equal(tab["p (vs parent)", m],
                  res$comparison$p[res$comparison$model == m])
+  }
 })
 
 test_that("result_table handles a single fitted model with no comparison", {

@@ -57,18 +57,19 @@ blank_pinned_ci <- function(ci, fixed) {
 
 #' Assemble the Table-2 style result block from an analysis
 #'
-#' Rows are the union of model parameters plus `objective`, `df`, and
-#' `p (vs parent)` -- the likelihood-ratio p-value comparing each model to the
-#' one it nests within (from `res$comparison`). The reference model has no
-#' parent, so its p-value is `NA`.
+#' Rows are the union of model parameters plus `objective`, `df`, and the
+#' likelihood-ratio test of each model against the one it nests within (from
+#' `res$comparison`): `chi-sq (vs parent)` (the LR statistic) and
+#' `p (vs parent)` (its p-value). The reference model has no parent, so both are
+#' `NA` for it.
 #' @param res An [analyse_mixture()] result.
-#' @return A matrix: parameters + `objective`/`df`/`p (vs parent)` in rows,
-#'   models in columns.
+#' @return A matrix: parameters + `objective`/`df`/`chi-sq (vs parent)`/
+#'   `p (vs parent)` in rows, models in columns.
 #' @export
 result_table <- function(res) {
   models <- names(res$fits)
   all_params <- unique(unlist(lapply(res$fits, function(f) names(f$par))))
-  rows <- c(all_params, "objective", "df", "p (vs parent)")
+  rows <- c(all_params, "objective", "df", "chi-sq (vs parent)", "p (vs parent)")
   tab <- matrix(NA_real_, nrow = length(rows), ncol = length(models),
                 dimnames = list(rows, models))
   for (m in models) {
@@ -80,7 +81,10 @@ result_table <- function(res) {
   if (!is.null(res$comparison) && nrow(res$comparison)) {
     for (i in seq_len(nrow(res$comparison))) {
       m <- res$comparison$model[i]
-      if (m %in% models) tab["p (vs parent)", m] <- res$comparison$p[i]
+      if (m %in% models) {
+        tab["chi-sq (vs parent)", m] <- res$comparison$chi[i]
+        tab["p (vs parent)", m]      <- res$comparison$p[i]
+      }
     }
   }
   tab
