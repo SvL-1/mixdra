@@ -56,7 +56,8 @@ select_parsimonious <- function(fits, n, response, alpha = 0.05) {
 #' form either way. The parent chain is `SA` vs `reference`, `DR`/`DL` vs `SA`;
 #' models absent from `fits` are dropped (e.g. ternary reference + SA only).
 #' @param fits Named list of fits (subset of `reference`, `SA`, `DR`, `DL`),
-#'   each with `objective` and `df`.
+#'   each with `objective` and `df`. A child whose parent is absent from `fits`
+#'   is silently dropped from the comparison rather than causing an error.
 #' @param n Number of observations.
 #' @param response "continuous" or "binary".
 #' @param alpha Significance threshold for [select_parsimonious()].
@@ -65,13 +66,14 @@ select_parsimonious <- function(fits, n, response, alpha = 0.05) {
 #' @export
 compare_fits <- function(fits, n, response, alpha = 0.05) {
   parent_of <- c(SA = "reference", DR = "SA", DL = "SA")
-  parent_of <- parent_of[intersect(names(parent_of), names(fits))]
+  parent_of <- parent_of[names(parent_of) %in% names(fits) &
+                          parent_of       %in% names(fits)]
   comparison <- if (length(parent_of)) {
     do.call(rbind, lapply(names(parent_of), function(m) {
       p <- parent_of[[m]]
-      t <- lr_test(fits[[p]]$objective, fits[[m]]$objective,
-                   fits[[p]]$df, fits[[m]]$df, n, response)
-      data.frame(model = m, parent = p, chi = t$chi, df = t$df, p = t$p)
+      lrt <- lr_test(fits[[p]]$objective, fits[[m]]$objective,
+                     fits[[p]]$df, fits[[m]]$df, n, response)
+      data.frame(model = m, parent = p, chi = lrt$chi, df = lrt$df, p = lrt$p)
     }))
   } else {
     NULL

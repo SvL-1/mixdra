@@ -51,4 +51,14 @@ test_that("compare_fits handles a ternary (reference + SA only) fit set", {
   cmp <- compare_fits(fits, n = 27, response = "continuous", alpha = 0.05)
   expect_equal(nrow(cmp$comparison), 1)          # only SA vs reference
   expect_equal(cmp$comparison$model, "SA")
+  expect_equal(cmp$chosen, "reference")          # p=0.092 > 0.05; SA not significant
+})
+
+test_that("compare_fits drops a child whose parent is absent", {
+  fits <- list(
+    reference = list(objective = 10, df = 5),
+    DR        = list(objective = 8,  df = 7))   # DR's parent SA is absent
+  cmp <- compare_fits(fits, n = 20, response = "continuous", alpha = 0.05)
+  expect_null(cmp$comparison)                    # no comparable child -> NULL
+  expect_equal(cmp$chosen, "reference")          # walk stops at reference
 })
