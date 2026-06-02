@@ -74,6 +74,50 @@ fit_curve_from_singles <- function(df, reference, response,
   fit$par[names(seed)]
 }
 
+#' Model order for the joint selection chain
+#'
+#' Binary mixtures walk reference -> SA -> {DR, DL}; ternary mixtures support
+#' only reference -> SA here (Advanced S/A is fitted separately).
+#' @keywords internal
+joint_chain_order <- function(n_chem) {
+  if (n_chem == 2) c("reference", "SA", "DR", "DL") else c("reference", "SA")
+}
+
+#' Fit one mixture model jointly (curves + interaction), warm-started
+#'
+#' Unlike the staged [fit_curve_from_singles()] + fixed-curve fits used by
+#' [analyse_mixture()], this leaves EVERY parameter free and optimises them
+#' together (the Excel-faithful joint fit). It is seeded from `parent_fit` when
+#' given (the parent in the nesting chain), else from `seed_curves`. The child's
+#' new interaction parameter (the one its parent lacks) is seeded at its neutral
+#' value `0` -- `a = 0` reduces SA to the reference, `b = 0` reduces DR/DL to SA
+#' -- so the child starts at a point reproducing the parent's fit and can only
+#' improve on it (keeping the nested LR comparison sound).
+#' @param df Mixture data frame (see [fit_model()]).
+#' @param reference "CA" or "IA".
+#' @param deviation "reference", "SA", "DR", or "DL".
+#' @param response "continuous" or "binary".
+#' @param seed_curves Named numeric of curve params (max, slope*, ec50*) used as
+#'   the start when there is no parent (the reference fit).
+#' @param parent_fit The parent model's joint fit, or `NULL` for the reference.
+#' @param n_starts,time_limit Forwarded to [fit_model()].
+#' @return An enriched mixture fit (as [fit_model()]).
+#' @keywords internal
+joint_fit_one <- function(df, reference, deviation, response,
+                          seed_curves, parent_fit = NULL,
+                          n_starts = 1, time_limit = 30) {
+  n_chem <- length(intersect(c("C1", "C2", "C3"), names(df)))
+  spec   <- model_spec(reference, deviation, n_chem)
+  start  <- if (is.null(parent_fit)) seed_curves else parent_fit$par
+  # Neutral-seed any interaction parameter the child adds beyond its start
+  # (a or b): 0 makes the new term vanish, reproducing the parent.
+  new_extra <- setdiff(spec$extra, names(start))
+  if (length(new_extra))
+    start <- c(start, stats::setNames(rep(0, length(new_extra)), new_extra))
+  fit_model(df, reference, deviation, response, start = start,
+            n_starts = n_starts, time_limit = time_limit)
+}
+
 #' Analyse a mixture: fit reference + deviations and compare
 #'
 #' Fitting is staged: the curve parameters are fixed from the single-compound
