@@ -171,11 +171,35 @@ binary_ui <- function(id) {
       )
     ),
 
-    # Stage 3 -- diagnostics for the displayed model (revealed once frozen).
+    # Stage 3 -- joint refinement of the displayed model. It is an action that
+    # rewrites the fit, so it precedes the outputs it drives (Stage 4).
     shiny::conditionalPanel(
       condition = "output.frozen", ns = ns,
       bslib::card(
-        bslib::card_header("Stage 3 · Diagnostics"),
+        bslib::card_header("Stage 3 · Optimize all parameters (joint)"),
+        shiny::conditionalPanel(
+          condition = "output.has_fit", ns = ns,
+          shiny::p("Refines the displayed model by fitting every parameter at ",
+                   "once (curves + interaction), seeded from the current values. ",
+                   "The refined curve parameters are written back into the ",
+                   "chemical panels above (both share one ",
+                   shiny::tags$code("max"), ")."),
+          shiny::actionButton(ns("optimize_all"), "Optimize all params",
+                              class = "btn-primary"),
+          shiny::uiOutput(ns("optimize_readout"))
+        ),
+        shiny::conditionalPanel(
+          condition = "!output.has_fit", ns = ns,
+          shiny::helpText("Fit an interaction model in Stage 2 first."))
+      )
+    ),
+
+    # Stage 4 -- results & diagnostics for the displayed model (revealed once
+    # frozen).
+    shiny::conditionalPanel(
+      condition = "output.frozen", ns = ns,
+      bslib::card(
+        bslib::card_header("Stage 4 · Results & diagnostics"),
         bslib::layout_columns(
           bslib::card(bslib::card_header("3-D response surface"),
                       plotly::plotlyOutput(ns("surface"), height = "520px")),
@@ -202,24 +226,6 @@ binary_ui <- function(id) {
                       DT::DTOutput(ns("results"))),
           bslib::card(bslib::card_header("Confidence intervals (displayed model)"),
                       DT::DTOutput(ns("cis")))
-        ),
-
-        # Joint refinement of the displayed model. Lives here in Stage 3 (a
-        # final polish on the chosen model), and writes its results straight
-        # back into the chemical panels + a/b grid -- one source of truth.
-        shiny::conditionalPanel(
-          condition = "output.has_fit", ns = ns,
-          bslib::card(
-            bslib::card_header("Optimize all parameters (joint)"),
-            shiny::p("Refines the displayed model by fitting every parameter at ",
-                     "once (curves + interaction), seeded from the current values. ",
-                     "The refined curve parameters are written back into the ",
-                     "chemical panels above (both share one ",
-                     shiny::tags$code("max"), ")."),
-            shiny::actionButton(ns("optimize_all"), "Optimize all params",
-                                class = "btn-primary"),
-            shiny::uiOutput(ns("optimize_readout"))
-          )
         )
       )
     )
