@@ -192,6 +192,49 @@ test_that("intro_server writes chem3 into the shared meta store", {
   })
 })
 
+test_that("ternary_server: three curves -> Fit Advanced S/A -> hub + selection", {
+  skip_on_cran()
+  ex <- system.file("extdata", "ternary_ca_fbsa_cpf_imi_continuous.csv", package = "mixdra")
+  skip_if_not(nzchar(ex) && file.exists(ex), "bundled ternary example not installed")
+  meta <- shiny::reactiveValues(chem1 = "CPF", chem2 = "FBSA", chem3 = "IMI")
+  shiny::testServer(ternary_server, args = list(meta = meta), {
+    session$setInputs(response = "continuous", reference = "CA",
+                      thorough = FALSE, n_starts = 1, time_limit = 30)
+    expect_length(errs(), 0)                  # bundled example is valid
+    expect_gt(nrow(engine_df()), 0)
+
+    # Simulate the three single curves (values near the validated fit).
+    session$setInputs(`chem1-val_max` = 872, `chem1-val_slope` = 4.67,
+                      `chem1-val_ec50` = 0.1275, `chem1-simulate` = 1)
+    session$setInputs(`chem2-val_max` = 872, `chem2-val_slope` = 13,
+                      `chem2-val_ec50` = 5.58, `chem2-simulate` = 1)
+    session$setInputs(`chem3-val_max` = 872, `chem3-val_slope` = 3.63,
+                      `chem3-val_ec50` = 0.575, `chem3-simulate` = 1)
+    expect_true(isTRUE(frozen()))
+
+    # Run the staged Advanced-S/A fit.
+    session$setInputs(fit_asa = 1)
+    res <- asa_res()
+    expect_false(is.null(res))
+    expect_setequal(names(res$pairwise), c("A1", "A2", "A3"))
+    expect_gt(nrow(res$individual), 0)
+
+    # Hub: Overall row + one row per ternary ratio; Overall selected by default.
+    h <- hub_df()
+    expect_equal(h$Ratio[1], "Overall")
+    expect_equal(nrow(h), 1L + nrow(res$individual))
+    expect_null(selected_ratio())             # row 1 (Overall) -> NULL ratio
+
+    # Clicking a ratio row selects that ratio.
+    session$setInputs(hub_rows_selected = 2)
+    expect_equal(selected_ratio(), h$.key[2])
+
+    # A curve edit clears the staged result (user re-runs Fit Advanced S/A).
+    session$setInputs(`chem1-val_max` = 880, `chem1-simulate` = 2)
+    expect_null(asa_res())
+  })
+})
+
 test_that("ternary_ui builds the sidebar, three curve panels, and the three stages", {
   html <- as.character(ternary_ui("ternary"))
   # sidebar controls + disabled-radio script
