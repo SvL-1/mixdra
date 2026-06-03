@@ -93,6 +93,27 @@ test_that("fit_ternary_asa recovers known base, A1-A3, and per-ratio A4", {
   expect_lt(ind$A4[ind$ratio == uk[2]], -0.1)  # antagonism
 })
 
+test_that("analyse_ternary uses a supplied base verbatim and skips the Stage-1 fit", {
+  skip_on_cran()
+  df <- utils::read.csv(testthat::test_path(
+    "fixtures", "ternary", "fbsa_cpf_imi", "ternary_fbsa_cpf_imi_continuous.csv"))
+  base <- c(max = 872.2, slope1 = 4.674, slope2 = 13, slope3 = 3.629,
+            ec50_1 = 0.1275, ec50_2 = 5.58, ec50_3 = 0.575)
+  res <- analyse_ternary(df, reference = "CA", response = "continuous", base = base)
+  # base passed through unchanged (not re-fit from the singles)
+  expect_equal(res$base[["max"]], 872.2)
+  expect_equal(res$base[["ec50_1"]], 0.1275)
+  expect_null(res$fits$base)                 # no Stage-1 fit object when base supplied
+  expect_setequal(names(res$pairwise), c("A1", "A2", "A3"))
+  expect_true(is.numeric(res$A4_overall))
+  expect_gt(nrow(res$individual), 0)
+})
+
+test_that("analyse_ternary errors when the supplied base is missing a param", {
+  df <- data.frame(C1 = c(0, 1, 1), C2 = c(0, 1, 0), C3 = c(0, 1, 1), Res = c(100, 20, 30))
+  expect_error(analyse_ternary(df, base = c(max = 800, slope1 = 4)), "missing")
+})
+
 test_that("analyse_ternary returns overall + per-ratio structure", {
   truth <- list(max = 800, slope1 = 3, slope2 = 2, slope3 = 2.5,
                 ec50_1 = 1, ec50_2 = 5, ec50_3 = 2, A1 = 0.5, A2 = 0, A3 = 0)

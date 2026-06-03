@@ -37,24 +37,38 @@ ternary_ratio_key <- function(df, sig = 6) {
 #' @param df Mixture data frame (C1,C2,C3 + Res for continuous).
 #' @param reference "CA" (IA not yet supported here).
 #' @param response "continuous" (binary not yet validated for ASA).
+#' @param base Optional named curve params (`max, slope1-3, ec50_1-3`); when
+#'   supplied the Stage-1 singles fit is skipped and these are held fixed.
+#'   Defaults to `NULL` (fit from singles).
 #' @param lower,upper,n_starts,time_limit Forwarded to [fit_model()].
 #' @return See [analyse_ternary()].
 #' @keywords internal
 fit_ternary_asa <- function(df, reference = "CA", response = "continuous",
-                            lower = NULL, upper = NULL, n_starts = 1,
-                            time_limit = 30) {
+                            base = NULL, lower = NULL, upper = NULL,
+                            n_starts = 1, time_limit = 30) {
   if (reference != "CA")
     stop("fit_ternary_asa: only reference = 'CA' is implemented")
   cls <- classify_rows(df)
   base_params <- model_spec(reference, "reference", 3)$params
 
-  # Stage 1 - base curve params from singles + control.
-  singles <- df[cls %in% c("control", "single"), , drop = FALSE]
-  seed <- seed_from_singles(df, response)
-  f1 <- fit_model(singles, reference, "reference", response, start = seed,
-                  lower = lower, upper = upper, n_starts = n_starts,
-                  time_limit = time_limit)
-  base_par <- f1$par[base_params]
+  # Stage 1 - base curve params: supplied (frozen, from the app's three single
+  # curves) or fit from the singles + control. A supplied `base` is held fixed
+  # downstream exactly as an auto-fit one would be.
+  if (is.null(base)) {
+    singles <- df[cls %in% c("control", "single"), , drop = FALSE]
+    seed <- seed_from_singles(df, response)
+    f1 <- fit_model(singles, reference, "reference", response, start = seed,
+                    lower = lower, upper = upper, n_starts = n_starts,
+                    time_limit = time_limit)
+    base_par <- f1$par[base_params]
+  } else {
+    miss <- setdiff(base_params, names(base))
+    if (length(miss))
+      stop("fit_ternary_asa: `base` is missing param(s): ",
+           paste(miss, collapse = ", "))
+    base_par <- base[base_params]
+    f1 <- NULL
+  }
 
   # Stage 2 - A1/A2/A3 from binaries; base + A4 held fixed; start all A at 0.
   binaries <- df[cls == "binary", , drop = FALSE]
@@ -114,6 +128,9 @@ fit_ternary_asa <- function(df, reference = "CA", response = "continuous",
 #' @param df Ternary mixture data: C1, C2, C3 and `Res` (continuous).
 #' @param reference "CA" (IA not yet supported).
 #' @param response "continuous" (binary not yet validated).
+#' @param base Optional named curve params (`max, slope1-3, ec50_1-3`); when
+#'   supplied the Stage-1 singles fit is skipped and these are held fixed.
+#'   Defaults to `NULL` (fit from singles).
 #' @param lower,upper,n_starts,time_limit Forwarded to [fit_model()].
 #' @return A list: `reference`, `response`, `base` (named curve params),
 #'   `pairwise` (A1,A2,A3), `A4_overall`, `individual` (data frame: ratio,
@@ -122,12 +139,12 @@ fit_ternary_asa <- function(df, reference = "CA", response = "continuous",
 #' @export
 analyse_ternary <- function(df, reference = "CA",
                             response = c("continuous", "binary"),
-                            lower = NULL, upper = NULL, n_starts = 1,
-                            time_limit = 30) {
+                            base = NULL, lower = NULL, upper = NULL,
+                            n_starts = 1, time_limit = 30) {
   response <- match.arg(response)
   if (!all(c("C1", "C2", "C3") %in% names(df)))
     stop("analyse_ternary requires C1, C2 and C3 columns")
-  fit_ternary_asa(df, reference = reference, response = response,
+  fit_ternary_asa(df, reference = reference, response = response, base = base,
                   lower = lower, upper = upper, n_starts = n_starts,
                   time_limit = time_limit)
 }
