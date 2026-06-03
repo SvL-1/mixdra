@@ -179,3 +179,30 @@ test_that("validate_upload catches a negative C3", {
   expect_match(paste(validate_upload(bad, "ternary", "continuous"), collapse = " "),
                ">= 0|negative|0")
 })
+
+test_that("marginal_df3 extracts a chemical's single series (other two == 0)", {
+  df <- data.frame(C1 = c(0, 1, 2, 0, 0, 3),
+                   C2 = c(0, 0, 0, 1, 2, 4),
+                   C3 = c(0, 0, 0, 0, 0, 5),
+                   Res = c(100, 60, 40, 70, 50, 10))
+  m1 <- marginal_df3(df, 1)             # rows where C2 == 0 AND C3 == 0
+  expect_equal(m1$C1, c(0, 1, 2))
+  expect_equal(m1$Res, c(100, 60, 40))
+  expect_false(any(c("C2", "C3") %in% names(m1)))
+
+  m3 <- marginal_df3(df, 3)             # rows where C1 == 0 AND C2 == 0; C3 -> C1
+  expect_equal(m3$C1, c(0))             # only the control row qualifies here
+  expect_equal(m3$Res, c(100))
+})
+
+test_that("assemble_curve_params3 averages max and uses underscore ec50 names", {
+  f1 <- list(par = c(max = 870, slope = 4.7, ec50 = 0.13))
+  f2 <- list(par = c(max = 872, slope = 13,  ec50 = 5.58))
+  f3 <- list(par = c(max = 874, slope = 3.6, ec50 = 0.57))
+  p <- assemble_curve_params3(f1, f2, f3)
+  expect_equal(names(p), c("max", "slope1", "slope2", "slope3",
+                           "ec50_1", "ec50_2", "ec50_3"))
+  expect_equal(unname(p[["max"]]), 872)         # mean(870, 872, 874)
+  expect_equal(unname(p[["slope2"]]), 13)
+  expect_equal(unname(p[["ec50_3"]]), 0.57)
+})

@@ -173,6 +173,48 @@ assemble_curve_params <- function(fit1, fit2) {
     ec502  = fit2$par[["ec50"]])
 }
 
+#' One chemical's single-compound series from a ternary frame
+#'
+#' Keeps rows where the OTHER TWO chemicals are 0 (so the shared control row is
+#' included), drops their columns, and renames this chemical's concentration
+#' column to `C1` — the shape a single-chemical fitter expects. The ternary
+#' analogue of [marginal_df()].
+#' @param df Ternary engine data frame (`C1`, `C2`, `C3`, response columns).
+#' @param chem 1, 2 or 3 — which chemical's marginal series to extract.
+#' @return A data frame with `C1` and the response columns.
+#' @keywords internal
+marginal_df3 <- function(df, chem) {
+  cols  <- paste0("C", 1:3)
+  this  <- paste0("C", chem)
+  other <- setdiff(cols, this)
+  keep  <- df[[other[1]]] == 0 & df[[other[2]]] == 0
+  out   <- df[keep, , drop = FALSE]
+  out[other] <- NULL
+  names(out)[names(out) == this] <- "C1"
+  rownames(out) <- NULL
+  out
+}
+
+#' Frozen ternary base-parameter vector from three single-chemical fits
+#'
+#' Builds the named vector [analyse_ternary()] holds fixed as its `base`: a
+#' shared `max` (mean of the three per-chemical fits, matching the engine's
+#' seeding) plus per-chemical `slope1/2/3` and `ec50_1/2/3`. Names match the
+#' ternary registry's base parameters (underscore `ec50_i`, unlike binary's
+#' `ec501`).
+#' @param fit1,fit2,fit3 Single-fit results (each `par = c(max, slope, ec50)`).
+#' @return A named numeric vector: `max`, `slope1-3`, `ec50_1-3`.
+#' @keywords internal
+assemble_curve_params3 <- function(fit1, fit2, fit3) {
+  c(max    = mean(c(fit1$par[["max"]], fit2$par[["max"]], fit3$par[["max"]])),
+    slope1 = fit1$par[["slope"]],
+    slope2 = fit2$par[["slope"]],
+    slope3 = fit3$par[["slope"]],
+    ec50_1 = fit1$par[["ec50"]],
+    ec50_2 = fit2$par[["ec50"]],
+    ec50_3 = fit3$par[["ec50"]])
+}
+
 #' Assemble lower/upper bound vectors from Advanced-panel inputs
 #'
 #' Reads `lo_<param>` / `hi_<param>` values for `params`; blank/NA entries are
