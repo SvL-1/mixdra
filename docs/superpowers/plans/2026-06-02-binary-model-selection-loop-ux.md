@@ -1,5 +1,7 @@
 # Binary Model-Selection Joint-Fit Loop (UX Spine) Implementation Plan
 
+> **STATUS (2026-06-03): executed on branch `binary-joint-selection-loop`, with a post-implementation reversal.** Tasks 1–5 were implemented joint as written, then the loop was switched back to the **staged** fit (Sam's required method — joint masks interactions; see the spec's AMENDMENT and `mixdra-staged-fitting`). The joint engine fns (`joint_fit_one`, `analyse_mixture_joint`) were removed; `compare_fits` + `selection_chain_order` remain. Where tasks below say "joint", the shipped loop calls `fit_model(..., start = curve_params(), fixed = names(curve_params()))` per model instead. The UX, live stepper, and LR comparison are unchanged.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the binary tab's automatic interaction-model choice the spine of the UI: a single "compare all models" action runs a warm-started, fully-joint fit per model (reference → SA → DR/DL), fills a live results table row by row, and highlights the parsimonious winner — retiring the separate staged "Find best" and manual "Optimize all" steps.
