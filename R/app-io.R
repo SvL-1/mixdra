@@ -86,7 +86,7 @@ validate_upload <- function(df, stage, response) {
     errs <- c(errs, paste0("Non-numeric column(s): ", paste(non_num, collapse = ", "), "."))
 
   # Range checks only on numeric columns that are present.
-  conc_cols <- intersect(c("Conc", "C1", "C2"), present)
+  conc_cols <- intersect(c("Conc", "C1", "C2", "C3"), present)
   conc_ok <- conc_cols[vapply(df[conc_cols], is.numeric, logical(1))]
   if (length(conc_ok) && any(unlist(df[conc_ok]) < 0, na.rm = TRUE))
     errs <- c(errs, "Concentrations must be >= 0.")
@@ -103,6 +103,14 @@ validate_upload <- function(df, stage, response) {
     n_distinct <- length(unique(df$Conc[!is.na(df$Conc)]))
     if (n_distinct < 4)
       errs <- c(errs, "Need at least 4 distinct concentrations to fit a single-chemical curve.")
+  }
+
+  if (stage == "ternary" && all(c("C1", "C2", "C3") %in% present) &&
+      all(vapply(df[c("C1", "C2", "C3")], is.numeric, logical(1)))) {
+    nz <- rowSums(as.matrix(df[c("C1", "C2", "C3")]) > 0)
+    if (!any(nz == 3, na.rm = TRUE))
+      errs <- c(errs, paste0("No ternary rows (all of C1, C2, C3 > 0); the ",
+                             "per-ratio A4 step needs at least one ternary mixture."))
   }
 
   errs

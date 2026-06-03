@@ -160,3 +160,22 @@ test_that("ternary template has the schema columns and spans every tier", {
   cls <- as.character(classify_rows(d))
   expect_true(all(c("control", "single", "binary", "ternary") %in% cls))
 })
+
+test_that("validate_upload accepts a valid ternary file", {
+  good <- data.frame(C1 = c(0, 1, 0, 0, 1), C2 = c(0, 0, 1, 0, 1),
+                     C3 = c(0, 0, 0, 1, 1), Res = c(100, 60, 60, 60, 20))
+  expect_length(validate_upload(good, "ternary", "continuous"), 0)
+})
+
+test_that("validate_upload flags a ternary file with no ternary rows", {
+  noternary <- data.frame(C1 = c(0, 1, 0), C2 = c(0, 0, 1),
+                          C3 = c(0, 0, 0), Res = c(100, 60, 60))
+  expect_match(paste(validate_upload(noternary, "ternary", "continuous"), collapse = " "),
+               "ternary rows")
+})
+
+test_that("validate_upload catches a negative C3", {
+  bad <- data.frame(C1 = c(0, 1), C2 = c(0, 1), C3 = c(-1, 1), Res = c(100, 20))
+  expect_match(paste(validate_upload(bad, "ternary", "continuous"), collapse = " "),
+               ">= 0|negative|0")
+})
