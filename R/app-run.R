@@ -29,7 +29,8 @@ app_server <- function(input, output, session) {
 
 #' Launch the mixdra Shiny app
 #'
-#' Starts the interactive app (Introduction, Single Chemical, Binary Mixture).
+#' Starts the interactive app (Introduction, Single Chemical, Binary Mixture,
+#' Ternary Mixture).
 #' The UI stack (`shiny`, `bslib`, `plotly`, `DT`) is a set of Suggested
 #' dependencies; this function stops with an install hint if any are missing.
 #' @param ... Passed to [shiny::runApp()] (e.g. `launch.browser`, `port`).
