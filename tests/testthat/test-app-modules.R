@@ -183,3 +183,26 @@ test_that("a bundled example dataset ships and validates as ternary continuous",
   expect_length(validate_upload(df, "ternary", "continuous"), 0)
   expect_true(all(c("C1", "C2", "C3", "Res") %in% names(df)))
 })
+
+test_that("ternary_ui builds the sidebar, three curve panels, and the three stages", {
+  html <- as.character(ternary_ui("ternary"))
+  # sidebar controls + disabled-radio script
+  expect_match(html, "ternary-response", fixed = TRUE)
+  expect_match(html, "ternary-reference", fixed = TRUE)
+  expect_match(html, "coming soon", fixed = TRUE)
+  expect_match(html, "prop('disabled', true)", fixed = TRUE)
+  # Stage 1: three curve panels
+  expect_match(html, "ternary-chem1-autofit", fixed = TRUE)
+  expect_match(html, "ternary-chem2-autofit", fixed = TRUE)
+  expect_match(html, "ternary-chem3-autofit", fixed = TRUE)
+  # Stage 2: fit button + hub table
+  expect_match(html, "ternary-fit_asa", fixed = TRUE)
+  expect_match(html, "ternary-hub", fixed = TRUE)
+  # Stage 3: plots + effect readout
+  expect_match(html, "ternary-isoplane", fixed = TRUE)
+  expect_match(html, "ternary-sigma_tu", fixed = TRUE)
+  expect_match(html, "ternary-effect", fixed = TRUE)
+  # no alpha / joint controls (deliberately dropped vs binary)
+  expect_false(grepl("ternary-alpha", html, fixed = TRUE))
+  expect_false(grepl("ternary-optimize_all", html, fixed = TRUE))
+})
