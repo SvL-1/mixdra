@@ -317,8 +317,30 @@ binary_server <- function(id, meta) {
     refine_pre   <- shiny::reactiveVal(NULL)   # objective before the last joint refine
     refine_post  <- shiny::reactiveVal(NULL)   # objective after
 
-    current_fit  <- shiny::reactive({
-      m <- input$model
+    # Row order in the comparison table (fixed) and the row the user clicked.
+    # `sel_row` persists the clicked row across table re-renders (e.g. when the
+    # joint column fills in). The displayed model defaults to the winner. Selecting
+    # a different row also clears the transient before->after readout, so a
+    # non-NULL refine_post() always refers to the currently selected model.
+    results_order <- shiny::reactive(
+      intersect(c("reference", "SA", "DR", "DL"), names(fits_store())))
+    sel_row <- shiny::reactiveVal(integer(0))
+    shiny::observeEvent(input$results_rows_selected, {
+      sel_row(input$results_rows_selected)
+      refine_pre(NULL); refine_post(NULL)
+    }, ignoreNULL = FALSE, ignoreInit = TRUE)
+
+    selected_model <- shiny::reactive({
+      ord <- results_order()
+      if (length(ord) == 0) return(NULL)
+      r <- sel_row()
+      if (length(r) >= 1 && r[[1]] >= 1 && r[[1]] <= length(ord)) return(ord[[r[[1]]]])
+      ch <- if (!is.null(last_compare())) last_compare()$chosen else NULL
+      if (!is.null(ch) && ch %in% ord) ch else ord[[1]]
+    })
+
+    current_fit <- shiny::reactive({
+      m <- selected_model()
       if (is.null(m)) return(NULL)
       fits_store()[[m]]
     })
@@ -327,7 +349,7 @@ binary_server <- function(id, meta) {
     # joint-refined fit when one exists, else the staged fit. Never read by the
     # comparison table (which stays purely staged).
     display_fit <- shiny::reactive({
-      m <- input$model
+      m <- selected_model()
       if (is.null(m)) return(NULL)
       r <- refined_fits()[[m]]
       if (!is.null(r)) r else fits_store()[[m]]
@@ -399,22 +421,11 @@ binary_server <- function(id, meta) {
           last_compare(list(fits = fits_store(), comparison = cmp$comparison,
                             chosen = cmp$chosen, reference = input$reference,
                             response = engine_response()))
-          shiny::updateSelectInput(session, "model", selected = cmp$chosen)
-          ch <- fits_store()[[cmp$chosen]]
-          shiny::updateNumericInput(session, "val_a",
-            value = if ("a" %in% names(ch$par)) round(ch$par[["a"]], 4) else NA)
-          shiny::updateNumericInput(session, "val_b",
-            value = if ("b" %in% names(ch$par)) round(ch$par[["b"]], 4) else NA)
+          ord <- intersect(c("reference", "SA", "DR", "DL"), names(fits_store()))
+          sel_row(match(cmp$chosen, ord))   # default-select the winner row
         }
       })
     })
-
-    # Read the entered a/b as a named numeric (blank -> NA).
-    read_ab <- function() {
-      raw <- list(a = input$val_a, b = input$val_b)
-      vapply(raw, function(x)
-        if (is.null(x) || length(x) == 0) NA_real_ else as.numeric(x), numeric(1))
-    }
 
     # Optimize all params (joint): re-fit EVERY parameter of the selected model
     # at once, seeded from its staged fit (Excel-style). Stored in refined_fits
@@ -441,80 +452,14 @@ binary_server <- function(id, meta) {
           NULL
         })
       if (is.null(newfit)) return()
-      r <- refined_fits(); r[[input$model]] <- newfit; refined_fits(r)
+      r <- refined_fits(); r[[selected_model()]] <- newfit; refined_fits(r)
       refine_pre(pre); refine_post(newfit$objective)
     })
 
-    # Autofit: fit only the selected model's interaction params, curves fixed.
-    shiny::observeEvent(input$autofit, {
-      shiny::req(frozen(), curve_params())
-      dev <- input$model
-      fit <- tryCatch(
-        shiny::withProgress(message = "Fitting interaction...", value = 0.5,
-          fit_model(engine_df(), input$reference, dev, engine_response(),
-                    start = curve_params(), fixed = names(curve_params()),
-                    n_starts = n_starts_eff(), time_limit = input$time_limit)),
-        error = function(e) {
-          shiny::showNotification(paste("Fit failed:", conditionMessage(e)), type = "error")
-          NULL
-        })
-      if (is.null(fit)) return()
-      if ("a" %in% names(fit$par))
-        shiny::updateNumericInput(session, "val_a", value = round(fit$par[["a"]], 4))
-      if ("b" %in% names(fit$par))
-        shiny::updateNumericInput(session, "val_b", value = round(fit$par[["b"]], 4))
-      s <- fits_store(); s[[dev]] <- fit; fits_store(s)
-      r <- refined_fits(); r[[dev]] <- NULL; refined_fits(r)  # staged edit supersedes a prior joint refine
-      refine_pre(NULL); refine_post(NULL)
-    })
-
-    # Simulate: evaluate the selected model with the entered a/b (no refit).
-    shiny::observeEvent(input$simulate, {
-      shiny::req(frozen(), curve_params())
-      dev <- input$model
-      if (dev == "reference") {
-        shiny::showNotification(
-          "The reference model has no interaction parameters to simulate.", type = "message")
-        return()
-      }
-      ab <- read_ab()
-      need <- if (dev == "SA") "a" else c("a", "b")
-      if (any(is.na(ab[need]))) {
-        shiny::showNotification("Enter a (and b) to simulate.", type = "warning")
-        return()
-      }
-      fit <- tryCatch(
-        eval_mixture(engine_df(), input$reference, dev, engine_response(),
-                     curve_params(), interaction = ab[need]),
-        error = function(e) {
-          shiny::showNotification(paste("Simulate failed:", conditionMessage(e)), type = "error")
-          NULL
-        })
-      if (is.null(fit)) return()
-      s <- fits_store(); s[[dev]] <- fit; fits_store(s)
-      r <- refined_fits(); r[[dev]] <- NULL; refined_fits(r)  # staged edit supersedes a prior joint refine
-      refine_pre(NULL); refine_post(NULL)
-    })
-
-    # Switching the picker syncs the grid to that model's stored a/b (blank if none).
-    shiny::observeEvent(input$model, {
-      f <- fits_store()[[input$model]]
-      shiny::updateNumericInput(session, "val_a",
-        value = if (!is.null(f) && "a" %in% names(f$par)) round(f$par[["a"]], 4) else NA)
-      shiny::updateNumericInput(session, "val_b",
-        value = if (!is.null(f) && "b" %in% names(f$par)) round(f$par[["b"]], 4) else NA)
-      # The before->after readout is action-scoped, so clear it on every switch:
-      # non-NULL refine_post() then always refers to the currently selected model.
-      # The persistent "this is a joint fit" indicator is the badge (refined_badge),
-      # which survives a switch via refined_fits[[m]] -- so losing the readout here
-      # is intentional, not a bug.
-      refine_pre(NULL); refine_post(NULL)
-    }, ignoreInit = TRUE)
-
     # Per-model explanation: tracks the reference and the selected model.
     output$interaction_help <- shiny::renderUI({
-      shiny::req(frozen())
-      interaction_help(input$reference, input$model)
+      shiny::req(frozen(), selected_model())
+      interaction_help(input$reference, selected_model())
     })
 
     # Fit-objective readout for the displayed model.
@@ -542,7 +487,7 @@ binary_server <- function(id, meta) {
 
     # Badge: the diagnostics are showing the joint-refined fit for this model.
     output$refined_badge <- shiny::renderUI({
-      m <- input$model
+      m <- selected_model()
       if (!is.null(m) && !is.null(refined_fits()[[m]]))
         shiny::div(class = "text-info", shiny::tags$small(
           "Showing the joint-refined (all-parameters) fit for this model. ",
@@ -561,12 +506,12 @@ binary_server <- function(id, meta) {
       shiny::req(frozen(), display_fit()); plot_obs_pred(display_fit(), engine_df())
     })
 
-    # One row per interaction model the user has fitted (model name in the first
-    # column): params + objective/df + LR p-value across the columns. A single
-    # Autofit/Simulate adds its own row; Compare all fills all four. The p-value
-    # column and the highlighted best-model row only appear once Compare all has
-    # run (it is the sole writer of `last_compare()`, which carries the parent
-    # comparison + chosen model). Sorting is disabled -- row order is fixed.
+    # One row per fitted model: staged params + objective/df + LR p-value, winner
+    # highlighted. A display-only joint-objective column is filled from
+    # refined_fits -- it is NEVER fed into the verdict (p / winner come from the
+    # staged `cmp`/`chosen`). Single-row selection drives the Stage 3 diagnostics;
+    # `selected = sel_row()` re-applies the selection across re-renders so
+    # optimising a row (which fills its joint cell) does not lose the selection.
     output$results <- DT::renderDT({
       fits <- fits_store()
       shiny::req(length(fits) > 0)
@@ -575,10 +520,16 @@ binary_server <- function(id, meta) {
       chosen <- if (!is.null(last_compare())) last_compare()$chosen else NULL
       mat  <- round(result_table(list(fits = fits[ord], comparison = cmp)), 4)
       disp <- as.data.frame(t(mat), check.names = FALSE)        # models -> rows
+      rf  <- refined_fits()
+      jlab <- if (identical(engine_response(), "binary")) "Dev (joint)" else "SSR (joint)"
+      disp[[jlab]] <- vapply(rownames(disp), function(m)
+        if (!is.null(rf[[m]])) round(rf[[m]]$objective, 4) else NA_real_, numeric(1))
       disp <- cbind(`Interaction model` = rownames(disp), disp, stringsAsFactors = FALSE)
       rownames(disp) <- NULL
-      dt <- DT::datatable(disp, rownames = FALSE,
-                          options = list(dom = "t", ordering = FALSE, scrollX = TRUE))
+      dt <- DT::datatable(
+        disp, rownames = FALSE,
+        selection = list(mode = "single", target = "row", selected = sel_row()),
+        options = list(dom = "t", ordering = FALSE, scrollX = TRUE))
       if (!is.null(chosen) && chosen %in% disp[["Interaction model"]])
         dt <- DT::formatStyle(dt, "Interaction model", target = "row",
                               fontWeight = DT::styleEqual(chosen, "bold"),
@@ -603,6 +554,7 @@ binary_server <- function(id, meta) {
     })
 
     list(current_fit = current_fit, last_compare = last_compare,
-         refined_fits = refined_fits, display_fit = display_fit)  # return for testability
+         refined_fits = refined_fits, display_fit = display_fit,
+         selected_model = selected_model)  # return for testability
   })
 }

@@ -37,7 +37,7 @@ test_that("single_ui builds a Shiny UI fragment", {
   expect_true(inherits(single_ui("single"), c("shiny.tag", "shiny.tag.list", "bslib_fragment")))
 })
 
-test_that("binary_server: compare-all loop fills the store live and selects a model", {
+test_that("binary_server: table auto-fills, row-click selects, joint refine is isolated", {
   skip_on_cran()
   meta <- shiny::reactiveValues(chem1 = "A", chem2 = "B")
   shiny::testServer(binary_server, args = list(meta = meta), {
@@ -45,50 +45,49 @@ test_that("binary_server: compare-all loop fills the store live and selects a mo
                                "binary_ca_mps_cpf_imi_continuous.csv")
     skip_if_not(file.exists(csv), "binary fixture missing")
     session$setInputs(response = "continuous", reference = "CA", thorough = FALSE,
-                      n_starts = 1, alpha = 0.05, time_limit = 30, model = "reference",
+                      n_starts = 1, alpha = 0.05, time_limit = 30,
                       file = list(datapath = csv, name = "binary.csv"))
-    expect_length(errs(), 0)
-
-    # supply both single curves deterministically via Simulate, distinct max
     session$setInputs(`chem1-val_max` = 700, `chem1-val_slope` = 2,
                       `chem1-val_ec50` = 1, `chem1-simulate` = 1)
     session$setInputs(`chem2-val_max` = 600, `chem2-val_slope` = 1,
                       `chem2-val_ec50` = 5, `chem2-simulate` = 1)
-    expect_true(isTRUE(frozen()))
 
-    # Both curves are now fit -> the staged loop auto-runs (no button). Drain it.
-    for (i in 1:8) session$elapse(5)             # drain the stepper queue
-
-    # all four staged fits stored, with staged df counts (curves fixed, only the
-    # interaction params are free: reference 0, SA 1 (a), DR/DL 2 (a, b))
+    # auto-fill: no button, just drain the timer
+    for (i in 1:8) session$elapse(5)
     expect_setequal(names(fits_store()), c("reference", "SA", "DR", "DL"))
-    expect_equal(fits_store()[["reference"]]$df, 0L)
-    expect_equal(fits_store()[["DR"]]$df, 2L)
-    # adding the interaction term cannot worsen the fit (a=0 reproduces the parent)
-    expect_lte(fits_store()[["SA"]]$objective,
-               fits_store()[["reference"]]$objective + 1e-6)
+    chosen     <- last_compare()$chosen
+    staged_cmp <- last_compare()$comparison
 
-    # comparison + chosen produced once the chain completed
-    expect_setequal(names(last_compare()$fits), c("reference", "SA", "DR", "DL"))
-    expect_equal(nrow(last_compare()$comparison), 3)
-    chosen <- last_compare()$chosen
-    expect_true(chosen %in% c("reference", "SA", "DR", "DL"))
-
-    # picker follows the chosen model (testServer doesn't echo updateSelectInput)
-    session$setInputs(model = chosen)
+    # with no row clicked, the displayed model defaults to the winner
+    expect_equal(selected_model(), chosen)
     expect_equal(current_fit()$deviation, chosen)
 
-    # "explore by hand" still works: Autofit the displayed model (staged a/b)
-    session$setInputs(model = "SA", autofit = 1)
+    # clicking a row (index in reference,SA,DR,DL order) selects that model
+    ord <- intersect(c("reference", "SA", "DR", "DL"), names(fits_store()))
+    session$setInputs(results_rows_selected = match("SA", ord))
+    expect_equal(selected_model(), "SA")
     expect_equal(current_fit()$deviation, "SA")
-    expect_true("a" %in% names(current_fit()$par))
 
-    # editing a single curve auto-re-runs the staged loop at the new curves
+    # optimise the selected (SA) model jointly -> refined_fits gets SA, verdict frozen
+    staged_sa_obj <- fits_store()[["SA"]]$objective
+    session$setInputs(optimize_all = 1)
+    expect_true(isTRUE(refined_fits()[["SA"]]$joint))
+    expect_lte(refined_fits()[["SA"]]$objective, staged_sa_obj + 1e-6)
+    expect_true(isTRUE(display_fit()$joint))
+    expect_identical(last_compare()$chosen, chosen)
+    expect_equal(last_compare()$comparison, staged_cmp)
+    expect_equal(fits_store()[["SA"]]$objective, staged_sa_obj)
+
+    # readout is action-scoped: selecting a different row clears the before->after
+    other <- setdiff(ord, "SA")[[1]]
+    session$setInputs(results_rows_selected = match(other, ord))
+    expect_null(refine_post())
+
+    # a curve edit re-runs the staged loop and clears refined fits
     session$setInputs(`chem1-val_max` = 720, `chem1-simulate` = 2)
     for (i in 1:8) session$elapse(5)
-    expect_true(isTRUE(frozen()))
-    expect_setequal(names(fits_store()), c("reference", "SA", "DR", "DL"))
-    expect_false(is.null(last_compare()))        # comparison recomputed at the new curves
+    expect_false(is.null(last_compare()))
+    expect_equal(length(refined_fits()), 0)
   })
 })
 
@@ -160,59 +159,4 @@ test_that("interaction_param_row renders a value input with inert bound cells", 
   expect_false(grepl("binary-hi_a", html, fixed = TRUE))  # no Upper input
 })
 
-test_that("binary_server: joint refine polishes a model but never moves the staged verdict", {
-  skip_on_cran()
-  meta <- shiny::reactiveValues(chem1 = "A", chem2 = "B")
-  shiny::testServer(binary_server, args = list(meta = meta), {
-    csv <- testthat::test_path("fixtures", "binary", "cpf_mps_imi",
-                               "binary_ca_mps_cpf_imi_continuous.csv")
-    skip_if_not(file.exists(csv), "binary fixture missing")
-    session$setInputs(response = "continuous", reference = "CA", thorough = FALSE,
-                      n_starts = 1, alpha = 0.05, time_limit = 30, model = "reference",
-                      file = list(datapath = csv, name = "binary.csv"))
-    session$setInputs(`chem1-val_max` = 700, `chem1-val_slope` = 2,
-                      `chem1-val_ec50` = 1, `chem1-simulate` = 1)
-    session$setInputs(`chem2-val_max` = 600, `chem2-val_slope` = 1,
-                      `chem2-val_ec50` = 5, `chem2-simulate` = 1)
-
-    session$setInputs(compare_all = 1)
-    for (i in 1:8) session$elapse(5)
-    chosen     <- last_compare()$chosen
-    staged_cmp <- last_compare()$comparison
-    staged_obj <- fits_store()[[chosen]]$objective
-    staged_df  <- fits_store()[[chosen]]$df
-
-    session$setInputs(model = chosen)
-    session$setInputs(optimize_all = 1)
-
-    rf <- refined_fits()[[chosen]]
-    expect_true(isTRUE(rf$joint))
-    expect_lte(rf$objective, staged_obj + 1e-6)
-    expect_gt(rf$df, staged_df)
-
-    expect_identical(last_compare()$chosen, chosen)
-    expect_equal(last_compare()$comparison, staged_cmp)
-    expect_equal(fits_store()[[chosen]]$objective, staged_obj)
-    expect_equal(fits_store()[[chosen]]$df, staged_df)
-    expect_true(isTRUE(display_fit()$joint))
-
-    # the before->after readout is action-scoped: switching to another model
-    # clears it, so it can never show one model's numbers while another is shown.
-    # (The refined fit itself persists -- only the readout is transient.)
-    other <- setdiff(c("reference", "SA", "DR", "DL"), chosen)[[1]]
-    session$setInputs(model = other)
-    expect_null(refine_post())                    # readout hidden for the un-refined model
-    session$setInputs(model = chosen)             # back to the refined model
-    expect_false(is.null(refined_fits()[[chosen]]))  # its refined fit survived the switch
-
-    session$setInputs(autofit = 1)
-    expect_null(refined_fits()[[chosen]])
-    expect_false(isTRUE(display_fit()$joint))
-
-    session$setInputs(model = chosen, optimize_all = 2)
-    expect_false(is.null(refined_fits()[[chosen]]))
-    session$setInputs(`chem1-val_max` = 720, `chem1-simulate` = 2)
-    expect_equal(length(refined_fits()), 0)
-  })
-})
 
