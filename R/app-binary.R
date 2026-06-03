@@ -528,6 +528,11 @@ binary_server <- function(id, meta) {
         value = if (!is.null(f) && "a" %in% names(f$par)) round(f$par[["a"]], 4) else NA)
       shiny::updateNumericInput(session, "val_b",
         value = if (!is.null(f) && "b" %in% names(f$par)) round(f$par[["b"]], 4) else NA)
+      # The before->after readout is action-scoped, so clear it on every switch:
+      # non-NULL refine_post() then always refers to the currently selected model.
+      # The persistent "this is a joint fit" indicator is the badge (refined_badge),
+      # which survives a switch via refined_fits[[m]] -- so losing the readout here
+      # is intentional, not a bug.
       refine_pre(NULL); refine_post(NULL)
     }, ignoreInit = TRUE)
 
@@ -555,7 +560,7 @@ binary_server <- function(id, meta) {
       lab <- if (identical(display_fit()$response, "binary")) "Deviance" else "SSR"
       improved <- refine_post() <= refine_pre() + 1e-9
       shiny::tags$p(
-        shiny::tags$b(paste0("Joint refine ", lab, ": ")),
+        shiny::tags$b(paste0("Joint refine ", lab, " (vs staged): ")),
         round(refine_pre(), 2), shiny::HTML(" &rarr; "), round(refine_post(), 2),
         if (improved) shiny::tags$span(style = "color:green", " ✓"))
     })

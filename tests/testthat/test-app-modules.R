@@ -196,6 +196,15 @@ test_that("binary_server: joint refine polishes a model but never moves the stag
     expect_equal(fits_store()[[chosen]]$df, staged_df)
     expect_true(isTRUE(display_fit()$joint))
 
+    # the before->after readout is action-scoped: switching to another model
+    # clears it, so it can never show one model's numbers while another is shown.
+    # (The refined fit itself persists -- only the readout is transient.)
+    other <- setdiff(c("reference", "SA", "DR", "DL"), chosen)[[1]]
+    session$setInputs(model = other)
+    expect_null(refine_post())                    # readout hidden for the un-refined model
+    session$setInputs(model = chosen)             # back to the refined model
+    expect_false(is.null(refined_fits()[[chosen]]))  # its refined fit survived the switch
+
     session$setInputs(autofit = 1)
     expect_null(refined_fits()[[chosen]])
     expect_false(isTRUE(display_fit()$joint))
