@@ -304,10 +304,27 @@ binary_server <- function(id, meta) {
     loop_queue <- shiny::reactiveVal(NULL)
     stepper_on <- shiny::reactiveVal(FALSE)
 
+    # Joint-refined fits, keyed by model name -- a POST-SELECTION polish. The
+    # comparison table NEVER reads this; only the selected model's diagnostics do.
+    # This is what keeps the staged verdict (table p-values + winner) untouched.
+    refined_fits <- shiny::reactiveVal(list())
+    refine_pre   <- shiny::reactiveVal(NULL)   # objective before the last joint refine
+    refine_post  <- shiny::reactiveVal(NULL)   # objective after
+
     current_fit  <- shiny::reactive({
       m <- input$model
       if (is.null(m)) return(NULL)
       fits_store()[[m]]
+    })
+
+    # The fit shown in the diagnostics / CIs for the selected model: the
+    # joint-refined fit when one exists, else the staged fit. Never read by the
+    # comparison table (which stays purely staged).
+    display_fit <- shiny::reactive({
+      m <- input$model
+      if (is.null(m)) return(NULL)
+      r <- refined_fits()[[m]]
+      if (!is.null(r)) r else fits_store()[[m]]
     })
 
     engine_response <- shiny::reactive(
@@ -330,6 +347,7 @@ binary_server <- function(id, meta) {
       {
         fits_store(list())
         last_compare(NULL)
+        refined_fits(list()); refine_pre(NULL); refine_post(NULL)
       },
       ignoreInit = TRUE)
 
@@ -362,6 +380,7 @@ binary_server <- function(id, meta) {
           fits_store(s)
         }
         last_compare(NULL)
+        refined_fits(list()); refine_pre(NULL); refine_post(NULL)
       },
       ignoreInit = TRUE)
 
@@ -370,6 +389,7 @@ binary_server <- function(id, meta) {
       shiny::req(frozen(), curve_params())
       fits_store(list())
       last_compare(NULL)
+      refined_fits(list()); refine_pre(NULL); refine_post(NULL)
       loop_queue(selection_chain_order(n_chem()))
       stepper_on(TRUE)
     })
@@ -428,6 +448,28 @@ binary_server <- function(id, meta) {
         if (is.null(x) || length(x) == 0) NA_real_ else as.numeric(x), numeric(1))
     }
 
+    # Optimize all params (joint): re-fit EVERY parameter of the selected model
+    # at once, seeded from its staged fit (Excel-style). Stored in refined_fits
+    # ONLY -- never in fits_store -- so the staged comparison verdict (table
+    # p-values + highlighted winner) is never affected. Post-selection polish.
+    shiny::observeEvent(input$optimize_all, {
+      shiny::req(frozen(), current_fit())
+      f   <- current_fit()
+      pre <- f$objective
+      newfit <- tryCatch(
+        shiny::withProgress(message = "Optimizing all parameters...", value = 0.5,
+          refine_joint(f, engine_df(),
+                       n_starts = n_starts_eff(), time_limit = input$time_limit)),
+        error = function(e) {
+          shiny::showNotification(paste("Optimize failed:", conditionMessage(e)),
+                                  type = "error")
+          NULL
+        })
+      if (is.null(newfit)) return()
+      r <- refined_fits(); r[[input$model]] <- newfit; refined_fits(r)
+      refine_pre(pre); refine_post(newfit$objective)
+    })
+
     # Autofit: fit only the selected model's interaction params, curves fixed.
     shiny::observeEvent(input$autofit, {
       shiny::req(frozen(), curve_params())
@@ -447,6 +489,8 @@ binary_server <- function(id, meta) {
       if ("b" %in% names(fit$par))
         shiny::updateNumericInput(session, "val_b", value = round(fit$par[["b"]], 4))
       s <- fits_store(); s[[dev]] <- fit; fits_store(s)
+      r <- refined_fits(); r[[dev]] <- NULL; refined_fits(r)  # staged edit supersedes a prior joint refine
+      refine_pre(NULL); refine_post(NULL)
     })
 
     # Simulate: evaluate the selected model with the entered a/b (no refit).
@@ -473,6 +517,8 @@ binary_server <- function(id, meta) {
         })
       if (is.null(fit)) return()
       s <- fits_store(); s[[dev]] <- fit; fits_store(s)
+      r <- refined_fits(); r[[dev]] <- NULL; refined_fits(r)  # staged edit supersedes a prior joint refine
+      refine_pre(NULL); refine_post(NULL)
     })
 
     # Switching the picker syncs the grid to that model's stored a/b (blank if none).
@@ -482,6 +528,7 @@ binary_server <- function(id, meta) {
         value = if (!is.null(f) && "a" %in% names(f$par)) round(f$par[["a"]], 4) else NA)
       shiny::updateNumericInput(session, "val_b",
         value = if (!is.null(f) && "b" %in% names(f$par)) round(f$par[["b"]], 4) else NA)
+      refine_pre(NULL); refine_post(NULL)
     }, ignoreInit = TRUE)
 
     # Per-model explanation: tracks the reference and the selected model.
@@ -492,25 +539,46 @@ binary_server <- function(id, meta) {
 
     # Fit-objective readout for the displayed model.
     output$objective <- shiny::renderUI({
-      shiny::req(current_fit())
-      f <- current_fit()
+      shiny::req(display_fit())
+      f <- display_fit()
       lab <- if (identical(f$response, "binary")) "Deviance" else "SSR"
       shiny::tags$p(
         shiny::tags$b(paste0(lab, ": ")), round(f$objective, 2),
         "   |   ", shiny::tags$b("n: "), f$n,
-        if (isTRUE(f$simulated)) shiny::tags$em(" (simulated)"))
+        if (isTRUE(f$simulated)) shiny::tags$em(" (simulated)")
+        else if (isTRUE(f$joint)) shiny::tags$em(" (joint-refined)"))
+    })
+
+    # Before -> after objective for the last joint refine of the selected model.
+    output$refine_readout <- shiny::renderUI({
+      shiny::req(!is.null(refine_post()), display_fit())
+      lab <- if (identical(display_fit()$response, "binary")) "Deviance" else "SSR"
+      improved <- refine_post() <= refine_pre() + 1e-9
+      shiny::tags$p(
+        shiny::tags$b(paste0("Joint refine ", lab, ": ")),
+        round(refine_pre(), 2), shiny::HTML(" &rarr; "), round(refine_post(), 2),
+        if (improved) shiny::tags$span(style = "color:green", " ✓"))
+    })
+
+    # Badge: the diagnostics are showing the joint-refined fit for this model.
+    output$refined_badge <- shiny::renderUI({
+      m <- input$model
+      if (!is.null(m) && !is.null(refined_fits()[[m]]))
+        shiny::div(class = "text-info", shiny::tags$small(
+          "Showing the joint-refined (all-parameters) fit for this model. ",
+          "The comparison table above is unchanged (staged)."))
     })
 
     output$surface <- plotly::renderPlotly({
-      shiny::req(frozen(), current_fit()); plot_surface(current_fit(), engine_df())
+      shiny::req(frozen(), display_fit()); plot_surface(display_fit(), engine_df())
     })
     output$isobole <- plotly::renderPlotly({
-      shiny::req(frozen(), current_fit())
+      shiny::req(frozen(), display_fit())
       ref <- if (!is.null(last_compare())) last_compare()$fits$reference else NULL
-      plot_isobole(current_fit(), engine_df(), reference_fit = ref)
+      plot_isobole(display_fit(), engine_df(), reference_fit = ref)
     })
     output$op <- plotly::renderPlotly({
-      shiny::req(frozen(), current_fit()); plot_obs_pred(current_fit(), engine_df())
+      shiny::req(frozen(), display_fit()); plot_obs_pred(display_fit(), engine_df())
     })
 
     # One row per interaction model the user has fitted (model name in the first
@@ -542,8 +610,8 @@ binary_server <- function(id, meta) {
     # For a joint fit, parameters that were pinned (Lower == Upper) were not
     # estimated, so their CI is meaningless -- blank those rows.
     output$cis <- DT::renderDT({
-      shiny::req(current_fit())
-      f <- current_fit()
+      shiny::req(display_fit())
+      f <- display_fit()
       tab <- if (isTRUE(f$simulated)) {
         data.frame(parameter = names(f$par), value = round(unname(f$par), 4))
       } else {
@@ -554,6 +622,7 @@ binary_server <- function(id, meta) {
       DT::datatable(tab, rownames = FALSE, options = list(dom = "t"))
     })
 
-    list(current_fit = current_fit, last_compare = last_compare)  # return for testability
+    list(current_fit = current_fit, last_compare = last_compare,
+         refined_fits = refined_fits, display_fit = display_fit)  # return for testability
   })
 }

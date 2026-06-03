@@ -160,3 +160,50 @@ test_that("interaction_param_row renders a value input with inert bound cells", 
   expect_false(grepl("binary-hi_a", html, fixed = TRUE))  # no Upper input
 })
 
+test_that("binary_server: joint refine polishes a model but never moves the staged verdict", {
+  skip_on_cran()
+  meta <- shiny::reactiveValues(chem1 = "A", chem2 = "B")
+  shiny::testServer(binary_server, args = list(meta = meta), {
+    csv <- testthat::test_path("fixtures", "binary", "cpf_mps_imi",
+                               "binary_ca_mps_cpf_imi_continuous.csv")
+    skip_if_not(file.exists(csv), "binary fixture missing")
+    session$setInputs(response = "continuous", reference = "CA", thorough = FALSE,
+                      n_starts = 1, alpha = 0.05, time_limit = 30, model = "reference",
+                      file = list(datapath = csv, name = "binary.csv"))
+    session$setInputs(`chem1-val_max` = 700, `chem1-val_slope` = 2,
+                      `chem1-val_ec50` = 1, `chem1-simulate` = 1)
+    session$setInputs(`chem2-val_max` = 600, `chem2-val_slope` = 1,
+                      `chem2-val_ec50` = 5, `chem2-simulate` = 1)
+
+    session$setInputs(compare_all = 1)
+    for (i in 1:8) session$elapse(5)
+    chosen     <- last_compare()$chosen
+    staged_cmp <- last_compare()$comparison
+    staged_obj <- fits_store()[[chosen]]$objective
+    staged_df  <- fits_store()[[chosen]]$df
+
+    session$setInputs(model = chosen)
+    session$setInputs(optimize_all = 1)
+
+    rf <- refined_fits()[[chosen]]
+    expect_true(isTRUE(rf$joint))
+    expect_lte(rf$objective, staged_obj + 1e-6)
+    expect_gt(rf$df, staged_df)
+
+    expect_identical(last_compare()$chosen, chosen)
+    expect_equal(last_compare()$comparison, staged_cmp)
+    expect_equal(fits_store()[[chosen]]$objective, staged_obj)
+    expect_equal(fits_store()[[chosen]]$df, staged_df)
+    expect_true(isTRUE(display_fit()$joint))
+
+    session$setInputs(autofit = 1)
+    expect_null(refined_fits()[[chosen]])
+    expect_false(isTRUE(display_fit()$joint))
+
+    session$setInputs(model = chosen, optimize_all = 2)
+    expect_false(is.null(refined_fits()[[chosen]]))
+    session$setInputs(`chem1-val_max` = 720, `chem1-simulate` = 2)
+    expect_equal(length(refined_fits()), 0)
+  })
+})
+
