@@ -1,11 +1,11 @@
 # Binary Mixture stage: upload the full binary dataset (single-chemical series +
-# mixture rows), fit each chemical's curve, then "Fit & compare all models" fits
-# CA/IA reference + SA/DR/DL via the staged method (curves fixed from the single
-# compounds, only a/b fitted per model -- one model per tick for the live table),
-# compares them by LR test, and selects the parsimonious winner. A selected model
-# can then be JOINT-refined (refine_joint, all params at once, Excel-style) as a
-# post-selection polish -- stored separately (refined_fits) so the staged verdict
-# never changes.
+# mixture rows) and fit each chemical's curve. The Stage-2 comparison table then
+# fills in automatically -- CA/IA reference + SA/DR/DL fit via the staged method
+# (curves fixed from the single compounds, only a/b per model), one per tick,
+# compared by LR test with the parsimonious winner highlighted. Click a row to
+# inspect that model (Stage 3 diagnostics); "Optimize all params (joint)" refines
+# the selected row (refine_joint, Excel-style) as a post-selection polish stored
+# separately, so the staged verdict (p-values + winner) never changes.
 
 #' Per-model explanation of the interaction fit (pure, for the Binary tab)
 #'
