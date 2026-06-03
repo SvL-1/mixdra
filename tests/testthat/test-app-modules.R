@@ -37,7 +37,7 @@ test_that("single_ui builds a Shiny UI fragment", {
   expect_true(inherits(single_ui("single"), c("shiny.tag", "shiny.tag.list", "bslib_fragment")))
 })
 
-test_that("binary_server: table auto-fills, row-click selects, joint refine is isolated", {
+test_that("binary_server: Fit-interactions fills the staged block, Optimize-all appends an isolated joint block", {
   skip_on_cran()
   meta <- shiny::reactiveValues(chem1 = "A", chem2 = "B")
   shiny::testServer(binary_server, args = list(meta = meta), {
@@ -55,9 +55,8 @@ test_that("binary_server: table auto-fills, row-click selects, joint refine is i
     session$setInputs(`chem2-val_max` = 600, `chem2-val_slope` = 1,
                       `chem2-val_ec50` = 5, `chem2-simulate` = 1)
 
-    # click "Fit interaction models", then drain the live stepper timer
+    # "Fit interaction models" runs the whole staged chain in one (blocking) go.
     session$setInputs(fit_interactions = 1)
-    for (i in 1:8) session$elapse(5)
     expect_setequal(names(fits_store()), c("reference", "SA", "DR", "DL"))
     chosen     <- last_compare()$chosen
     staged_cmp <- last_compare()$comparison
@@ -66,31 +65,43 @@ test_that("binary_server: table auto-fills, row-click selects, joint refine is i
     expect_equal(selected_model(), chosen)
     expect_equal(current_fit()$deviation, chosen)
 
-    # clicking a row (index in reference,SA,DR,DL order) selects that model
+    # only the staged block exists so far: 4 rows, all variant "staged"
+    expect_equal(length(table_rows()), 4L)
+    expect_true(all(vapply(table_rows(), function(e) e$variant == "staged", logical(1))))
+
+    # clicking a staged row (index in reference,SA,DR,DL order) selects that model
     ord <- intersect(c("reference", "SA", "DR", "DL"), names(fits_store()))
     session$setInputs(results_rows_selected = match("SA", ord))
     expect_equal(selected_model(), "SA")
     expect_equal(current_fit()$deviation, "SA")
+    expect_false(isTRUE(display_fit()$joint))      # a staged row shows the staged fit
 
-    # optimise the selected (SA) model jointly -> refined_fits gets SA, verdict frozen
+    # "Optimize all params" jointly refines EVERY model -> a separator + joint block
     staged_sa_obj <- fits_store()[["SA"]]$objective
     session$setInputs(optimize_all = 1)
-    expect_true(isTRUE(refined_fits()[["SA"]]$joint))
+    expect_setequal(names(refined_fits()), c("reference", "SA", "DR", "DL"))
+    expect_true(all(vapply(refined_fits(), function(f) isTRUE(f$joint), logical(1))))
     expect_lte(refined_fits()[["SA"]]$objective, staged_sa_obj + 1e-6)
-    expect_true(isTRUE(display_fit()$joint))
-    expect_false(is.null(refine_post()))           # before->after readout is live for SA
+
+    # the table now has the staged block, a separator, and the joint block
+    expect_equal(length(table_rows()), 4L + 1L + 4L)
+    sep <- vapply(table_rows(), function(e) isTRUE(e$separator), logical(1))
+    expect_equal(sum(sep), 1L)
+
+    # the staged verdict is untouched (still built from fits_store only)
     expect_identical(last_compare()$chosen, chosen)
     expect_equal(last_compare()$comparison, staged_cmp)
     expect_equal(fits_store()[["SA"]]$objective, staged_sa_obj)
 
-    # readout is action-scoped: selecting a DIFFERENT row clears the before->after
-    other <- setdiff(ord, "SA")[[1]]
-    session$setInputs(results_rows_selected = match(other, ord))
-    expect_null(refine_post())
+    # clicking the JOINT SA row shows the joint-refined fit in the diagnostics
+    sa_joint <- which(vapply(table_rows(), function(e)
+      identical(e$model, "SA") && identical(e$variant, "joint"), logical(1)))
+    session$setInputs(results_rows_selected = sa_joint)
+    expect_equal(selected_model(), "SA")
+    expect_true(isTRUE(display_fit()$joint))
 
-    # a curve edit clears the interaction fits -- the table's interaction columns
-    # blank until the user re-runs "Fit interaction models" (curve columns still
-    # show the new values, read live from curve_params() in the renderer).
+    # a curve edit clears BOTH the staged and joint fits -- the user re-runs the
+    # buttons (curve columns still show the new values, read live in the renderer).
     session$setInputs(`chem1-val_max` = 720, `chem1-simulate` = 2)
     expect_null(last_compare())
     expect_equal(length(fits_store()), 0)
@@ -126,7 +137,7 @@ test_that("binary_ui: always-visible table + Fit/Optimize buttons, then diagnost
   expect_match(html, "binary-fit_interactions", fixed = TRUE)
   expect_match(html, "Fit interaction models", fixed = TRUE)
   expect_match(html, "binary-alpha", fixed = TRUE)
-  expect_match(html, "significance threshold for the model comparison", fixed = TRUE)
+  expect_match(html, "threshold for the model comparison", fixed = TRUE)
   expect_match(html, "binary-optimize_all", fixed = TRUE)
   expect_match(html, "Optimize all params (joint)", fixed = TRUE)
   expect_match(html, "binary-refine_readout", fixed = TRUE)
