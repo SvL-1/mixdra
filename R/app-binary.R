@@ -419,10 +419,11 @@ binary_server <- function(id, meta) {
     # p-values + highlighted winner) is never affected. Post-selection polish.
     shiny::observeEvent(input$optimize_all, {
       shiny::req(frozen())
-      # A joint refine seeds from the model's STAGED fit, so there must be one.
+      # A joint refine seeds from the selected model's STAGED fit, so there must
+      # be one -- i.e. the user has run "Fit interaction models" and clicked a row.
       if (is.null(current_fit())) {
         shiny::showNotification(
-          "Wait for the comparison table to finish filling in -- the joint refine seeds from the staged fit.",
+          "Select a fitted model row first (run \"Fit interaction models\" if the table is empty).",
           type = "warning")
         return()
       }
