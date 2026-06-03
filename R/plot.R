@@ -72,6 +72,22 @@ plot_obs_pred <- function(fit, df) {
 #' @export
 plot_surface <- function(fit, df, n = 100) {
   require_plotly()
+  # With fit = NULL, show only the observed point cloud (raw data, before any
+  # fit) -- mirrors plot_dose_response(NULL, ...). The fitted surface is added
+  # once a model exists.
+  if (is.null(fit)) {
+    obs <- data.frame(x = df$C1, y = df$C2, z = obs_response(df))
+    p <- plotly::plot_ly()
+    p <- plotly::add_trace(p, x = obs$x, y = obs$y, z = obs$z,
+                           type = "scatter3d", mode = "markers",
+                           marker = list(size = 3, color = "blue"), name = "observed")
+    return(plotly::layout(p,
+      margin = list(l = 0, r = 0, b = 0, t = 0),
+      scene = list(
+        domain = list(x = c(0, 1), y = c(0, 1)),
+        xaxis = list(title = "C1"), yaxis = list(title = "C2"),
+        zaxis = list(title = "response"))))
+  }
   g <- surface_grid_data(fit, df, n = n)
   p <- plotly::plot_ly()
   p <- plotly::add_trace(p, x = g$observed$x, y = g$observed$y, z = g$observed$z,
