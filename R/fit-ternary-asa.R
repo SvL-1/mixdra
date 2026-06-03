@@ -62,6 +62,8 @@ fit_ternary_asa <- function(df, reference = "CA", response = "continuous",
                     time_limit = time_limit)
     base_par <- f1$par[base_params]
   } else {
+    if (!is.numeric(base))
+      stop("fit_ternary_asa: `base` must be a named numeric vector")
     miss <- setdiff(base_params, names(base))
     if (length(miss))
       stop("fit_ternary_asa: `base` is missing param(s): ",
