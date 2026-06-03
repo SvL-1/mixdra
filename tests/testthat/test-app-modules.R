@@ -47,12 +47,16 @@ test_that("binary_server: table auto-fills, row-click selects, joint refine is i
     session$setInputs(response = "continuous", reference = "CA", thorough = FALSE,
                       n_starts = 1, alpha = 0.05, time_limit = 30,
                       file = list(datapath = csv, name = "binary.csv"))
+    # the comparison table renders from the very start, before any curve/interaction
+    # fit (all four rows present, empty) -- it is no longer gated on `frozen`.
+    expect_false(is.null(output$results))
     session$setInputs(`chem1-val_max` = 700, `chem1-val_slope` = 2,
                       `chem1-val_ec50` = 1, `chem1-simulate` = 1)
     session$setInputs(`chem2-val_max` = 600, `chem2-val_slope` = 1,
                       `chem2-val_ec50` = 5, `chem2-simulate` = 1)
 
-    # auto-fill: no button, just drain the timer
+    # click "Fit interaction models", then drain the live stepper timer
+    session$setInputs(fit_interactions = 1)
     for (i in 1:8) session$elapse(5)
     expect_setequal(names(fits_store()), c("reference", "SA", "DR", "DL"))
     chosen     <- last_compare()$chosen
@@ -84,10 +88,12 @@ test_that("binary_server: table auto-fills, row-click selects, joint refine is i
     session$setInputs(results_rows_selected = match(other, ord))
     expect_null(refine_post())
 
-    # a curve edit re-runs the staged loop and clears refined fits
+    # a curve edit clears the interaction fits -- the table's interaction columns
+    # blank until the user re-runs "Fit interaction models" (curve columns still
+    # show the new values, read live from curve_params() in the renderer).
     session$setInputs(`chem1-val_max` = 720, `chem1-simulate` = 2)
-    for (i in 1:8) session$elapse(5)
-    expect_false(is.null(last_compare()))
+    expect_null(last_compare())
+    expect_equal(length(fits_store()), 0)
     expect_equal(length(refined_fits()), 0)
   })
 })
@@ -112,11 +118,13 @@ test_that("binary_server falls back to the bundled example before any upload", {
   })
 })
 
-test_that("binary_ui: auto-fill table (selectable) + Optimize button, then diagnostics", {
+test_that("binary_ui: always-visible table + Fit/Optimize buttons, then diagnostics", {
   html <- as.character(binary_ui("binary"))
   expect_false(grepl("Freeze curves", html, fixed = TRUE))
-  # Stage 2: the live table + alpha + the single Optimize button + readout/badge/help
+  # Stage 2: the table + alpha + Fit-interactions + the single Optimize button
   expect_match(html, "binary-results", fixed = TRUE)
+  expect_match(html, "binary-fit_interactions", fixed = TRUE)
+  expect_match(html, "Fit interaction models", fixed = TRUE)
   expect_match(html, "binary-alpha", fixed = TRUE)
   expect_match(html, "significance threshold for the model comparison", fixed = TRUE)
   expect_match(html, "binary-optimize_all", fixed = TRUE)
