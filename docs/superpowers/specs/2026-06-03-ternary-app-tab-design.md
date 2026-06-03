@@ -79,8 +79,9 @@ curves fixed via `curve_params()`. It is the only engine change.
 
 ## 6. Bundled example
 
-Copy `tests/testthat/fixtures/ternary/.../ternary_fbsa_cpf_imi_continuous.csv`
-(or the validated `ternary_fbsa_cpf_imi_continuous.csv`) to
+Copy the validated fixture
+`tests/testthat/fixtures/ternary_fbsa_cpf_imi_continuous.csv` (the one T1 anchors
+its validation to; confirm the exact path at plan time) to
 `inst/extdata/ternary_ca_fbsa_cpf_imi_continuous.csv`. The server auto-loads it
 via `system.file("extdata", …)` until the user uploads, mirroring binary.
 
