@@ -456,7 +456,14 @@ binary_server <- function(id, meta) {
     # ONLY -- never in fits_store -- so the staged comparison verdict (table
     # p-values + highlighted winner) is never affected. Post-selection polish.
     shiny::observeEvent(input$optimize_all, {
-      shiny::req(frozen(), current_fit())
+      shiny::req(frozen())
+      # A joint refine seeds from the model's STAGED fit, so there must be one.
+      if (is.null(current_fit())) {
+        shiny::showNotification(
+          "Run \"Fit & compare all models\" first -- the joint refine seeds from the staged fit.",
+          type = "warning")
+        return()
+      }
       f   <- current_fit()
       pre <- f$objective
       newfit <- tryCatch(

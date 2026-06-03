@@ -128,6 +128,7 @@ test_that("binary_ui: comparison table + tune/refine panel with joint optimize, 
   expect_match(html, "binary-model", fixed = TRUE)
   expect_match(html, "binary-interaction_help", fixed = TRUE)
   expect_match(html, "binary-val_a", fixed = TRUE)
+  expect_match(html, "binary-val_b", fixed = TRUE)
   expect_match(html, "Autofit (a, b)", fixed = TRUE)
   expect_match(html, "Simulate", fixed = TRUE)
   expect_match(html, "binary-optimize_all", fixed = TRUE)          # NEW joint button
