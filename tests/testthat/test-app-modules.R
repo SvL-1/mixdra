@@ -55,11 +55,8 @@ test_that("binary_server: compare-all loop fills the store live and selects a mo
     session$setInputs(`chem2-val_max` = 600, `chem2-val_slope` = 1,
                       `chem2-val_ec50` = 5, `chem2-simulate` = 1)
     expect_true(isTRUE(frozen()))
-    expect_null(current_fit())
 
-    # Kick the staged compare-all loop. The first model fits when the queue is
-    # armed; the rest advance on timer ticks.
-    session$setInputs(compare_all = 1)
+    # Both curves are now fit -> the staged loop auto-runs (no button). Drain it.
     for (i in 1:8) session$elapse(5)             # drain the stepper queue
 
     # all four staged fits stored, with staged df counts (curves fixed, only the
@@ -86,11 +83,12 @@ test_that("binary_server: compare-all loop fills the store live and selects a mo
     expect_equal(current_fit()$deviation, "SA")
     expect_true("a" %in% names(current_fit()$par))
 
-    # editing a single curve keeps the workspace and re-evaluates stored fits
+    # editing a single curve auto-re-runs the staged loop at the new curves
     session$setInputs(`chem1-val_max` = 720, `chem1-simulate` = 2)
+    for (i in 1:8) session$elapse(5)
     expect_true(isTRUE(frozen()))
-    expect_gt(length(fits_store()), 0)
-    expect_null(last_compare())                  # comparison invalidated by curve change
+    expect_setequal(names(fits_store()), c("reference", "SA", "DR", "DL"))
+    expect_false(is.null(last_compare()))        # comparison recomputed at the new curves
   })
 })
 

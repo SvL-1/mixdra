@@ -346,59 +346,21 @@ binary_server <- function(id, meta) {
                      "the interaction workspace."))
     })
 
-    # A structural change (reference model or response type) makes the stored
-    # fits meaningless, so clear everything.
+    # Auto-fill: once both single curves are fit -- and again whenever the curves,
+    # reference, or response type change -- clear the stores and re-run the staged
+    # comparison loop. There is no "Compare all" button; the table fills in and
+    # stays live on its own. `curve_params()` req()s both single fits, so this is
+    # inert until frozen. The stepper below refits one model per tick.
     shiny::observeEvent(
-      list(input$reference, input$response),
+      list(curve_params(), input$reference, input$response),
       {
+        shiny::req(frozen())
         fits_store(list())
         last_compare(NULL)
         refined_fits(list()); refine_pre(NULL); refine_post(NULL)
-      },
-      ignoreInit = TRUE)
-
-    # A changed curve does NOT blank the interaction: re-evaluate each stored fit
-    # at the new curve parameters (keeping its a/b), so Stage 3 stays in sync with
-    # Stage 1 live. This is what makes editing chemical 1 show up in the
-    # diagnostics. The model comparison, however, was computed at the old curves,
-    # so it is invalidated (re-run Compare all to compare at the new curves).
-    shiny::observeEvent(
-      list(fit1(), fit2()),
-      {
-        s <- fits_store()
-        if (length(s)) {
-          cp <- curve_params()
-          for (m in names(s)) {
-            old <- s[[m]]
-            ab  <- old$par[intersect(c("a", "b"), names(old$par))]
-            newf <- tryCatch(
-              eval_mixture(engine_df(), old$reference, m, old$response, cp,
-                           interaction = ab),
-              error = function(e) NULL)
-            if (is.null(newf)) next
-            # carry the metadata the diagnostics / comparison / CI layer relies on
-            newf$df        <- old$df
-            newf$joint     <- old$joint
-            newf$fixed     <- old$fixed
-            newf$simulated <- old$simulated
-            s[[m]] <- newf
-          }
-          fits_store(s)
-        }
-        last_compare(NULL)
-        refined_fits(list()); refine_pre(NULL); refine_post(NULL)
-      },
-      ignoreInit = TRUE)
-
-    # Kick: clear the store and arm the selection chain (reference -> SA -> DR -> DL).
-    shiny::observeEvent(input$compare_all, {
-      shiny::req(frozen(), curve_params())
-      fits_store(list())
-      last_compare(NULL)
-      refined_fits(list()); refine_pre(NULL); refine_post(NULL)
-      loop_queue(selection_chain_order(n_chem()))
-      stepper_on(TRUE)
-    })
+        loop_queue(selection_chain_order(n_chem()))
+        stepper_on(TRUE)
+      })
 
     # Stepper: re-runs on each timer tick while armed. Reads the queue with
     # isolate() so only the timer (not its own writes) re-triggers it, which is
