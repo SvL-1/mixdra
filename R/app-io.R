@@ -2,7 +2,7 @@
 # are fully unit-testable and run without the UI stack installed.
 
 #' Fixed column schema for a stage and response type
-#' @param stage "single" or "binary".
+#' @param stage "single", "binary", or "ternary".
 #' @param response "continuous" or "quantal".
 #' @return Character vector of required column names.
 #' @keywords internal
@@ -128,7 +128,7 @@ read_upload <- function(path) {
 #'
 #' The single-chemical template uses `Conc`; the engine expects `C1`.
 #' @param df Uploaded data frame.
-#' @param stage "single" or "binary".
+#' @param stage "single", "binary", or "ternary".
 #' @return The data frame with engine-ready column names.
 #' @keywords internal
 to_engine_df <- function(df, stage) {

@@ -9,7 +9,7 @@ to_engine_df(df, stage)
 \arguments{
 \item{df}{Uploaded data frame.}
 
-\item{stage}{"single" or "binary".}
+\item{stage}{"single", "binary", or "ternary".}
 }
 \value{
 The data frame with engine-ready column names.
