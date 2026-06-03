@@ -74,11 +74,12 @@ test_that("binary_server: table auto-fills, row-click selects, joint refine is i
     expect_true(isTRUE(refined_fits()[["SA"]]$joint))
     expect_lte(refined_fits()[["SA"]]$objective, staged_sa_obj + 1e-6)
     expect_true(isTRUE(display_fit()$joint))
+    expect_false(is.null(refine_post()))           # before->after readout is live for SA
     expect_identical(last_compare()$chosen, chosen)
     expect_equal(last_compare()$comparison, staged_cmp)
     expect_equal(fits_store()[["SA"]]$objective, staged_sa_obj)
 
-    # readout is action-scoped: selecting a different row clears the before->after
+    # readout is action-scoped: selecting a DIFFERENT row clears the before->after
     other <- setdiff(ord, "SA")[[1]]
     session$setInputs(results_rows_selected = match(other, ord))
     expect_null(refine_post())

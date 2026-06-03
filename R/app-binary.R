@@ -326,8 +326,14 @@ binary_server <- function(id, meta) {
       intersect(c("reference", "SA", "DR", "DL"), names(fits_store())))
     sel_row <- shiny::reactiveVal(integer(0))
     shiny::observeEvent(input$results_rows_selected, {
+      # Only clear the action-scoped before->after readout when the selected row
+      # actually CHANGES. A table re-render (e.g. when the joint column fills in
+      # after Optimize-all) re-applies `selected = sel_row()`, which makes DT
+      # re-emit the same index -- without this guard that would wipe the readout
+      # the user just generated.
+      changed <- !identical(input$results_rows_selected, sel_row())
       sel_row(input$results_rows_selected)
-      refine_pre(NULL); refine_post(NULL)
+      if (changed) { refine_pre(NULL); refine_post(NULL) }
     }, ignoreNULL = FALSE, ignoreInit = TRUE)
 
     selected_model <- shiny::reactive({
@@ -421,8 +427,7 @@ binary_server <- function(id, meta) {
           last_compare(list(fits = fits_store(), comparison = cmp$comparison,
                             chosen = cmp$chosen, reference = input$reference,
                             response = engine_response()))
-          ord <- intersect(c("reference", "SA", "DR", "DL"), names(fits_store()))
-          sel_row(match(cmp$chosen, ord))   # default-select the winner row
+          sel_row(match(cmp$chosen, results_order()))   # default-select the winner row
         }
       })
     })
@@ -515,7 +520,7 @@ binary_server <- function(id, meta) {
     output$results <- DT::renderDT({
       fits <- fits_store()
       shiny::req(length(fits) > 0)
-      ord    <- intersect(c("reference", "SA", "DR", "DL"), names(fits))
+      ord    <- results_order()
       cmp    <- if (!is.null(last_compare())) last_compare()$comparison else NULL
       chosen <- if (!is.null(last_compare())) last_compare()$chosen else NULL
       mat  <- round(result_table(list(fits = fits[ord], comparison = cmp)), 4)
