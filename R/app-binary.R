@@ -1,6 +1,8 @@
 # Binary Mixture stage: upload the full binary dataset (single-chemical series +
-# mixture rows), fit CA/IA reference + SA/DR/DL deviations via analyse_mixture(),
-# compare them, and visualise the chosen (or any) fit.
+# mixture rows), fit each chemical's curve, then "Fit & compare all models" fits
+# CA/IA reference + SA/DR/DL via the staged method (curves fixed from the single
+# compounds, only a/b fitted per model -- one model per tick for the live table),
+# compares them by LR test, and selects the parsimonious winner.
 
 #' Per-model explanation of the interaction fit (pure, for the Binary tab)
 #'
@@ -372,7 +374,7 @@ binary_server <- function(id, meta) {
       shiny::req(frozen(), curve_params())
       fits_store(list())
       last_compare(NULL)
-      loop_queue(joint_chain_order(n_chem()))
+      loop_queue(selection_chain_order(n_chem()))
       stepper_on(TRUE)
     })
 
@@ -385,14 +387,19 @@ binary_server <- function(id, meta) {
       q <- shiny::isolate(loop_queue())
       if (is.null(q) || length(q) == 0) { stepper_on(FALSE); return() }
       shiny::isolate({
-        dev    <- q[[1]]
-        s      <- fits_store()
-        pkey   <- model_spec(input$reference, dev, n_chem())$parent
-        parent <- if (is.null(pkey)) NULL else s[[pkey]]
+        dev <- q[[1]]
+        s   <- fits_store()
+        # Staged per-model fit: curves are FIXED at the single-compound values
+        # (curve_params()) and only the interaction params (a, b) are fitted to
+        # the mixture rows -- the same fit analyse_mixture() does, run one model
+        # per tick for the live table. This keeps the CA/IA reference built only
+        # from the single compounds, so genuine interactions surface as a/b
+        # rather than being absorbed by re-fitted curves (Sam's required method;
+        # do NOT switch this loop to a joint curve+interaction fit).
         fit <- tryCatch(
-          joint_fit_one(engine_df(), input$reference, dev, engine_response(),
-                        seed_curves = curve_params(), parent_fit = parent,
-                        n_starts = n_starts_eff(), time_limit = input$time_limit),
+          fit_model(engine_df(), input$reference, dev, engine_response(),
+                    start = curve_params(), fixed = names(curve_params()),
+                    n_starts = n_starts_eff(), time_limit = input$time_limit),
           error = function(e) {
             shiny::showNotification(
               paste0("Fit failed (", dev, "): ", conditionMessage(e)), type = "error")

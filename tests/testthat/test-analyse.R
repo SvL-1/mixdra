@@ -1,3 +1,8 @@
+test_that("selection_chain_order is reference->SA->DR->DL (binary), reference->SA (ternary)", {
+  expect_equal(selection_chain_order(2), c("reference", "SA", "DR", "DL"))
+  expect_equal(selection_chain_order(3), c("reference", "SA"))
+})
+
 test_that("analyse_mixture returns a fit per deviation and a chosen model", {
   df <- (function() {
     g <- expand.grid(C1 = c(0, 0.05, 0.2), C2 = c(0, 0.5, 5))

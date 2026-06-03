@@ -57,16 +57,17 @@ test_that("binary_server: compare-all loop fills the store live and selects a mo
     expect_true(isTRUE(frozen()))
     expect_null(current_fit())
 
-    # Kick the joint compare-all loop. The first model fits synchronously when
-    # the queue is armed; the rest advance on timer ticks.
+    # Kick the staged compare-all loop. The first model fits when the queue is
+    # armed; the rest advance on timer ticks.
     session$setInputs(compare_all = 1)
     for (i in 1:8) session$elapse(5)             # drain the stepper queue
 
-    # all four joint fits stored, with FULL (joint) df counts
+    # all four staged fits stored, with staged df counts (curves fixed, only the
+    # interaction params are free: reference 0, SA 1 (a), DR/DL 2 (a, b))
     expect_setequal(names(fits_store()), c("reference", "SA", "DR", "DL"))
-    expect_equal(fits_store()[["reference"]]$df, 5L)
-    expect_equal(fits_store()[["DR"]]$df, 7L)
-    # warm-start monotonicity along the chain
+    expect_equal(fits_store()[["reference"]]$df, 0L)
+    expect_equal(fits_store()[["DR"]]$df, 2L)
+    # adding the interaction term cannot worsen the fit (a=0 reproduces the parent)
     expect_lte(fits_store()[["SA"]]$objective,
                fits_store()[["reference"]]$objective + 1e-6)
 
