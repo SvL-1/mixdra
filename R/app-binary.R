@@ -212,8 +212,8 @@ binary_server <- function(id, meta) {
     })
 
     # Data source: the user's upload, or -- before any upload -- a bundled
-    # example dataset (continuous IA binary mixture) so the tab is usable on
-    # open. `system.file` resolves under inst/ in dev and the install tree.
+    # example dataset (CPF + IMI, continuous) so the tab is usable on open.
+    # `system.file` resolves under inst/ in dev and the install tree.
     upload_path <- shiny::reactive({
       if (!is.null(input$file)) return(input$file$datapath)
       ex <- system.file("extdata", "binary_ca_cpf_imi_fbsa_continuous.csv", package = "mixdra")
@@ -249,8 +249,6 @@ binary_server <- function(id, meta) {
     # Stages 2-3 are gated on `frozen`: both single curves fitted. There is no
     # manual freeze step -- the workspace simply appears once both fits exist.
     frozen <- shiny::reactive(!is.null(fit1()) && !is.null(fit2()))
-    output$frozen <- shiny::reactive(isTRUE(frozen()))
-    shiny::outputOptions(output, "frozen", suspendWhenHidden = FALSE)
 
     # Frozen curve-parameter vector (shared max = average of the two fits).
     curve_params <- shiny::reactive({

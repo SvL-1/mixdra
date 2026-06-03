@@ -110,7 +110,7 @@ test_that("binary_server: Fit-interactions fills the staged block, Optimize-all 
 })
 
 test_that("a bundled example dataset ships and validates as binary continuous", {
-  ex <- system.file("extdata", "binary_ia_cpf_imi_continuous.csv", package = "mixdra")
+  ex <- system.file("extdata", "binary_ca_cpf_imi_fbsa_continuous.csv", package = "mixdra")
   skip_if_not(nzchar(ex) && file.exists(ex), "bundled example not installed")
   df <- read_upload(ex)
   expect_length(validate_upload(df, "binary", "continuous"), 0)
@@ -119,7 +119,7 @@ test_that("a bundled example dataset ships and validates as binary continuous", 
 
 test_that("binary_server falls back to the bundled example before any upload", {
   skip_on_cran()
-  ex <- system.file("extdata", "binary_ia_cpf_imi_continuous.csv", package = "mixdra")
+  ex <- system.file("extdata", "binary_ca_cpf_imi_fbsa_continuous.csv", package = "mixdra")
   skip_if_not(nzchar(ex) && file.exists(ex), "bundled example not installed")
   meta <- shiny::reactiveValues(chem1 = "CPF", chem2 = "IMI")
   shiny::testServer(binary_server, args = list(meta = meta), {
@@ -175,5 +175,3 @@ test_that("interaction_param_row renders a value input with inert bound cells", 
   expect_false(grepl("binary-lo_a", html, fixed = TRUE))  # no Lower input
   expect_false(grepl("binary-hi_a", html, fixed = TRUE))  # no Upper input
 })
-
-

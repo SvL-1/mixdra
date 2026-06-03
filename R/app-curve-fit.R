@@ -101,33 +101,12 @@ curve_fit_ui <- function(id) {
 #' @param meta Shared reactiveValues for experiment metadata (axis labels).
 #' @param chem_field Optional meta field for the x-axis label (e.g. "chem1"); NULL
 #'   uses a generic "Concentration" label.
-#' @param inject Optional reactive returning a named list `list(max=, slope=,
-#'   ec50=)` (or NULL). When it changes, the panel's Value inputs and current fit
-#'   are overwritten with those values -- used by the Binary tab to write a joint
-#'   refine's curve parameters back into the chemical panels (single source of
-#'   truth). NULL disables write-back.
 #' @return A reactive returning the current fit (a [analyse_single()]/[eval_single()]
 #'   result), or NULL before any fit.
 #' @keywords internal
-curve_fit_server <- function(id, fit_df, meta, chem_field = NULL, inject = NULL) {
+curve_fit_server <- function(id, fit_df, meta, chem_field = NULL) {
   shiny::moduleServer(id, function(input, output, session) {
     current_fit <- shiny::reactiveVal(NULL)
-
-    # Write-back: when the parent injects curve parameters (e.g. from a joint
-    # refine), reflect them in the Value inputs and the displayed fit.
-    if (!is.null(inject)) {
-      shiny::observeEvent(inject(), {
-        v <- inject()
-        if (is.null(v)) return()
-        df <- fit_df()
-        shiny::req(!is.null(df), nrow(df) > 0)
-        shiny::updateNumericInput(session, "val_max",   value = round(v[["max"]], 4))
-        shiny::updateNumericInput(session, "val_slope", value = round(v[["slope"]], 4))
-        shiny::updateNumericInput(session, "val_ec50",  value = round(v[["ec50"]], 4))
-        current_fit(eval_single(df$C1, obs_response(df),
-                                v[["max"]], v[["slope"]], v[["ec50"]]))
-      }, ignoreInit = TRUE)
-    }
 
     # The Value column read as a named numeric (blank -> NA).
     current_values <- function() {
