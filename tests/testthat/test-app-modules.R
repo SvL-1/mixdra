@@ -112,34 +112,31 @@ test_that("binary_server falls back to the bundled example before any upload", {
   })
 })
 
-test_that("binary_ui: comparison table + tune/refine panel with joint optimize, then diagnostics", {
+test_that("binary_ui: auto-fill table (selectable) + Optimize button, then diagnostics", {
   html <- as.character(binary_ui("binary"))
   expect_false(grepl("Freeze curves", html, fixed = TRUE))
-  # Stage 2: staged verdict hero (compare-all + alpha + table)
-  expect_match(html, "binary-compare_all", fixed = TRUE)
-  expect_match(html, "Fit &amp; compare all models", fixed = TRUE)
+  # Stage 2: the live table + alpha + the single Optimize button + readout/badge/help
   expect_match(html, "binary-results", fixed = TRUE)
   expect_match(html, "binary-alpha", fixed = TRUE)
   expect_match(html, "significance threshold for the model comparison", fixed = TRUE)
-  # Tune / refine panel (under the table): picker, help, a/b grid, three actions
-  expect_match(html, "Tune / refine selected model", fixed = TRUE)
-  expect_match(html, "binary-model", fixed = TRUE)
-  expect_match(html, "binary-interaction_help", fixed = TRUE)
-  expect_match(html, "binary-val_a", fixed = TRUE)
-  expect_match(html, "binary-val_b", fixed = TRUE)
-  expect_match(html, "Autofit (a, b)", fixed = TRUE)
-  expect_match(html, "Simulate", fixed = TRUE)
-  expect_match(html, "binary-optimize_all", fixed = TRUE)          # NEW joint button
+  expect_match(html, "binary-optimize_all", fixed = TRUE)
   expect_match(html, "Optimize all params (joint)", fixed = TRUE)
   expect_match(html, "binary-refine_readout", fixed = TRUE)
   expect_match(html, "binary-refined_badge", fixed = TRUE)
+  expect_match(html, "binary-interaction_help", fixed = TRUE)
+  expect_match(html, "binary-objective", fixed = TRUE)
   # Stage 3: diagnostics
   expect_match(html, "binary-surface", fixed = TRUE)
   expect_match(html, "binary-isobole", fixed = TRUE)
   expect_match(html, "binary-op", fixed = TRUE)
   expect_match(html, "binary-cis", fixed = TRUE)
   expect_match(html, "binary-n_starts", fixed = TRUE)
-  # the old staged Find-best button is still gone
+  # the manual path + compare-all button + model picker are gone
+  expect_false(grepl("binary-compare_all", html, fixed = TRUE))
+  expect_false(grepl("binary-model", html, fixed = TRUE))
+  expect_false(grepl("binary-autofit", html, fixed = TRUE))
+  expect_false(grepl("binary-simulate", html, fixed = TRUE))
+  expect_false(grepl("binary-val_a", html, fixed = TRUE))
   expect_false(grepl("binary-find_best", html, fixed = TRUE))
 })
 
