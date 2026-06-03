@@ -175,3 +175,11 @@ test_that("interaction_param_row renders a value input with inert bound cells", 
   expect_false(grepl("binary-lo_a", html, fixed = TRUE))  # no Lower input
   expect_false(grepl("binary-hi_a", html, fixed = TRUE))  # no Upper input
 })
+
+test_that("a bundled example dataset ships and validates as ternary continuous", {
+  ex <- system.file("extdata", "ternary_ca_fbsa_cpf_imi_continuous.csv", package = "mixdra")
+  skip_if_not(nzchar(ex) && file.exists(ex), "bundled ternary example not installed")
+  df <- read_upload(ex)
+  expect_length(validate_upload(df, "ternary", "continuous"), 0)
+  expect_true(all(c("C1", "C2", "C3", "Res") %in% names(df)))
+})
