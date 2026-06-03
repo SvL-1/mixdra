@@ -29,9 +29,11 @@ That means every analysis is:
 - **hard to trust** — there is no test suite, no version history, no record of the starting values;
 - **hard to share** — it is one `.xlsm` file, not a tool.
 
-`mixdra` takes the *same science* and makes it a proper instrument: a pure computational engine
-(no spreadsheet, no GUI required) with a regression test suite pinned against the original Excel
-results, wrapped in a modern Shiny dashboard.
+`mixdra` takes the *same science* — the method behind a peer-reviewed 2025 *Journal of Hazardous
+Materials* study of microplastic, PFAS, and pesticide mixtures (see [Citation](#citation)) — and
+makes it a proper instrument: a pure computational engine (no spreadsheet, no GUI required) with a
+regression test suite pinned against the original Excel results, wrapped in a modern Shiny
+dashboard.
 
 ## What it does
 
@@ -167,12 +169,21 @@ non-monotonic (J-shaped / hormesis) curves.
 
 ## Citation
 
-If you use `mixdra`, please cite the underlying methodology:
+`mixdra` implements the interaction-analysis method used in:
+
+> van Loon, S., Xie, G., Svendsen, C., Kraak, M.H.S., de Jeu, L., Schut, N.C., Sprokkereef, E.,
+> Hurley, R., van Wezel, A.P. & van Gestel, C.A.M. (2025). Microplastics and PFAS as ubiquitous
+> pollutants affect potencies of highly toxic chemicals in mixtures. *Journal of Hazardous
+> Materials*, 500, 140493. https://doi.org/10.1016/j.jhazmat.2025.140493
+
+and is based on the underlying methodology of:
 
 > Jonker, M.J., Svendsen, C., Bedaux, J.J.M., Bongers, M. & Kammenga, J.E. (2005). Significance
 > testing of synergistic/antagonistic, dose level–dependent, or dose ratio–dependent effects in
 > mixture dose–response analysis. *Environmental Toxicology and Chemistry*, 24(10), 2701–2713.
 > https://doi.org/10.1897/04-431R.1
+
+Please cite both if you use this package in published work.
 
 ## License
 
