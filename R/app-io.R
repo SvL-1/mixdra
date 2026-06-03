@@ -7,12 +7,15 @@
 #' @return Character vector of required column names.
 #' @keywords internal
 upload_schema <- function(stage, response) {
-  stage <- match.arg(stage, c("single", "binary"))
+  stage <- match.arg(stage, c("single", "binary", "ternary"))
   response <- match.arg(response, c("continuous", "quantal"))
   if (stage == "single") {
     if (response == "continuous") c("Conc", "Res") else c("Conc", "Affected", "Exposed")
-  } else {
+  } else if (stage == "binary") {
     if (response == "continuous") c("C1", "C2", "Res") else c("C1", "C2", "Affected", "Exposed")
+  } else {
+    if (response == "continuous") c("C1", "C2", "C3", "Res")
+    else c("C1", "C2", "C3", "Affected", "Exposed")
   }
 }
 
@@ -33,7 +36,7 @@ template_df <- function(stage, response) {
     } else {
       data.frame(Conc = conc, Affected = c(0, 1, 2, 5, 8, 10), Exposed = rep(10, 6))
     }
-  } else {
+  } else if (stage == "binary") {
     # single-chemical series for each chemical + a few mixture rows
     c1 <- c(0, 0.1, 0.3, 1, 0, 0, 0, 0.1, 0.3, 1)
     c2 <- c(0, 0,   0,   0, 0.1, 0.3, 1, 0.1, 0.3, 1)
@@ -43,6 +46,21 @@ template_df <- function(stage, response) {
     } else {
       data.frame(C1 = c1, C2 = c2,
                  Affected = c(0, 2, 4, 8, 1, 3, 7, 3, 6, 9), Exposed = rep(10, 10))
+    }
+  } else {  # ternary: all tiers so the staged fit has data at every stage
+    rows <- rbind(
+      data.frame(C1 = 0,           C2 = 0,           C3 = 0),            # control
+      data.frame(C1 = c(0.1, 0.3, 1), C2 = 0,        C3 = 0),           # chem1 single
+      data.frame(C1 = 0,           C2 = c(0.1, 0.3, 1), C3 = 0),        # chem2 single
+      data.frame(C1 = 0,           C2 = 0,           C3 = c(0.1, 0.3, 1)), # chem3 single
+      data.frame(C1 = c(0.5, 0.5, 0), C2 = c(0.5, 0, 0.5), C3 = c(0, 0.5, 0.5)), # 3 binaries
+      data.frame(C1 = c(0.2, 0.4, 0.6), C2 = c(0.2, 0.4, 0.6), C3 = c(0.2, 0.4, 0.6)) # 1:1:1 ternary
+    )
+    tot <- rows$C1 + rows$C2 + rows$C3
+    if (response == "continuous") {
+      cbind(rows, Res = round(100 / (1 + tot), 1))          # illustrative decline
+    } else {
+      cbind(rows, Affected = pmin(round(10 * tot / (1 + tot)), 10), Exposed = 10)
     }
   }
 }

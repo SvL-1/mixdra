@@ -146,3 +146,17 @@ test_that("split_fixed_bounds with no bounds returns empty fixed and NULL bounds
   expect_null(sp$upper)
   expect_equal(sp$start, start)
 })
+
+test_that("upload_schema knows the ternary stage", {
+  expect_equal(upload_schema("ternary", "continuous"), c("C1", "C2", "C3", "Res"))
+  expect_equal(upload_schema("ternary", "quantal"),
+               c("C1", "C2", "C3", "Affected", "Exposed"))
+})
+
+test_that("ternary template has the schema columns and spans every tier", {
+  d <- template_df("ternary", "continuous")
+  expect_equal(names(d), c("C1", "C2", "C3", "Res"))
+  expect_true(all(vapply(d, is.numeric, logical(1))))
+  cls <- as.character(classify_rows(d))
+  expect_true(all(c("control", "single", "binary", "ternary") %in% cls))
+})
