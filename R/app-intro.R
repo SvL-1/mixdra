@@ -16,6 +16,7 @@ intro_ui <- function(id) {
       shiny::helpText("Enter chemical names in the order used throughout the app."),
       shiny::textInput(ns("chem1"), "Chemical 1 name"),
       shiny::textInput(ns("chem2"), "Chemical 2 name"),
+      shiny::textInput(ns("chem3"), "Chemical 3 name (ternary)"),
       shiny::textInput(ns("unit"), "Concentration unit (e.g. mg/L)")
     ),
     bslib::card(
@@ -39,6 +40,7 @@ intro_server <- function(id, meta) {
       meta$endpoint <- input$endpoint
       meta$chem1    <- input$chem1
       meta$chem2    <- input$chem2
+      meta$chem3    <- input$chem3
       meta$unit     <- input$unit
     })
   })

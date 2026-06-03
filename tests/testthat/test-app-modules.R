@@ -184,6 +184,14 @@ test_that("a bundled example dataset ships and validates as ternary continuous",
   expect_true(all(c("C1", "C2", "C3", "Res") %in% names(df)))
 })
 
+test_that("intro_server writes chem3 into the shared meta store", {
+  meta <- shiny::reactiveValues()
+  shiny::testServer(intro_server, args = list(meta = meta), {
+    session$setInputs(chem1 = "CPF", chem2 = "FBSA", chem3 = "IMI")
+    expect_equal(meta$chem3, "IMI")
+  })
+})
+
 test_that("ternary_ui builds the sidebar, three curve panels, and the three stages", {
   html <- as.character(ternary_ui("ternary"))
   # sidebar controls + disabled-radio script

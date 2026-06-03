@@ -12,7 +12,8 @@ app_ui <- function() {
     fillable = FALSE,
     bslib::nav_panel("Introduction", intro_ui("intro")),
     bslib::nav_panel("Single Chemical", single_ui("single")),
-    bslib::nav_panel("Binary Mixture", binary_ui("binary"))
+    bslib::nav_panel("Binary Mixture", binary_ui("binary")),
+    bslib::nav_panel("Ternary Mixture", ternary_ui("ternary"))
   )
 }
 
@@ -23,6 +24,7 @@ app_server <- function(input, output, session) {
   intro_server("intro", meta)
   single_server("single", meta)
   binary_server("binary", meta)
+  ternary_server("ternary", meta)
 }
 
 #' Launch the mixdra Shiny app
