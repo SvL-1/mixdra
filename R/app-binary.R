@@ -94,15 +94,15 @@ binary_ui <- function(id) {
       shiny::helpText(shiny::tags$small(
         "An example dataset (CPF + IMI, continuous) is loaded until you upload your own.")),
       shiny::uiOutput(ns("errors")),
-      # Optimizer-tuning knobs apply to EVERY fit on this tab (Autofit,
-      # Simulate, and the compare-all loop). They are advanced/rarely-changed,
+      # Optimizer-tuning knobs apply to EVERY fit on this tab (the staged
+      # comparison loop and the joint Optimize). They are advanced/rarely-changed,
       # so they live in a collapsed accordion at the bottom of the sidebar --
       # grouped with the other tab-wide settings, out of the Stage 1->2->3 flow.
       bslib::accordion(
         open = FALSE,
         bslib::accordion_panel(
           "Advanced fitting options",
-          shiny::helpText("Apply to Autofit, Simulate, and the compare-all loop."),
+          shiny::helpText("Apply to the staged comparison loop and Optimize all params (joint)."),
           shiny::numericInput(ns("n_starts"), "n_starts", value = 1, min = 1),
           shiny::numericInput(ns("time_limit"), "time_limit (s/model)", value = 30, min = 1),
           shiny::checkboxInput(ns("thorough"), "Thorough fit (multi-start, slower)", FALSE),
@@ -255,10 +255,10 @@ binary_server <- function(id, meta) {
       assemble_curve_params(fit1(), fit2())
     })
 
-    # Per-model interaction fits, keyed by model name. Autofit/Simulate write one
-    # entry; Compare all writes all four. `current_fit` is whatever is stored for
-    # the selected model (NULL if none yet). When a curve changes, the stored fits
-    # are re-evaluated at the new curve parameters (not cleared) so Stage 3 stays live.
+    # Per-model staged interaction fits, keyed by model name. The auto-fill loop
+    # writes all four (reference/SA/DR/DL). `current_fit` is whatever is stored for
+    # the selected (clicked) row, NULL if none yet. A curve/reference/response
+    # change re-runs the loop, rebuilding the store at the new curves.
     fits_store   <- shiny::reactiveVal(list())
     last_compare <- shiny::reactiveVal(NULL)
 
@@ -403,7 +403,7 @@ binary_server <- function(id, meta) {
       # A joint refine seeds from the model's STAGED fit, so there must be one.
       if (is.null(current_fit())) {
         shiny::showNotification(
-          "Run \"Fit & compare all models\" first -- the joint refine seeds from the staged fit.",
+          "Wait for the comparison table to finish filling in -- the joint refine seeds from the staged fit.",
           type = "warning")
         return()
       }
