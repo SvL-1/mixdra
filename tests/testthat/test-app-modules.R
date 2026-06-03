@@ -37,85 +37,80 @@ test_that("single_ui builds a Shiny UI fragment", {
   expect_true(inherits(single_ui("single"), c("shiny.tag", "shiny.tag.list", "bslib_fragment")))
 })
 
-test_that("binary_server workspace: auto-reveal, autofit/simulate/find-best, invalidate", {
+test_that("binary_server: Fit-interactions fills the staged block, Optimize-all appends an isolated joint block", {
   skip_on_cran()
   meta <- shiny::reactiveValues(chem1 = "A", chem2 = "B")
   shiny::testServer(binary_server, args = list(meta = meta), {
-    csv <- testthat::test_path("fixtures", "binary", "cpf_mps_imi", "binary_ca_mps_cpf_imi_continuous.csv")
+    csv <- testthat::test_path("fixtures", "binary", "cpf_mps_imi",
+                               "binary_ca_mps_cpf_imi_continuous.csv")
     skip_if_not(file.exists(csv), "binary fixture missing")
     session$setInputs(response = "continuous", reference = "CA", thorough = FALSE,
-                      n_starts = 1, alpha = 0.05, time_limit = 30, model = "reference",
+                      n_starts = 1, alpha = 0.05, time_limit = 30,
                       file = list(datapath = csv, name = "binary.csv"))
-    expect_length(errs(), 0)
-
-    # supply both single curves deterministically via Simulate, distinct max
+    # the comparison table renders from the very start, before any curve/interaction
+    # fit (all four rows present, empty) -- it is no longer gated on `frozen`.
+    expect_false(is.null(output$results))
     session$setInputs(`chem1-val_max` = 700, `chem1-val_slope` = 2,
                       `chem1-val_ec50` = 1, `chem1-simulate` = 1)
     session$setInputs(`chem2-val_max` = 600, `chem2-val_slope` = 1,
                       `chem2-val_ec50` = 5, `chem2-simulate` = 1)
-    expect_equal(unname(curve_params()[["max"]]), 650)
 
-    # both curves fitted -> Stage 2/3 auto-reveal (no manual freeze step), but
-    # no interaction is fitted yet
-    expect_true(isTRUE(frozen()))
-    expect_null(current_fit())
+    # "Fit interaction models" runs the whole staged chain in one (blocking) go.
+    session$setInputs(fit_interactions = 1)
+    expect_setequal(names(fits_store()), c("reference", "SA", "DR", "DL"))
+    chosen     <- last_compare()$chosen
+    staged_cmp <- last_compare()$comparison
 
-    # Autofit the selected (S/A) model -> a fit for SA is stored
-    session$setInputs(model = "SA")
-    session$setInputs(autofit = 1)
-    expect_equal(current_fit()$deviation, "SA")
-    expect_true("a" %in% names(current_fit()$par))
-
-    # Simulate S/A with an entered a -> a simulated fit replaces the stored one
-    session$setInputs(val_a = 3, simulate = 1)
-    expect_true(isTRUE(current_fit()$simulated))
-    expect_equal(current_fit()$par[["a"]], 3)
-
-    # Find best model -> comparison of all four + a chosen model
-    session$setInputs(find_best = 1)
-    expect_setequal(names(last_compare()$fits), c("reference", "SA", "DR", "DL"))
-    expect_equal(nrow(last_compare()$comparison), 3)
-    expect_true(last_compare()$chosen %in% c("reference", "SA", "DR", "DL"))
-
-    # in a live session Find best switches the picker to the chosen model; testServer
-    # does not echo updateSelectInput, so set it explicitly and confirm current_fit
-    # follows the picker to that stored (fitted) model -- the per-model store design.
-    session$setInputs(model = last_compare()$chosen)
-    expect_equal(current_fit()$deviation, last_compare()$chosen)
-    expect_false(isTRUE(current_fit()$simulated))
-
-    # Optimize-all: jointly refine the displayed model; objective must not worsen.
-    chosen <- last_compare()$chosen
-    pre_obj <- current_fit()$objective
-    session$setInputs(optimize_all = 1)
-    expect_true(isTRUE(current_fit()$joint))
+    # with no row clicked, the displayed model defaults to the winner
+    expect_equal(selected_model(), chosen)
     expect_equal(current_fit()$deviation, chosen)
-    expect_lte(current_fit()$objective, pre_obj + 1e-6)
-    # SSR before -> after readout bookkeeping.
-    expect_equal(optimize_pre(), pre_obj)
-    expect_equal(optimize_post(), current_fit()$objective, tolerance = 1e-6)
-    # Write-back: the refined curve params land in the chemical panels, and both
-    # chemicals now share one max (= the joint fit's max).
-    expect_equal(unname(fit1()$par[["max"]]), unname(current_fit()$par[["max"]]),
-                 tolerance = 1e-6)
-    expect_equal(unname(fit1()$par[["max"]]), unname(fit2()$par[["max"]]),
-                 tolerance = 1e-6)
-    expect_equal(unname(fit1()$par[["slope"]]), unname(current_fit()$par[["slope1"]]),
-                 tolerance = 1e-6)
 
-    # editing a single curve keeps the workspace and RE-EVALUATES the stored
-    # interaction fits at the new curves (live sync), rather than clearing them;
-    # only the staged model comparison is invalidated.
+    # only the staged block exists so far: 4 rows, all variant "staged"
+    expect_equal(length(table_rows()), 4L)
+    expect_true(all(vapply(table_rows(), function(e) e$variant == "staged", logical(1))))
+
+    # clicking a staged row (index in reference,SA,DR,DL order) selects that model
+    ord <- intersect(c("reference", "SA", "DR", "DL"), names(fits_store()))
+    session$setInputs(results_rows_selected = match("SA", ord))
+    expect_equal(selected_model(), "SA")
+    expect_equal(current_fit()$deviation, "SA")
+    expect_false(isTRUE(display_fit()$joint))      # a staged row shows the staged fit
+
+    # "Optimize all params" jointly refines EVERY model -> a separator + joint block
+    staged_sa_obj <- fits_store()[["SA"]]$objective
+    session$setInputs(optimize_all = 1)
+    expect_setequal(names(refined_fits()), c("reference", "SA", "DR", "DL"))
+    expect_true(all(vapply(refined_fits(), function(f) isTRUE(f$joint), logical(1))))
+    expect_lte(refined_fits()[["SA"]]$objective, staged_sa_obj + 1e-6)
+
+    # the table now has the staged block, a separator, and the joint block
+    expect_equal(length(table_rows()), 4L + 1L + 4L)
+    sep <- vapply(table_rows(), function(e) isTRUE(e$separator), logical(1))
+    expect_equal(sum(sep), 1L)
+
+    # the staged verdict is untouched (still built from fits_store only)
+    expect_identical(last_compare()$chosen, chosen)
+    expect_equal(last_compare()$comparison, staged_cmp)
+    expect_equal(fits_store()[["SA"]]$objective, staged_sa_obj)
+
+    # clicking the JOINT SA row shows the joint-refined fit in the diagnostics
+    sa_joint <- which(vapply(table_rows(), function(e)
+      identical(e$model, "SA") && identical(e$variant, "joint"), logical(1)))
+    session$setInputs(results_rows_selected = sa_joint)
+    expect_equal(selected_model(), "SA")
+    expect_true(isTRUE(display_fit()$joint))
+
+    # a curve edit clears BOTH the staged and joint fits -- the user re-runs the
+    # buttons (curve columns still show the new values, read live in the renderer).
     session$setInputs(`chem1-val_max` = 720, `chem1-simulate` = 2)
-    expect_true(isTRUE(frozen()))
-    expect_gt(length(fits_store()), 0)        # fits re-evaluated, not cleared
-    expect_false(is.null(current_fit()))      # Stage 3 still has a model to show
-    expect_null(last_compare())               # comparison invalidated by the curve change
+    expect_null(last_compare())
+    expect_equal(length(fits_store()), 0)
+    expect_equal(length(refined_fits()), 0)
   })
 })
 
 test_that("a bundled example dataset ships and validates as binary continuous", {
-  ex <- system.file("extdata", "binary_ia_cpf_imi_continuous.csv", package = "mixdra")
+  ex <- system.file("extdata", "binary_ca_cpf_imi_fbsa_continuous.csv", package = "mixdra")
   skip_if_not(nzchar(ex) && file.exists(ex), "bundled example not installed")
   df <- read_upload(ex)
   expect_length(validate_upload(df, "binary", "continuous"), 0)
@@ -124,7 +119,7 @@ test_that("a bundled example dataset ships and validates as binary continuous", 
 
 test_that("binary_server falls back to the bundled example before any upload", {
   skip_on_cran()
-  ex <- system.file("extdata", "binary_ia_cpf_imi_continuous.csv", package = "mixdra")
+  ex <- system.file("extdata", "binary_ca_cpf_imi_fbsa_continuous.csv", package = "mixdra")
   skip_if_not(nzchar(ex) && file.exists(ex), "bundled example not installed")
   meta <- shiny::reactiveValues(chem1 = "CPF", chem2 = "IMI")
   shiny::testServer(binary_server, args = list(meta = meta), {
@@ -134,26 +129,34 @@ test_that("binary_server falls back to the bundled example before any upload", {
   })
 })
 
-test_that("binary_ui: auto-reveal (no Freeze button) + Stage 2 workspace", {
+test_that("binary_ui: always-visible table + Fit/Optimize buttons, then diagnostics", {
   html <- as.character(binary_ui("binary"))
-  # the manual Freeze checkpoint is gone -- Stage 2/3 auto-reveal
   expect_false(grepl("Freeze curves", html, fixed = TRUE))
-  expect_false(grepl("binary-freeze", html, fixed = TRUE))
-  # the Stage-2 LR comparison table moved down into the results section
-  expect_false(grepl("binary-comparison", html, fixed = TRUE))
+  # Stage 2: the table + alpha + Fit-interactions + the single Optimize button
   expect_match(html, "binary-results", fixed = TRUE)
-  # Stage 2 workspace: model picker, a/b value input, the three actions
-  expect_match(html, "binary-model", fixed = TRUE)
-  expect_match(html, "binary-val_a", fixed = TRUE)
-  expect_match(html, "Autofit (a, b)", fixed = TRUE)
-  expect_match(html, "Simulate", fixed = TRUE)
-  expect_match(html, "Find best model", fixed = TRUE)
-  # relocated fit options + the per-model explanation slot
-  expect_match(html, "binary-n_starts", fixed = TRUE)
+  expect_match(html, "binary-fit_interactions", fixed = TRUE)
+  expect_match(html, "Fit interaction models", fixed = TRUE)
   expect_match(html, "binary-alpha", fixed = TRUE)
+  expect_match(html, "threshold for the model comparison", fixed = TRUE)
+  expect_match(html, "binary-optimize_all", fixed = TRUE)
+  expect_match(html, "Optimize all params (joint)", fixed = TRUE)
+  expect_match(html, "binary-refine_readout", fixed = TRUE)
+  expect_match(html, "binary-refined_badge", fixed = TRUE)
   expect_match(html, "binary-interaction_help", fixed = TRUE)
-  # alpha now sits next to Find best model and carries an explanation
-  expect_match(html, "significance threshold for the model comparison", fixed = TRUE)
+  expect_match(html, "binary-objective", fixed = TRUE)
+  # Stage 3: diagnostics
+  expect_match(html, "binary-surface", fixed = TRUE)
+  expect_match(html, "binary-isobole", fixed = TRUE)
+  expect_match(html, "binary-op", fixed = TRUE)
+  expect_match(html, "binary-cis", fixed = TRUE)
+  expect_match(html, "binary-n_starts", fixed = TRUE)
+  # the manual path + compare-all button + model picker are gone
+  expect_false(grepl("binary-compare_all", html, fixed = TRUE))
+  expect_false(grepl("binary-model", html, fixed = TRUE))
+  expect_false(grepl("binary-autofit", html, fixed = TRUE))
+  expect_false(grepl("binary-simulate", html, fixed = TRUE))
+  expect_false(grepl("binary-val_a", html, fixed = TRUE))
+  expect_false(grepl("binary-find_best", html, fixed = TRUE))
 })
 
 test_that("single_ui shows the model equation and Autofit/Simulate buttons", {
@@ -171,14 +174,4 @@ test_that("interaction_param_row renders a value input with inert bound cells", 
   expect_match(html, "—", fixed = TRUE)          # em-dash placeholder present
   expect_false(grepl("binary-lo_a", html, fixed = TRUE))  # no Lower input
   expect_false(grepl("binary-hi_a", html, fixed = TRUE))  # no Upper input
-})
-
-test_that("binary_ui: Optimize-all is a plain button + readout (no bounds grid)", {
-  html <- as.character(binary_ui("binary"))
-  expect_match(html, "Optimize all params", fixed = TRUE)     # button
-  expect_match(html, "binary-optimize_all", fixed = TRUE)     # action id
-  expect_match(html, "binary-optimize_readout", fixed = TRUE) # SSR before->after readout
-  # no per-parameter bounds/pin grid any more (bounds live in Stage 1; values too)
-  expect_false(grepl("binary-olo_max", html, fixed = TRUE))
-  expect_false(grepl("binary-ohi_ec502", html, fixed = TRUE))
 })

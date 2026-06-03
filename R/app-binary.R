@@ -1,6 +1,12 @@
 # Binary Mixture stage: upload the full binary dataset (single-chemical series +
-# mixture rows), fit CA/IA reference + SA/DR/DL deviations via analyse_mixture(),
-# compare them, and visualise the chosen (or any) fit.
+# mixture rows) and fit each chemical's curve. "Fit interaction models" fills the
+# Stage-2 comparison table -- CA/IA reference + SA/DR/DL fit via the staged method
+# (curves fixed from the single compounds, only a/b per model), compared by LR
+# test with the parsimonious winner highlighted. Click a row to inspect that model
+# (Stage 3 diagnostics). "Optimize all params (joint)" re-fits every parameter of
+# every model (refine_joint, Excel-style) and appends them as a second "Optimized
+# (joint)" block of rows for inspection -- stored separately, so the staged verdict
+# (p-values + winner) never changes.
 
 #' Per-model explanation of the interaction fit (pure, for the Binary tab)
 #'
@@ -89,15 +95,19 @@ binary_ui <- function(id) {
       shiny::helpText(shiny::tags$small(
         "An example dataset (CPF + IMI, continuous) is loaded until you upload your own.")),
       shiny::uiOutput(ns("errors")),
-      # Optimizer-tuning knobs apply to EVERY fit on this tab (Autofit, Find
-      # best, Optimize all). They are advanced/rarely-changed, so they live in a
-      # collapsed accordion at the bottom of the sidebar -- grouped with the
-      # other tab-wide settings, out of the Stage 1->2->3 flow.
+      # Optimizer-tuning knobs apply to EVERY fit on this tab (the staged
+      # comparison loop and the joint Optimize). They are advanced/rarely-changed,
+      # so they live in a collapsed accordion at the bottom of the sidebar --
+      # grouped with the other tab-wide settings, out of the Stage 1->2->3 flow.
       bslib::accordion(
         open = FALSE,
         bslib::accordion_panel(
           "Advanced fitting options",
-          shiny::helpText("Apply to Autofit, Find best model, and Optimize all params."),
+          shiny::helpText("Apply to the staged comparison loop and Optimize all params (joint)."),
+          shiny::numericInput(ns("alpha"), "alpha (α)", value = 0.05,
+                              min = 0, max = 1, step = 0.01),
+          shiny::helpText("Significance threshold for the model comparison: a more ",
+                          "complex model is kept only if it improves the fit at p < α."),
           shiny::numericInput(ns("n_starts"), "n_starts", value = 1, min = 1),
           shiny::numericInput(ns("time_limit"), "time_limit (s/model)", value = 30, min = 1),
           shiny::checkboxInput(ns("thorough"), "Thorough fit (multi-start, slower)", FALSE),
@@ -111,9 +121,8 @@ binary_ui <- function(id) {
     bslib::card(
       bslib::card_header("Stage 1 · Single curves"),
       shiny::p("Fit each chemical's dose-response curve (Autofit or Simulate). ",
-               "The interaction workspace appears once both are fitted. The ",
-               "mixture model uses one shared ", shiny::tags$code("max"),
-               " (the average of the two fits)."),
+               "These curves are held fixed when the interaction models are ",
+               "compared below. The comparison workspace appears once both are fitted."),
       # One row per chemical, stacked vertically (sets up the ternary case --
       # chemical 3 is simply another row). Each row is settings | plots.
       shiny::div(shiny::h5(shiny::textOutput(ns("chem1_title"))),
@@ -124,110 +133,54 @@ binary_ui <- function(id) {
       shiny::uiOutput(ns("reveal_note"))
     ),
 
-    # Stage 2 -- per-model interaction workspace (revealed once frozen).
-    shiny::conditionalPanel(
-      condition = "output.frozen", ns = ns,
-      bslib::card(
-        bslib::card_header("Stage 2 · Interaction model"),
-
-        # Single-model picker: choose which interaction model to view / fit by
-        # hand. Model SELECTION (Find best + alpha) lives in the Results & model
-        # comparison card below, where the chosen model is highlighted.
-        shiny::selectInput(
-          ns("model"), "Model",
-          choices = c("No interaction (reference)" = "reference",
-                      "Similar action (S/A)"       = "SA",
-                      "Dose-ratio (DR)"            = "DR",
-                      "Dose-level (DL)"            = "DL")),
-
-        shiny::uiOutput(ns("interaction_help")),
-
-        # a/b parameter grid (hidden for the reference model; b shown for DR/DL).
-        shiny::conditionalPanel(
-          condition = "input.model != 'reference'", ns = ns,
-          bslib::card(
-            bslib::card_header("Parameters"),
-            shiny::fluidRow(
-              shiny::column(2, shiny::tags$small(shiny::tags$b("Parameter"))),
-              shiny::column(4, shiny::tags$small(shiny::tags$b("Meaning"))),
-              shiny::column(2, shiny::tags$small(shiny::tags$b("Lower"))),
-              shiny::column(2, shiny::tags$small(shiny::tags$b("Upper"))),
-              shiny::column(2, shiny::tags$small(shiny::tags$b("Value")))
-            ),
-            interaction_param_row(ns, "a", "a",
-                                  "Overall strength & direction (a > 0 antagonism, a < 0 synergism)."),
-            shiny::conditionalPanel(
-              condition = "input.model == 'DR' || input.model == 'DL'", ns = ns,
-              interaction_param_row(ns, "b", "b",
-                                    "How the interaction shifts with the mixture ratio / dose level."))
-          )
-        ),
-
-        shiny::div(
-          shiny::actionButton(ns("autofit"), "Autofit (a, b)", class = "btn-primary"),
-          shiny::actionButton(ns("simulate"), "Simulate")
-        ),
-        shiny::uiOutput(ns("objective"))
-      )
+    # Stage 2 -- the comparison table IS the hub and is ALWAYS visible: it shows
+    # all four model rows (reference/SA/DR/DL) from the start. The curve columns
+    # fill in as soon as both Stage-1 curves are fitted; "Fit interaction models"
+    # fills the a/b/objective/df/p columns. Click a row to inspect it (Stage 3);
+    # "Optimize all params (joint)" appends a joint-refined block of rows.
+    bslib::card(
+      bslib::card_header("Stage 2 · Interaction models"),
+      shiny::p("Fit both single-chemical curves in Stage 1, then ",
+               shiny::tags$b("Fit interaction models"), " to fill the table ",
+               "(reference → S/A → DR/DL, curves held fixed from the singles). ",
+               "Click a row to inspect that model; the best is highlighted."),
+      shiny::div(
+        shiny::actionButton(ns("fit_interactions"), "Fit interaction models",
+                            class = "btn-primary")),
+      shiny::helpText(
+        "The highlighted row is the selected (best) model. ",
+        "The \"… (joint)\" column is filled by Optimize all params and is ",
+        "display-only — it never changes which model is selected."),
+      DT::DTOutput(ns("results")),
+      shiny::uiOutput(ns("interaction_help")),
+      shiny::uiOutput(ns("refined_badge")),
+      shiny::uiOutput(ns("objective")),
+      shiny::div(class = "mt-2",
+        shiny::actionButton(ns("optimize_all"), "Optimize all params (joint)")),
+      shiny::helpText("Re-fits every parameter (curves + interaction) of each ",
+                      "model at once, seeded from its staged fit — the Excel-style ",
+                      "joint fit. The results are appended as a second \"Optimized ",
+                      "(joint)\" block of rows; click one to inspect its surface. ",
+                      "The staged block above (p-values / winner) is unchanged."),
+      shiny::uiOutput(ns("refine_readout"))
     ),
 
-    # Stage 3 -- joint refinement of the displayed model. It is an action that
-    # rewrites the fit, so it precedes the outputs it drives (Stage 4).
-    shiny::conditionalPanel(
-      condition = "output.frozen", ns = ns,
-      bslib::card(
-        bslib::card_header("Stage 3 · Optimize all parameters (joint)"),
-        shiny::conditionalPanel(
-          condition = "output.has_fit", ns = ns,
-          shiny::p("Refines the displayed model by fitting every parameter at ",
-                   "once (curves + interaction), seeded from the current values. ",
-                   "The refined curve parameters are written back into the ",
-                   "chemical panels above (both share one ",
-                   shiny::tags$code("max"), ")."),
-          shiny::actionButton(ns("optimize_all"), "Optimize all params",
-                              class = "btn-primary"),
-          shiny::uiOutput(ns("optimize_readout"))
-        ),
-        shiny::conditionalPanel(
-          condition = "!output.has_fit", ns = ns,
-          shiny::helpText("Fit an interaction model in Stage 2 first."))
-      )
-    ),
-
-    # Stage 4 -- results & diagnostics for the displayed model (revealed once
-    # frozen).
-    shiny::conditionalPanel(
-      condition = "output.frozen", ns = ns,
-      bslib::card(
-        bslib::card_header("Stage 4 · Results & diagnostics"),
-        bslib::layout_columns(
-          bslib::card(bslib::card_header("3-D response surface"),
-                      plotly::plotlyOutput(ns("surface"), height = "520px")),
-          bslib::card(bslib::card_header("2-D isobole (vs reference)"),
-                      plotly::plotlyOutput(ns("isobole"), height = "520px"))
-        ),
-        bslib::card(bslib::card_header("Observed vs predicted"),
-                    plotly::plotlyOutput(ns("op"))),
-        bslib::layout_columns(
-          bslib::card(bslib::card_header("Results & model comparison"),
-                      bslib::layout_columns(
-                        col_widths = c(7, 5),
-                        shiny::div(class = "mt-4",
-                                   shiny::actionButton(ns("find_best"), "Find best model",
-                                                       class = "btn-primary")),
-                        shiny::numericInput(ns("alpha"), "alpha", value = 0.05,
-                                            min = 0, max = 1, step = 0.01)),
-                      shiny::helpText(
-                        "alpha (α) is the significance threshold for the model comparison: ",
-                        "Find best model keeps a more complex model only if it improves the ",
-                        "fit at p < α (default 0.05). The table shows every model you've ",
-                        "fitted; Find best fills all four and highlights the selected (best) ",
-                        "model."),
-                      DT::DTOutput(ns("results"))),
-          bslib::card(bslib::card_header("Confidence intervals (displayed model)"),
-                      DT::DTOutput(ns("cis")))
-        )
-      )
+    # Stage 3 -- diagnostics. ALWAYS visible: the 3-D surface shows the raw
+    # observed point cloud from the moment data is loaded, and gains the fitted
+    # surface once a model is selected. The isobole / obs-pred / CI panels are
+    # model-based, so they fill in once a model is fitted.
+    bslib::card(
+      bslib::card_header("Stage 3 · Inspect the selected model"),
+      bslib::layout_columns(
+        bslib::card(bslib::card_header("3-D response surface"),
+                    plotly::plotlyOutput(ns("surface"), height = "520px")),
+        bslib::card(bslib::card_header("2-D isobole (vs reference)"),
+                    plotly::plotlyOutput(ns("isobole"), height = "520px"))
+      ),
+      bslib::card(bslib::card_header("Observed vs predicted"),
+                  plotly::plotlyOutput(ns("op"))),
+      bslib::card(bslib::card_header("Confidence intervals (displayed model)"),
+                  DT::DTOutput(ns("cis")))
     )
   )
 }
@@ -259,11 +212,11 @@ binary_server <- function(id, meta) {
     })
 
     # Data source: the user's upload, or -- before any upload -- a bundled
-    # example dataset (continuous IA binary mixture) so the tab is usable on
-    # open. `system.file` resolves under inst/ in dev and the install tree.
+    # example dataset (CPF + IMI, continuous) so the tab is usable on open.
+    # `system.file` resolves under inst/ in dev and the install tree.
     upload_path <- shiny::reactive({
       if (!is.null(input$file)) return(input$file$datapath)
-      ex <- system.file("extdata", "binary_ia_cpf_imi_continuous.csv", package = "mixdra")
+      ex <- system.file("extdata", "binary_ca_cpf_imi_fbsa_continuous.csv", package = "mixdra")
       if (nzchar(ex)) ex else NULL
     })
     parsed <- shiny::reactive({
@@ -286,21 +239,16 @@ binary_server <- function(id, meta) {
     m2 <- shiny::reactive(marginal_df(engine_df(), 2))
 
     # Stage 1: two embedded single-chemical fitters, one per marginal series.
-    # `inject*` lets the joint refine (Optimize all) write its curve parameters
-    # back into the panels, so the chemical panels stay the single source of
-    # truth for the curves.
-    inject1 <- shiny::reactiveVal(NULL)
-    inject2 <- shiny::reactiveVal(NULL)
+    # The chemical panels are the single source of truth for the curves; the
+    # staged compare-all loop reads them (curve_params()) and never writes back.
     fit1 <- curve_fit_server("chem1", fit_df = m1, meta = meta,
-                             chem_field = "chem1", inject = inject1)
+                             chem_field = "chem1")
     fit2 <- curve_fit_server("chem2", fit_df = m2, meta = meta,
-                             chem_field = "chem2", inject = inject2)
+                             chem_field = "chem2")
 
     # Stages 2-3 are gated on `frozen`: both single curves fitted. There is no
     # manual freeze step -- the workspace simply appears once both fits exist.
     frozen <- shiny::reactive(!is.null(fit1()) && !is.null(fit2()))
-    output$frozen <- shiny::reactive(isTRUE(frozen()))
-    shiny::outputOptions(output, "frozen", suspendWhenHidden = FALSE)
 
     # Frozen curve-parameter vector (shared max = average of the two fits).
     curve_params <- shiny::reactive({
@@ -308,29 +256,107 @@ binary_server <- function(id, meta) {
       assemble_curve_params(fit1(), fit2())
     })
 
-    # Per-model interaction fits, keyed by model name. Autofit/Simulate write one
-    # entry; Find best writes all four. `current_fit` is whatever is stored for the
-    # selected model (NULL if none yet). When a curve changes, the stored fits are
-    # re-evaluated at the new curve parameters (not cleared) so Stage 3 stays live.
+    # Per-model staged interaction fits, keyed by model name. The auto-fill loop
+    # writes all four (reference/SA/DR/DL). `current_fit` is whatever is stored for
+    # the selected (clicked) row, NULL if none yet. A curve/reference/response
+    # change re-runs the loop, rebuilding the store at the new curves.
     fits_store   <- shiny::reactiveVal(list())
     last_compare <- shiny::reactiveVal(NULL)
-    # Optimize-all readout: seed vs refined objective (before -> after).
-    optimize_pre  <- shiny::reactiveVal(NULL)
-    optimize_post <- shiny::reactiveVal(NULL)
-    current_fit  <- shiny::reactive({
-      m <- input$model
+
+    # Number of chemicals present (binary tab -> 2; future-proofs the loop order).
+    n_chem <- shiny::reactive(
+      length(intersect(c("C1", "C2", "C3"), names(engine_df()))))
+
+    # Joint-refined fits, keyed by model name -- a POST-SELECTION polish. These
+    # appear as their OWN rows (a second "Optimized (joint)" block) below the
+    # staged rows; the staged verdict (table p-values + winner) is built only
+    # from fits_store and is never affected.
+    refined_fits <- shiny::reactiveVal(list())
+
+    # Staged model order (reference/SA/DR/DL for binary) and the clicked row.
+    # The table shows the staged block first, then -- once Optimize-all has run --
+    # a separator and the joint block. `table_model()` below holds the per-row
+    # model/variant mapping the selection uses; `sel_row` persists the clicked
+    # index across re-renders.
+    results_order <- shiny::reactive(selection_chain_order(n_chem()))
+    sel_row <- shiny::reactiveVal(integer(0))
+    shiny::observeEvent(input$results_rows_selected, {
+      sel_row(input$results_rows_selected)
+    }, ignoreNULL = FALSE, ignoreInit = TRUE)
+
+    # The ordered list of table rows and their model/variant mapping. The staged
+    # block is always present (one row per model in results_order()); once any
+    # joint refine exists, a separator row and the joint block are appended. Each
+    # entry: list(model, variant "staged"/"joint", separator TRUE/FALSE, fit).
+    table_rows <- shiny::reactive({
+      ord <- results_order()
+      s   <- fits_store()
+      rf  <- refined_fits()
+      rows <- lapply(ord, function(m)
+        list(model = m, variant = "staged", separator = FALSE, fit = s[[m]]))
+      jmods <- ord[vapply(ord, function(m) !is.null(rf[[m]]), logical(1))]
+      if (length(jmods)) {
+        rows <- c(rows, list(list(model = NA_character_, variant = "joint",
+                                  separator = TRUE, fit = NULL)))
+        rows <- c(rows, lapply(jmods, function(m)
+          list(model = m, variant = "joint", separator = FALSE, fit = rf[[m]])))
+      }
+      rows
+    })
+
+    # The selected row's entry (model + variant). A separator click, or no click,
+    # falls back to the staged winner.
+    selected_entry <- shiny::reactive({
+      rows <- table_rows()
+      if (length(rows) == 0) return(NULL)
+      r <- sel_row()
+      if (length(r) >= 1 && r[[1]] >= 1 && r[[1]] <= length(rows)) {
+        e <- rows[[r[[1]]]]
+        if (!isTRUE(e$separator)) return(e)
+      }
+      ord <- results_order()
+      ch  <- if (!is.null(last_compare())) last_compare()$chosen else NULL
+      m   <- if (!is.null(ch) && ch %in% ord) ch else ord[[1]]
+      list(model = m, variant = "staged", separator = FALSE, fit = fits_store()[[m]])
+    })
+
+    selected_model <- shiny::reactive({
+      e <- selected_entry(); if (is.null(e)) NULL else e$model
+    })
+
+    # The staged fit of the selected model (used to seed/guard Optimize-all).
+    current_fit <- shiny::reactive({
+      m <- selected_model()
       if (is.null(m)) return(NULL)
       fits_store()[[m]]
     })
 
-    # Reveal the Optimize-all card only once a model is displayed.
-    output$has_fit <- shiny::reactive(!is.null(current_fit()))
-    shiny::outputOptions(output, "has_fit", suspendWhenHidden = FALSE)
+    # The fit shown in the diagnostics / CIs: the staged or joint fit for the
+    # selected row, exactly as clicked (so the user can A/B the two surfaces).
+    display_fit <- shiny::reactive({
+      e <- selected_entry(); if (is.null(e)) return(NULL)
+      e$fit
+    })
 
     engine_response <- shiny::reactive(
       if (input$response == "quantal") "binary" else "continuous")
     n_starts_eff <- shiny::reactive(
       if (isTRUE(input$thorough)) max(input$n_starts, 20) else input$n_starts)
+
+    # The reference (CA/IA) model has NO interaction parameters -- its surface is
+    # fully determined by the two frozen marginal curves. So we can build it the
+    # moment both curves are fitted, with no "Fit interaction models" step: it is
+    # the additivity baseline. The 3-D surface shows it by default until a fitted
+    # interaction model is selected; the gap between it and the points IS the
+    # interaction. Cheap (no free params to estimate).
+    reference_fit_live <- shiny::reactive({
+      shiny::req(frozen())
+      tryCatch(
+        fit_model(engine_df(), input$reference, "reference", engine_response(),
+                  start = curve_params(), fixed = names(curve_params()),
+                  n_starts = 1, time_limit = input$time_limit),
+        error = function(e) NULL)
+    })
 
     output$reveal_note <- shiny::renderUI({
       if (is.null(fit1()) || is.null(fit2()))
@@ -340,243 +366,243 @@ binary_server <- function(id, meta) {
                      "the interaction workspace."))
     })
 
-    # A structural change (reference model or response type) makes the stored
-    # fits meaningless, so clear everything.
+    # Any change to the curves / reference / response makes the stored interaction
+    # fits stale, so clear them (the table's interaction columns blank out; its
+    # curve columns still show the new curve values, read live from curve_params()
+    # in the renderer). The user re-runs "Fit interaction models" to refit.
+    # `curve_params()` req()s both single fits, so this is inert until frozen.
     shiny::observeEvent(
-      list(input$reference, input$response),
+      list(curve_params(), input$reference, input$response),
       {
         fits_store(list())
         last_compare(NULL)
-        optimize_pre(NULL); optimize_post(NULL)
+        refined_fits(list())
       },
       ignoreInit = TRUE)
 
-    # A changed curve does NOT blank the interaction: re-evaluate each stored fit
-    # at the new curve parameters (keeping its a/b), so Stage 3 stays in sync with
-    # Stage 1 live. This is what makes editing chemical 1 show up in the
-    # diagnostics, and what reconciles a joint refine's write-back. The staged
-    # model comparison, however, was computed at the old curves, so it is
-    # invalidated (re-run Find best to compare at the new curves).
-    shiny::observeEvent(
-      list(fit1(), fit2()),
-      {
-        s <- fits_store()
-        if (length(s)) {
-          cp <- curve_params()
-          for (m in names(s)) {
-            old <- s[[m]]
-            ab  <- old$par[intersect(c("a", "b"), names(old$par))]
-            newf <- tryCatch(
-              eval_mixture(engine_df(), old$reference, m, old$response, cp,
-                           interaction = ab),
-              error = function(e) NULL)
-            if (is.null(newf)) next
-            # carry the metadata the diagnostics / comparison / CI layer relies on
-            newf$df        <- old$df
-            newf$joint     <- old$joint
-            newf$fixed     <- old$fixed
-            newf$simulated <- old$simulated
-            s[[m]] <- newf
-          }
-          fits_store(s)
-        }
-        last_compare(NULL)
-      },
-      ignoreInit = TRUE)
-
-    # Read the entered a/b as a named numeric (blank -> NA).
-    read_ab <- function() {
-      raw <- list(a = input$val_a, b = input$val_b)
-      vapply(raw, function(x)
-        if (is.null(x) || length(x) == 0) NA_real_ else as.numeric(x), numeric(1))
-    }
-
-    # Autofit: fit only the selected model's interaction params, curves fixed.
-    shiny::observeEvent(input$autofit, {
-      shiny::req(frozen(), curve_params())
-      dev <- input$model
-      fit <- tryCatch(
-        shiny::withProgress(message = "Fitting interaction...", value = 0.5,
-          fit_model(engine_df(), input$reference, dev, engine_response(),
-                    start = curve_params(), fixed = names(curve_params()),
-                    n_starts = n_starts_eff(), time_limit = input$time_limit)),
-        error = function(e) {
-          shiny::showNotification(paste("Fit failed:", conditionMessage(e)), type = "error")
-          NULL
-        })
-      if (is.null(fit)) return()
-      if ("a" %in% names(fit$par))
-        shiny::updateNumericInput(session, "val_a", value = round(fit$par[["a"]], 4))
-      if ("b" %in% names(fit$par))
-        shiny::updateNumericInput(session, "val_b", value = round(fit$par[["b"]], 4))
-      s <- fits_store(); s[[dev]] <- fit; fits_store(s)
-      optimize_pre(NULL); optimize_post(NULL)  # a new fit voids the last refine readout
-    })
-
-    # Simulate: evaluate the selected model with the entered a/b (no refit).
-    shiny::observeEvent(input$simulate, {
-      shiny::req(frozen(), curve_params())
-      dev <- input$model
-      if (dev == "reference") {
+    # "Fit interaction models": fit the staged chain (reference -> SA -> DR -> DL)
+    # in one go, with a progress bar. Each model is its own staged fit -- curves
+    # FIXED at the single-compound values (curve_params()), only the interaction
+    # params (a, b) fitted to the mixture rows -- the same fit analyse_mixture()
+    # does. This keeps the CA/IA reference built only from the single compounds,
+    # so genuine interactions surface as a/b rather than being absorbed by
+    # re-fitted curves (Sam's required method; do NOT switch to a joint fit).
+    # The whole table renders once at the end (no live streaming) -- simple and
+    # robust.
+    shiny::observeEvent(input$fit_interactions, {
+      if (!isTRUE(frozen())) {
         shiny::showNotification(
-          "The reference model has no interaction parameters to simulate.", type = "message")
+          "Fit both single-chemical curves first (Autofit / Simulate in Stage 1).",
+          type = "warning")
         return()
       }
-      ab <- read_ab()
-      need <- if (dev == "SA") "a" else c("a", "b")
-      if (any(is.na(ab[need]))) {
-        shiny::showNotification("Enter a (and b) to simulate.", type = "warning")
-        return()
-      }
-      fit <- tryCatch(
-        eval_mixture(engine_df(), input$reference, dev, engine_response(),
-                     curve_params(), interaction = ab[need]),
-        error = function(e) {
-          shiny::showNotification(paste("Simulate failed:", conditionMessage(e)), type = "error")
-          NULL
-        })
-      if (is.null(fit)) return()
-      s <- fits_store(); s[[dev]] <- fit; fits_store(s)
-      optimize_pre(NULL); optimize_post(NULL)  # a new fit voids the last refine readout
-    })
-
-    # Find best model: fit all four + select; store every fit, land on the chosen.
-    shiny::observeEvent(input$find_best, {
-      shiny::req(frozen(), curve_params())
-      res <- tryCatch(
-        shiny::withProgress(message = "Comparing interaction models...", value = 0.5,
-          analyse_mixture(engine_df(), reference = input$reference,
-                          response = engine_response(), start = curve_params(),
-                          alpha = input$alpha, n_starts = n_starts_eff(),
-                          time_limit = input$time_limit)),
-        error = function(e) {
-          shiny::showNotification(paste("Fit failed:", conditionMessage(e)), type = "error")
-          NULL
-        })
-      if (is.null(res)) return()
-      last_compare(res)
-      s <- fits_store()
-      for (m in names(res$fits)) s[[m]] <- res$fits[[m]]
+      refined_fits(list())
+      models <- selection_chain_order(n_chem())
+      s <- list()
+      shiny::withProgress(message = "Fitting interaction models", value = 0, {
+        for (i in seq_along(models)) {
+          dev <- models[[i]]
+          shiny::incProgress(0, detail = paste0("model ", dev, " (", i, "/",
+                                                length(models), ")"))
+          fit <- tryCatch(
+            fit_model(engine_df(), input$reference, dev, engine_response(),
+                      start = curve_params(), fixed = names(curve_params()),
+                      n_starts = n_starts_eff(), time_limit = input$time_limit),
+            error = function(e) {
+              shiny::showNotification(
+                paste0("Fit failed (", dev, "): ", conditionMessage(e)), type = "error")
+              NULL
+            })
+          if (!is.null(fit)) s[[dev]] <- fit
+          shiny::incProgress(1 / length(models))
+        }
+      })
       fits_store(s)
-      shiny::updateSelectInput(session, "model", selected = res$chosen)
-      ch <- res$fits[[res$chosen]]
-      shiny::updateNumericInput(session, "val_a",
-        value = if ("a" %in% names(ch$par)) round(ch$par[["a"]], 4) else NA)
-      shiny::updateNumericInput(session, "val_b",
-        value = if ("b" %in% names(ch$par)) round(ch$par[["b"]], 4) else NA)
+      cmp <- compare_fits(s, nrow(engine_df()), engine_response(), input$alpha)
+      last_compare(list(fits = s, comparison = cmp$comparison,
+                        chosen = cmp$chosen, reference = input$reference,
+                        response = engine_response()))
+      sel_row(match(cmp$chosen, results_order()))   # default-select the winner row
     })
 
-    # Switching the picker syncs the grid to that model's stored a/b (blank if none).
-    shiny::observeEvent(input$model, {
-      f <- fits_store()[[input$model]]
-      shiny::updateNumericInput(session, "val_a",
-        value = if (!is.null(f) && "a" %in% names(f$par)) round(f$par[["a"]], 4) else NA)
-      shiny::updateNumericInput(session, "val_b",
-        value = if (!is.null(f) && "b" %in% names(f$par)) round(f$par[["b"]], 4) else NA)
-      optimize_pre(NULL); optimize_post(NULL)
-    }, ignoreInit = TRUE)
-
-    # Optimize all params: jointly refine the displayed model, seeded from it
-    # (every parameter free, positivity-constrained -- no per-parameter pinning).
+    # Optimize all params (joint): for EVERY staged model, re-fit every parameter
+    # (curves + interaction) at once, seeded from its staged fit (Excel-style).
+    # Stored in refined_fits ONLY -- never in fits_store -- and shown as a second
+    # "Optimized (joint)" block of rows, so the staged verdict (table p-values +
+    # highlighted winner) is never affected. Click a joint row to see its surface.
     shiny::observeEvent(input$optimize_all, {
-      shiny::req(frozen(), current_fit())
-      f <- current_fit()
-      pre <- f$objective
-      newfit <- tryCatch(
-        shiny::withProgress(message = "Optimizing all parameters...", value = 0.5,
-          refine_joint(f, engine_df(),
-                       n_starts = n_starts_eff(), time_limit = input$time_limit)),
-        error = function(e) {
-          shiny::showNotification(paste("Optimize failed:", conditionMessage(e)),
-                                  type = "error")
-          NULL
-        })
-      if (is.null(newfit)) return()
-      s <- fits_store(); s[[f$deviation]] <- newfit; fits_store(s)
-      optimize_pre(pre); optimize_post(newfit$objective)
-      p <- newfit$par
-      if ("a" %in% names(p))
-        shiny::updateNumericInput(session, "val_a", value = round(p[["a"]], 4))
-      if ("b" %in% names(p))
-        shiny::updateNumericInput(session, "val_b", value = round(p[["b"]], 4))
-      # Write the refined curve parameters back into the chemical panels -- one
-      # shared max to BOTH. The re-evaluation observer then reconciles the stored
-      # fit at these curves, keeping everything in sync.
-      inject1(list(max = p[["max"]], slope = p[["slope1"]], ec50 = p[["ec501"]]))
-      inject2(list(max = p[["max"]], slope = p[["slope2"]], ec50 = p[["ec502"]]))
+      shiny::req(frozen())
+      s <- fits_store()
+      if (length(s) == 0) {
+        shiny::showNotification(
+          "Run \"Fit interaction models\" first -- the joint optimization refines those fits.",
+          type = "warning")
+        return()
+      }
+      models <- intersect(results_order(), names(s))
+      r <- list()
+      shiny::withProgress(message = "Optimizing all parameters (joint)", value = 0, {
+        for (i in seq_along(models)) {
+          m <- models[[i]]
+          shiny::incProgress(0, detail = paste0("model ", m, " (", i, "/",
+                                                length(models), ")"))
+          newfit <- tryCatch(
+            refine_joint(s[[m]], engine_df(),
+                         n_starts = n_starts_eff(), time_limit = input$time_limit),
+            error = function(e) {
+              shiny::showNotification(
+                paste0("Optimize failed (", m, "): ", conditionMessage(e)), type = "error")
+              NULL
+            })
+          if (!is.null(newfit)) r[[m]] <- newfit
+          shiny::incProgress(1 / length(models))
+        }
+      })
+      refined_fits(r)
     })
 
     # Per-model explanation: tracks the reference and the selected model.
     output$interaction_help <- shiny::renderUI({
-      shiny::req(frozen())
-      interaction_help(input$reference, input$model)
-    })
-
-    # SSR/Deviance before -> after readout for the joint refine.
-    output$optimize_readout <- shiny::renderUI({
-      shiny::req(!is.null(optimize_post()), current_fit())
-      lab <- if (identical(current_fit()$response, "binary")) "Deviance" else "SSR"
-      improved <- optimize_post() <= optimize_pre() + 1e-9
-      shiny::tags$p(
-        shiny::tags$b(paste0(lab, ": ")),
-        round(optimize_pre(), 2), shiny::HTML(" &rarr; "), round(optimize_post(), 2),
-        if (improved) shiny::tags$span(style = "color:green", " ✓ improved"))
+      shiny::req(frozen(), selected_model())
+      interaction_help(input$reference, selected_model())
     })
 
     # Fit-objective readout for the displayed model.
     output$objective <- shiny::renderUI({
-      shiny::req(current_fit())
-      f <- current_fit()
+      shiny::req(display_fit())
+      f <- display_fit()
       lab <- if (identical(f$response, "binary")) "Deviance" else "SSR"
       shiny::tags$p(
         shiny::tags$b(paste0(lab, ": ")), round(f$objective, 2),
         "   |   ", shiny::tags$b("n: "), f$n,
-        if (isTRUE(f$simulated)) shiny::tags$em(" (simulated)"))
+        if (isTRUE(f$simulated)) shiny::tags$em(" (simulated)")
+        else if (isTRUE(f$joint)) shiny::tags$em(" (joint-refined)"))
+    })
+
+    # Staged -> joint objective for the selected row, when a joint row (or a model
+    # with a joint refine) is selected.
+    output$refine_readout <- shiny::renderUI({
+      e <- selected_entry()
+      shiny::req(e, identical(e$variant, "joint"))
+      staged <- fits_store()[[e$model]]; joint <- refined_fits()[[e$model]]
+      shiny::req(staged, joint)
+      lab <- if (identical(joint$response, "binary")) "Deviance" else "SSR"
+      improved <- joint$objective <= staged$objective + 1e-9
+      shiny::tags$p(
+        shiny::tags$b(paste0(e$model, " joint refine ", lab, " (vs staged): ")),
+        round(staged$objective, 2), shiny::HTML(" &rarr; "), round(joint$objective, 2),
+        if (improved) shiny::tags$span(style = "color:green", " ✓"))
+    })
+
+    # Badge: the diagnostics are showing a joint-refined (Optimized) row.
+    output$refined_badge <- shiny::renderUI({
+      e <- selected_entry()
+      if (!is.null(e) && identical(e$variant, "joint"))
+        shiny::div(class = "text-info", shiny::tags$small(
+          "Showing the joint-refined (all-parameters) fit for this model. ",
+          "The staged comparison block above is unchanged."))
     })
 
     output$surface <- plotly::renderPlotly({
-      shiny::req(frozen(), current_fit()); plot_surface(current_fit(), engine_df())
+      shiny::req(engine_df())
+      # raw point cloud before any curves; once both curves are frozen, the
+      # additivity (reference) surface; once an interaction model is selected,
+      # that model's surface (display_fit()).
+      f <- display_fit()
+      if (is.null(f) && isTRUE(frozen())) f <- reference_fit_live()
+      plot_surface(f, engine_df())
     })
     output$isobole <- plotly::renderPlotly({
-      shiny::req(frozen(), current_fit())
+      shiny::req(frozen(), display_fit())
       ref <- if (!is.null(last_compare())) last_compare()$fits$reference else NULL
-      plot_isobole(current_fit(), engine_df(), reference_fit = ref)
+      plot_isobole(display_fit(), engine_df(), reference_fit = ref)
     })
     output$op <- plotly::renderPlotly({
-      shiny::req(frozen(), current_fit()); plot_obs_pred(current_fit(), engine_df())
+      shiny::req(frozen(), display_fit()); plot_obs_pred(display_fit(), engine_df())
     })
 
-    # One row per interaction model the user has fitted (model name in the first
-    # column): params + objective/df + LR p-value across the columns. A single
-    # Autofit/Simulate adds its own row; Find best fills all four. The p-value
-    # column and the highlighted best-model row only appear once Find best has
-    # run (it is the sole writer of `last_compare()`, which carries the parent
-    # comparison + chosen model). Sorting is disabled -- row order is fixed.
+    # The comparison table. The staged block (one row per model) is always shown
+    # -- empty at first, curve columns filling from curve_params() once both
+    # Stage-1 curves are fitted, and a/b/objective/df/p filling when "Fit
+    # interaction models" completes. Once "Optimize all params" has run, a
+    # separator row ("Optimized (joint)") and one joint row per model are
+    # appended; each joint row carries that model's fully re-fitted parameters so
+    # the user can click it and compare its surface against the staged version.
+    # Only the staged block feeds the verdict (p / highlighted winner). Selection
+    # is read via isolate() so clicking a row does NOT re-render the table (DT
+    # highlights client-side); the current selection is reapplied on the
+    # re-renders that DO happen (after a fit / optimize completes).
     output$results <- DT::renderDT({
-      fits <- fits_store()
-      shiny::req(length(fits) > 0)
-      ord    <- intersect(c("reference", "SA", "DR", "DL"), names(fits))
-      cmp    <- if (!is.null(last_compare())) last_compare()$comparison else NULL
+      rows <- table_rows()
+      cmp  <- if (!is.null(last_compare())) last_compare()$comparison else NULL
       chosen <- if (!is.null(last_compare())) last_compare()$chosen else NULL
-      mat  <- round(result_table(list(fits = fits[ord], comparison = cmp)), 4)
-      disp <- as.data.frame(t(mat), check.names = FALSE)        # models -> rows
-      disp <- cbind(`Interaction model` = rownames(disp), disp, stringsAsFactors = FALSE)
-      rownames(disp) <- NULL
-      dt <- DT::datatable(disp, rownames = FALSE,
-                          options = list(dom = "t", ordering = FALSE, scrollX = TRUE))
-      if (!is.null(chosen) && chosen %in% disp[["Interaction model"]])
-        dt <- DT::formatStyle(dt, "Interaction model", target = "row",
-                              fontWeight = DT::styleEqual(chosen, "bold"),
-                              backgroundColor = DT::styleEqual(chosen, "#d8f0d8"))
-      dt
+      cp   <- tryCatch(curve_params(), error = function(e) NULL)  # NULL until frozen
+      olab <- if (identical(engine_response(), "binary")) "Deviance" else "SSR"
+
+      vcurve <- function(e, nm) {                   # curve param (max/slope/ec50)
+        if (isTRUE(e$separator)) return(NA_real_)
+        f <- e$fit
+        if (!is.null(f) && nm %in% names(f$par)) round(unname(f$par[[nm]]), 4)
+        else if (identical(e$variant, "staged") && !is.null(cp) && nm %in% names(cp))
+          round(unname(cp[[nm]]), 4)
+        else NA_real_
+      }
+      vip <- function(e, nm) {                      # interaction param a/b
+        if (isTRUE(e$separator) || is.null(e$fit) || !(nm %in% names(e$fit$par)))
+          return(NA_real_)
+        round(unname(e$fit$par[[nm]]), 4)
+      }
+      vobj <- function(e) if (!isTRUE(e$separator) && !is.null(e$fit))
+        round(e$fit$objective, 4) else NA_real_
+      vdf  <- function(e) if (!isTRUE(e$separator) && !is.null(e$fit))
+        as.numeric(e$fit$df) else NA_real_
+      vp   <- function(e) {                         # staged verdict p only
+        if (isTRUE(e$separator) || !identical(e$variant, "staged") || is.null(cmp))
+          return(NA_real_)
+        i <- which(cmp$model == e$model); if (length(i)) round(cmp$p[i[[1]]], 4) else NA_real_
+      }
+      vlabel <- function(e) if (isTRUE(e$separator)) "─ Optimized (joint) ─" else e$model
+      vhl <- function(e) {
+        if (isTRUE(e$separator)) return("sep")
+        if (identical(e$variant, "staged") && !is.null(chosen) &&
+            identical(e$model, chosen)) return("win")
+        ""
+      }
+
+      disp <- data.frame(check.names = FALSE,
+        `Interaction model` = vapply(rows, vlabel, character(1)),
+        max    = vapply(rows, vcurve, numeric(1), "max"),
+        slope1 = vapply(rows, vcurve, numeric(1), "slope1"),
+        slope2 = vapply(rows, vcurve, numeric(1), "slope2"),
+        ec501  = vapply(rows, vcurve, numeric(1), "ec501"),
+        ec502  = vapply(rows, vcurve, numeric(1), "ec502"),
+        a      = vapply(rows, vip, numeric(1), "a"),
+        b      = vapply(rows, vip, numeric(1), "b"))
+      disp[[olab]] <- vapply(rows, vobj, numeric(1))
+      disp[["df"]] <- vapply(rows, vdf, numeric(1))
+      disp[["p"]]  <- vapply(rows, vp, numeric(1))
+      disp[[".hl"]] <- vapply(rows, vhl, character(1))   # hidden style flag
+
+      hl_idx <- ncol(disp) - 1L                          # 0-based index of .hl
+      dt <- DT::datatable(
+        disp, rownames = FALSE,
+        selection = list(mode = "single", target = "row",
+                         selected = shiny::isolate(sel_row())),
+        options = list(dom = "t", ordering = FALSE, scrollX = TRUE,
+                       columnDefs = list(list(visible = FALSE, targets = hl_idx))))
+      DT::formatStyle(dt, "Interaction model", valueColumns = ".hl", target = "row",
+                      backgroundColor = DT::styleEqual(c("win", "sep"),
+                                                       c("#d8f0d8", "#eeeeee")),
+                      fontWeight = DT::styleEqual("win", "bold"),
+                      fontStyle  = DT::styleEqual("sep", "italic"))
     })
     # CIs for a fitted model; a simulated (hand-entered) set has no CIs, so show
     # its entered values instead (honest -- those are the numbers you set).
     # For a joint fit, parameters that were pinned (Lower == Upper) were not
     # estimated, so their CI is meaningless -- blank those rows.
     output$cis <- DT::renderDT({
-      shiny::req(current_fit())
-      f <- current_fit()
+      shiny::req(display_fit())
+      f <- display_fit()
       tab <- if (isTRUE(f$simulated)) {
         data.frame(parameter = names(f$par), value = round(unname(f$par), 4))
       } else {
@@ -587,6 +613,8 @@ binary_server <- function(id, meta) {
       DT::datatable(tab, rownames = FALSE, options = list(dom = "t"))
     })
 
-    list(current_fit = current_fit, last_compare = last_compare)  # return for testability
+    list(current_fit = current_fit, last_compare = last_compare,
+         refined_fits = refined_fits, display_fit = display_fit,
+         selected_model = selected_model)  # return for testability
   })
 }

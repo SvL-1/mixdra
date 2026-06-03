@@ -1,7 +1,21 @@
 # Binary tab: model selection as a joint-fit loop (UX spine)
 
 **Date:** 2026-06-02
-**Status:** Design approved; pending spec review → implementation plan
+**Status:** Implemented 2026-06-03 on branch `binary-joint-selection-loop`, **with one reversal.**
+
+> **AMENDMENT (2026-06-03):** the 3-stage UX, the live row-by-row compare-all
+> loop, and the retirement of "Find best"/"Optimize all" were all built as
+> specified. **However, the core "fit each model JOINTLY" decision was reverted
+> to STAGED** (curves fixed from the single compounds, only `a`/`b` per model).
+> Reason: the memory `mixdra-staged-fitting` records that Sam signed off
+> (2026-06-01) on staged as the scientifically required method — joint re-absorbs
+> interactions into re-fitted curves and masks real effects (e.g. the quantal
+> `reference→DR` flip). The loop therefore runs `analyse_mixture`'s staged
+> per-model fit one model per tick, then `compare_fits`. The joint engine
+> functions (`joint_fit_one`, `analyse_mixture_joint`) were removed; `compare_fits`
+> and `selection_chain_order` remain. Read the rest of this doc with "joint"
+> replaced by "staged" in the loop; everything else (UX, live updates, LR test)
+> stands as written.
 
 ## Context
 
