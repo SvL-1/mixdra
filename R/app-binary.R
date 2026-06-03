@@ -113,8 +113,8 @@ binary_ui <- function(id) {
     bslib::card(
       bslib::card_header("Stage 1 · Single curves"),
       shiny::p("Fit each chemical's dose-response curve (Autofit or Simulate). ",
-               "These seed the joint fits below — they are a starting point, ",
-               "not frozen. The comparison workspace appears once both are fitted."),
+               "These curves are held fixed when the interaction models are ",
+               "compared below. The comparison workspace appears once both are fitted."),
       # One row per chemical, stacked vertically (sets up the ternary case --
       # chemical 3 is simply another row). Each row is settings | plots.
       shiny::div(shiny::h5(shiny::textOutput(ns("chem1_title"))),
@@ -125,15 +125,15 @@ binary_ui <- function(id) {
       shiny::uiOutput(ns("reveal_note"))
     ),
 
-    # Stage 2 -- the hero: fit & compare ALL interaction models jointly, live.
+    # Stage 2 -- the hero: fit & compare ALL interaction models (staged), live.
     shiny::conditionalPanel(
       condition = "output.frozen", ns = ns,
       bslib::card(
         bslib::card_header("Stage 2 · Compare interaction models"),
-        shiny::p("Fits every interaction model jointly (curves + interaction ",
-                 "together), warm-started reference → S/A → DR/DL, and ",
-                 "compares them. Rows fill in as each model finishes; the best ",
-                 "model is highlighted."),
+        shiny::p("Fits every interaction model with the curves held fixed from ",
+                 "the single compounds (only the interaction terms are fitted), ",
+                 "reference → S/A → DR/DL, and compares them. Rows fill in as each ",
+                 "model finishes; the best model is highlighted."),
         bslib::layout_columns(
           col_widths = c(7, 5),
           shiny::div(class = "mt-4",
@@ -268,15 +268,12 @@ binary_server <- function(id, meta) {
     m2 <- shiny::reactive(marginal_df(engine_df(), 2))
 
     # Stage 1: two embedded single-chemical fitters, one per marginal series.
-    # `inject*` lets the joint refine (Optimize all) write its curve parameters
-    # back into the panels, so the chemical panels stay the single source of
-    # truth for the curves.
-    inject1 <- shiny::reactiveVal(NULL)
-    inject2 <- shiny::reactiveVal(NULL)
+    # The chemical panels are the single source of truth for the curves; the
+    # staged compare-all loop reads them (curve_params()) and never writes back.
     fit1 <- curve_fit_server("chem1", fit_df = m1, meta = meta,
-                             chem_field = "chem1", inject = inject1)
+                             chem_field = "chem1")
     fit2 <- curve_fit_server("chem2", fit_df = m2, meta = meta,
-                             chem_field = "chem2", inject = inject2)
+                             chem_field = "chem2")
 
     # Stages 2-3 are gated on `frozen`: both single curves fitted. There is no
     # manual freeze step -- the workspace simply appears once both fits exist.
@@ -291,9 +288,9 @@ binary_server <- function(id, meta) {
     })
 
     # Per-model interaction fits, keyed by model name. Autofit/Simulate write one
-    # entry; Find best writes all four. `current_fit` is whatever is stored for the
-    # selected model (NULL if none yet). When a curve changes, the stored fits are
-    # re-evaluated at the new curve parameters (not cleared) so Stage 3 stays live.
+    # entry; Compare all writes all four. `current_fit` is whatever is stored for
+    # the selected model (NULL if none yet). When a curve changes, the stored fits
+    # are re-evaluated at the new curve parameters (not cleared) so Stage 3 stays live.
     fits_store   <- shiny::reactiveVal(list())
     last_compare <- shiny::reactiveVal(NULL)
 
@@ -301,7 +298,7 @@ binary_server <- function(id, meta) {
     n_chem <- shiny::reactive(
       length(intersect(c("C1", "C2", "C3"), names(engine_df()))))
 
-    # Live joint compare-all loop. `loop_queue` holds the models still to fit;
+    # Live staged compare-all loop. `loop_queue` holds the models still to fit;
     # `stepper_on` arms the timer-driven stepper. We fit ONE model per tick and
     # let Shiny flush (paint the new table row) between ticks via invalidateLater.
     loop_queue <- shiny::reactiveVal(NULL)
@@ -339,9 +336,8 @@ binary_server <- function(id, meta) {
     # A changed curve does NOT blank the interaction: re-evaluate each stored fit
     # at the new curve parameters (keeping its a/b), so Stage 3 stays in sync with
     # Stage 1 live. This is what makes editing chemical 1 show up in the
-    # diagnostics, and what reconciles a joint refine's write-back. The staged
-    # model comparison, however, was computed at the old curves, so it is
-    # invalidated (re-run Find best to compare at the new curves).
+    # diagnostics. The model comparison, however, was computed at the old curves,
+    # so it is invalidated (re-run Compare all to compare at the new curves).
     shiny::observeEvent(
       list(fit1(), fit2()),
       {
@@ -369,7 +365,7 @@ binary_server <- function(id, meta) {
       },
       ignoreInit = TRUE)
 
-    # Kick: clear the store and arm the joint chain (reference -> SA -> DR -> DL).
+    # Kick: clear the store and arm the selection chain (reference -> SA -> DR -> DL).
     shiny::observeEvent(input$compare_all, {
       shiny::req(frozen(), curve_params())
       fits_store(list())
@@ -519,8 +515,8 @@ binary_server <- function(id, meta) {
 
     # One row per interaction model the user has fitted (model name in the first
     # column): params + objective/df + LR p-value across the columns. A single
-    # Autofit/Simulate adds its own row; Find best fills all four. The p-value
-    # column and the highlighted best-model row only appear once Find best has
+    # Autofit/Simulate adds its own row; Compare all fills all four. The p-value
+    # column and the highlighted best-model row only appear once Compare all has
     # run (it is the sole writer of `last_compare()`, which carries the parent
     # comparison + chosen model). Sorting is disabled -- row order is fixed.
     output$results <- DT::renderDT({
