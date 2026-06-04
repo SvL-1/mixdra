@@ -710,9 +710,12 @@ Open `vignettes/methodology.html` in a browser (or read it) and confirm: all six
 - [ ] **Step 5: Commit the generated artefacts**
 
 ```bash
-git add vignettes/methodology.Rmd vignettes/figure-curve1.png vignettes/figure-curve2.png vignettes/figure-obs-pred.png vignettes/figure-surface.png vignettes/figure-isobole.png vignettes/figure-isoplane.png vignettes/methodology.html
+git add vignettes/methodology.Rmd vignettes/figure-curve1.png vignettes/figure-curve2.png vignettes/figure-obs-pred.png vignettes/figure-surface.png vignettes/figure-isobole.png vignettes/figure-isoplane.png
 git commit -m "docs(vignette): pre-computed methodology vignette + figures"
 ```
+
+(`vignettes/methodology.html` is a build/verification artefact — `R CMD build`
+regenerates it into `inst/doc/`. It is git-ignored, NOT committed.)
 
 - [ ] **Step 6: Update the README to point at the vignette**
 
