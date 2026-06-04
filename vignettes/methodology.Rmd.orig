@@ -142,3 +142,50 @@ objective against the degrees of freedom it spent). A small *p*-value means the
 extra interaction parameter bought a real improvement; a large one means it did not,
 and the simpler parent stands. `res$chosen` is the model this rule selects — the
 interaction pattern the data actually justify, not the most flattering one.
+
+# Step 5 — reading and visualising the result
+
+`result_table()` turns the selected fit into the parameter block you would read off
+the paper or workbook: fitted `max`, per-chemical slopes and EC50s, the interaction
+parameter(s), and the fit statistic.
+
+```{r result-table}
+result_table(res)
+```
+
+The fitted marginal curve for each chemical, with the observed points overlaid:
+
+```{r plot-curve-1, results = "hide"}
+fit <- res$fits[[res$chosen]]
+knitr::include_graphics(save_png(plot_dose_response(fit, df, chem = 1),
+                                 "figure-curve1.png"))
+```
+
+```{r plot-curve-2, results = "hide"}
+knitr::include_graphics(save_png(plot_dose_response(fit, df, chem = 2),
+                                 "figure-curve2.png"))
+```
+
+Observed-versus-predicted is the quickest global check of fit — points should hug
+the dashed 1:1 line:
+
+```{r plot-obs-pred, results = "hide"}
+knitr::include_graphics(save_png(plot_obs_pred(fit, df), "figure-obs-pred.png"))
+```
+
+The full fitted response surface over the (C1, C2) plane, with the observed cloud:
+
+```{r plot-surface, results = "hide"}
+knitr::include_graphics(save_png(plot_surface(fit, df), "figure-surface.png"))
+```
+
+Finally the isoboles — equal-response contours. Overlaying the CA reference
+(dashed) on the chosen model (solid) makes any departure from additivity visible: if
+the solid contours bow away from the reference, the mixture is more (or less) potent
+than additivity predicts.
+
+```{r plot-isobole, results = "hide"}
+knitr::include_graphics(save_png(
+  plot_isobole(fit, df, reference_fit = res$fits$reference),
+  "figure-isobole.png"))
+```
