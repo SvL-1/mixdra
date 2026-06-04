@@ -75,9 +75,12 @@ fit2 <- analyse_single(data.frame(C1 = s2$C2, Res = s2$Res))
 rbind(`chemical 1` = fit1$par, `chemical 2` = fit2$par)
 ```
 
-These per-chemical `max`, `slope`, and `EC50` values are exactly what the staged
-mixture fit (Step 3) will hold fixed: the curves come from the single-compound data,
-never from the mixture rows.
+`analyse_single()` fits each chemical on its own, each with its own `max`. The staged
+mixture fit re-derives these curves a little differently — it fits the reference model to
+the single-compound rows with a **single shared `max`** pooled across both chemicals — so
+the `max`/`slope`/`EC50` it holds fixed (shown in Step 5) differ slightly from the
+per-chemical values above. The invariant that matters is unchanged: every curve parameter
+comes from the single-compound data, never from the mixture rows.
 
 # Step 2 — the additivity reference models
 
