@@ -51,3 +51,28 @@ head(df)
 The design crosses the two chemicals: rows with `C2 == 0` are the chemical-1-only
 series, rows with `C1 == 0` are the chemical-2-only series, the `C1 == 0 & C2 == 0`
 rows are untreated controls, and the remainder are genuine mixtures.
+
+# Step 1 — the single-compound curves
+
+Each chemical alone is described by a three-parameter log-logistic curve
+
+$$ y(c) \;=\; \frac{\mathrm{max}}{1 + (c / \mathrm{EC50})^{\,\mathrm{slope}}}, $$
+
+where `max` is the control-level response, `EC50` is the concentration giving half
+that response, and `slope` controls steepness. `analyse_single()` fits this curve
+from a one-chemical data frame (`C1` + `Res`). We fit each chemical from its own
+single-compound rows.
+
+```{r single-fits}
+s1 <- subset(df, C2 == 0)                              # chemical-1-only + controls
+s2 <- subset(df, C1 == 0)                              # chemical-2-only + controls
+
+fit1 <- analyse_single(s1)
+fit2 <- analyse_single(data.frame(C1 = s2$C2, Res = s2$Res))
+
+rbind(`chemical 1` = fit1$par, `chemical 2` = fit2$par)
+```
+
+These per-chemical `max`, `slope`, and `EC50` values are exactly what the staged
+mixture fit (Step 3) will hold fixed: the curves come from the single-compound data,
+never from the mixture rows.
