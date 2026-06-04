@@ -742,3 +742,16 @@ git commit -m "docs(readme): link to the methodology vignette"
 - **Unverified API accessors to confirm during implementation (flagged in-task):** `analyse_single()$par` field name (Task 3 Step 2); `res$comparison` column names for the prose (Task 6 Step 2). Both have an explicit verify-and-adjust step.
 - **Plot-object/`fit` contract:** all binary `plot_*` take a single enriched fit (`res$fits[[res$chosen]]` or `res$fits$reference`), confirmed against `R/plot.R`; ternary plots take the `analyse_ternary()` result, confirmed against `R/plot.R` and `R/ternary-isoplane.R`.
 - **Build-time safety:** Task 9 Step 2 explicitly asserts no live `{r}` chunks survive in the shipped `.Rmd`, which is the whole point of the pre-compute pattern.
+
+## Correction applied during execution (2026-06-04)
+
+The plan's plot chunks (Tasks 7 & 8) originally specified `results = "hide"`. That was
+**wrong**: `results = "hide"` also suppresses the output of `knitr::include_graphics()`,
+which *is* the rendered image — so the first full precompute produced a vignette with the
+PNGs written to disk but **no figures embedded**. Fix applied to `vignettes/methodology.Rmd.orig`:
+(1) removed `results = "hide"` from all six plot chunks so the images render; (2) added
+`message = FALSE, warning = FALSE` to the global `knitr::opts_chunk$set()` in the setup chunk,
+which both hides the webshot "screenshot completed" chatter and keeps the fit chunks' ~31
+non-fatal Nelder-Mead warnings out of the rendered vignette. After the fix the HTML embeds all
+six figures (verified: 6 base64 images, 6 `![](figure-*.png)` refs in the static `.Rmd`, 0 live
+`{r}` chunks, 0 leaked warnings).
