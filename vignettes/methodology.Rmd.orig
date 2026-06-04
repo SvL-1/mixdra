@@ -103,8 +103,9 @@ same way by passing `reference = "IA"`.
 A *deviation* model adds a single interaction term on top of a reference, each
 capturing a different *pattern* of non-additivity (Jonker et al. 2005, Table 1):
 
-- **S/A** — one parameter `a`: overall synergism (`a > 0`) or antagonism (`a < 0`),
-  the same everywhere in the mixture.
+- **S/A** — one parameter `a`: overall antagonism (`a > 0`, mixture less toxic than
+  the reference predicts) or synergism (`a < 0`, more toxic), the same everywhere in
+  the mixture.
 - **DR** — dose-ratio-dependent: the interaction changes with the *ratio* of the two
   chemicals (parameters `a` and `b`).
 - **DL** — dose-level-dependent: the interaction changes with the overall *dose
