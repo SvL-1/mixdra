@@ -23,3 +23,4 @@ demo_*
 plots_demo/
 *.log
 vignettes/precompute.marker
+vignettes/*.html
