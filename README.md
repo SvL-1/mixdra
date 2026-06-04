@@ -94,9 +94,9 @@ install.packages(c("shiny", "bslib", "plotly", "DT"))
 mixdra::run_app()
 ```
 
-Opens a `bslib` dashboard with **Single Chemical** and **Binary Mixture** workflows: upload your
-data (or use the built-in example), fit the curves, and step through fit-and-compare with live
-plots and an editable data table.
+Opens a `bslib` dashboard with **Single Chemical**, **Binary Mixture**, and **Ternary Mixture**
+workflows: upload your data (or use the built-in example), fit the curves, and step through
+fit-and-compare with live plots and an editable data table.
 
 ### Scripted analysis
 
