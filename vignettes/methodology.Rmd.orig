@@ -30,8 +30,24 @@ library(mixdra)
 
 # Introduction
 
-_Scaffold — replaced in later tasks._
+The interaction-analysis method of Jonker et al. (2005) is usually run by hand in
+an Excel/VBA workbook with the Solver add-in: one model fitted per click, no test
+suite, no record of the starting values. `mixdra` reproduces the same science as a
+tested R package. This vignette walks the whole method through one real dataset, so
+you see both *what each step does* and *how to drive the package to do it*.
 
-```{r scaffold}
-1 + 1
+We use a bundled binary mixture: a *Folsomia candida* soil reproduction assay with
+two co-applied chemicals. Columns `C1` and `C2` are the two concentrations (mg/kg);
+`Res` is the continuous reproduction response (offspring count).
+
+```{r load-data}
+path <- system.file("extdata", "binary_ca_cpf_imi_fbsa_continuous.csv",
+                    package = "mixdra")
+df <- read.csv(path)
+str(df)
+head(df)
 ```
+
+The design crosses the two chemicals: rows with `C2 == 0` are the chemical-1-only
+series, rows with `C1 == 0` are the chemical-2-only series, the `C1 == 0 & C2 == 0`
+rows are untreated controls, and the remainder are genuine mixtures.
