@@ -24,3 +24,9 @@ plots_demo/
 *.log
 vignettes/precompute.marker
 vignettes/*.html
+
+# transient vignette-build scratch (never commit)
+verify-*.R
+verify-*.out
+verify-*.rds
+t?-*.png
