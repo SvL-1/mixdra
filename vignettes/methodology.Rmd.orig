@@ -95,3 +95,32 @@ predictions. `mixdra` fits both as the additivity baselines; departures from the
 are what the deviation models (Step 3) capture. This worked example uses CA as the
 reference throughout (it is the reference behind the source workbook); IA is fit the
 same way by passing `reference = "IA"`.
+
+# Step 3 — deviation models and staged fitting
+
+A *deviation* model adds a single interaction term on top of a reference, each
+capturing a different *pattern* of non-additivity (Jonker et al. 2005, Table 1):
+
+- **S/A** — one parameter `a`: overall synergism (`a > 0`) or antagonism (`a < 0`),
+  the same everywhere in the mixture.
+- **DR** — dose-ratio-dependent: the interaction changes with the *ratio* of the two
+  chemicals (parameters `a` and `b`).
+- **DL** — dose-level-dependent: the interaction changes with the overall *dose
+  level* / effect magnitude (parameters `a` and `b`).
+
+`mixdra` fits these in **stages**, which is the whole point of the method: the curve
+parameters are estimated from the single-compound rows and then *held fixed*, and
+only the interaction parameter(s) are fitted to the full mixture data. The mixture
+points can therefore never distort the single-chemical potencies.
+
+`analyse_mixture()` does the entire chain in one call — it fits the reference and
+each deviation, then compares them (Step 4). We raise `n_starts` so the multi-start
+optimiser reliably escapes the local minima of the non-smooth CA surface.
+
+```{r fit-mixture}
+set.seed(1)
+res <- analyse_mixture(df, reference = "CA", response = "continuous",
+                       n_starts = 12)
+names(res)
+names(res$fits)   # reference, SA, DR, DL
+```
