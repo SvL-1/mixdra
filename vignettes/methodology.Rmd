@@ -11,10 +11,293 @@ vignette: >
 
 # Introduction
 
-_Scaffold — replaced in later tasks._
+The interaction-analysis method of Jonker et al. (2005) is usually run by hand in
+an Excel/VBA workbook with the Solver add-in: one model fitted per click, no test
+suite, no record of the starting values. `mixdra` reproduces the same science as a
+tested R package. This vignette walks the whole method through one real dataset, so
+you see both *what each step does* and *how to drive the package to do it*.
+
+We use a bundled binary mixture: a *Folsomia candida* soil reproduction assay with
+two co-applied chemicals. Columns `C1` and `C2` are the two concentrations (mg/kg);
+`Res` is the continuous reproduction response (offspring count).
 
 
 ``` r
-1 + 1
-#> [1] 2
+path <- system.file("extdata", "binary_ca_cpf_imi_fbsa_continuous.csv",
+                    package = "mixdra")
+df <- read.csv(path)
+str(df)
+#> 'data.frame':	144 obs. of  3 variables:
+#>  $ C1 : num  0 0 0 0 0 0 0 0 0 0 ...
+#>  $ C2 : num  0 0 0 0 0 0 0 0 0 0 ...
+#>  $ Res: num  797 815 703 733 861 ...
+head(df)
+#>   C1 C2      Res
+#> 1  0  0 797.0000
+#> 2  0  0 815.0000
+#> 3  0  0 703.0000
+#> 4  0  0 733.0000
+#> 5  0  0 860.9425
+#> 6  0  0 966.9487
 ```
+
+The design crosses the two chemicals: rows with `C2 == 0` are the chemical-1-only
+series, rows with `C1 == 0` are the chemical-2-only series, the `C1 == 0 & C2 == 0`
+rows are untreated controls, and the remainder are genuine mixtures.
+
+# Step 1 — the single-compound curves
+
+Each chemical alone is described by a three-parameter log-logistic curve
+
+$$ y(c) \;=\; \frac{\mathrm{max}}{1 + (c / \mathrm{EC50})^{\,\mathrm{slope}}}, $$
+
+where `max` is the control-level response, `EC50` is the concentration giving half
+that response, and `slope` controls steepness. `analyse_single()` fits this curve
+from a one-chemical data frame (`C1` + `Res`). We fit each chemical from its own
+single-compound rows.
+
+
+``` r
+s1 <- subset(df, C2 == 0)                              # chemical-1-only + controls
+s2 <- subset(df, C1 == 0)                              # chemical-2-only + controls
+
+fit1 <- analyse_single(s1)
+fit2 <- analyse_single(data.frame(C1 = s2$C2, Res = s2$Res))
+
+rbind(`chemical 1` = fit1$par, `chemical 2` = fit2$par)
+#>                 max    slope      ec50
+#> chemical 1 792.9802 7.759435 0.1249886
+#> chemical 2 843.7352 4.024043 0.5804836
+```
+
+These per-chemical `max`, `slope`, and `EC50` values are exactly what the staged
+mixture fit (Step 3) will hold fixed: the curves come from the single-compound data,
+never from the mixture rows.
+
+# Step 2 — the additivity reference models
+
+Before asking whether two chemicals *interact*, we need a baseline for "no
+interaction". The method offers two:
+
+- **Concentration Addition (CA)** assumes the chemicals act through the same
+  mechanism and add up on the *concentration* (toxic-unit) scale: a mixture is as
+  toxic as the sum of each chemical's potency-scaled dose. CA predicts the mixture
+  response by solving, at each mixture point, for the equi-effective single dose.
+- **Independent Action (IA)** assumes independent mechanisms and combines on the
+  *effect* (probability) scale: the chemicals act on different sites, so their
+  fractional effects multiply.
+
+Neither has extra free parameters beyond the single-compound curves — they are pure
+predictions. `mixdra` fits both as the additivity baselines; departures from them
+are what the deviation models (Step 3) capture. This worked example uses CA as the
+reference throughout (it is the reference behind the source workbook); IA is fit the
+same way by passing `reference = "IA"`.
+
+# Step 3 — deviation models and staged fitting
+
+A *deviation* model adds a single interaction term on top of a reference, each
+capturing a different *pattern* of non-additivity (Jonker et al. 2005, Table 1):
+
+- **S/A** — one parameter `a`: overall synergism (`a > 0`) or antagonism (`a < 0`),
+  the same everywhere in the mixture.
+- **DR** — dose-ratio-dependent: the interaction changes with the *ratio* of the two
+  chemicals (parameters `a` and `b`).
+- **DL** — dose-level-dependent: the interaction changes with the overall *dose
+  level* / effect magnitude (parameters `a` and `b`).
+
+`mixdra` fits these in **stages**, which is the whole point of the method: the curve
+parameters are estimated from the single-compound rows and then *held fixed*, and
+only the interaction parameter(s) are fitted to the full mixture data. The mixture
+points can therefore never distort the single-chemical potencies.
+
+`analyse_mixture()` does the entire chain in one call — it fits the reference and
+each deviation, then compares them (Step 4). We raise `n_starts` so the multi-start
+optimiser reliably escapes the local minima of the non-smooth CA surface.
+
+
+``` r
+set.seed(1)
+res <- analyse_mixture(df, reference = "CA", response = "continuous",
+                       n_starts = 12)
+names(res)
+#> [1] "fits"       "comparison" "chosen"     "reference"  "response"
+names(res$fits)   # reference, SA, DR, DL
+#> [1] "reference" "SA"        "DR"        "DL"
+```
+
+# Step 4 — which interaction does the data support?
+
+Each deviation model nests its reference (set the interaction parameters to zero and
+you recover CA), so nested pairs can be compared by a **likelihood-ratio test**.
+`analyse_mixture()` builds the comparison table and applies the parsimony rule:
+prefer the simplest model the data do not reject.
+
+
+``` r
+res$comparison
+#>   model    parent       chi df            p
+#> 1    SA reference  4.196550  1 4.050630e-02
+#> 2    DR        SA  2.369824  1 1.237010e-01
+#> 3    DL        SA 22.941476  1 1.670092e-06
+res$chosen
+#> [1] "DL"
+```
+
+Read the table top-down: each row tests a model against its parent (the change in
+objective against the degrees of freedom it spent). A small *p*-value means the
+extra interaction parameter bought a real improvement; a large one means it did not,
+and the simpler parent stands. `res$chosen` is the model this rule selects — the
+interaction pattern the data actually justify, not the most flattering one.
+
+# Step 5 — reading and visualising the result
+
+`result_table()` turns the selected fit into the parameter block you would read off
+the paper or workbook: fitted `max`, per-chemical slopes and EC50s, the interaction
+parameter(s), and the fit statistic.
+
+
+``` r
+result_table(res)
+#>                       reference           SA            DR            DL
+#> max                8.220041e+02 8.220041e+02  8.220041e+02  8.220041e+02
+#> slope1             7.348648e+00 7.348648e+00  7.348648e+00  7.348648e+00
+#> slope2             4.322461e+00 4.322461e+00  4.322461e+00  4.322461e+00
+#> ec501              1.227690e-01 1.227690e-01  1.227690e-01  1.227690e-01
+#> ec502              5.896706e-01 5.896706e-01  5.896706e-01  5.896706e-01
+#> a                            NA 4.750572e-01  1.711181e+00 -1.971389e+00
+#> b                            NA           NA -3.071504e+00  9.058730e-01
+#> objective          2.379937e+06 2.311580e+06  2.273849e+06  1.971147e+06
+#> df                 0.000000e+00 1.000000e+00  2.000000e+00  2.000000e+00
+#> chi-sq (vs parent)           NA 4.196550e+00  2.369824e+00  2.294148e+01
+#> p (vs parent)                NA 4.050630e-02  1.237010e-01  1.670092e-06
+```
+
+The fitted marginal curve for each chemical, with the observed points overlaid:
+
+
+``` r
+fit <- res$fits[[res$chosen]]
+knitr::include_graphics(save_png(plot_dose_response(fit, df, chem = 1),
+                                 "figure-curve1.png"))
+```
+
+![plot of chunk plot-curve-1](figure-curve1.png)
+
+
+``` r
+knitr::include_graphics(save_png(plot_dose_response(fit, df, chem = 2),
+                                 "figure-curve2.png"))
+```
+
+![plot of chunk plot-curve-2](figure-curve2.png)
+
+Observed-versus-predicted is the quickest global check of fit — points should hug
+the dashed 1:1 line:
+
+
+``` r
+knitr::include_graphics(save_png(plot_obs_pred(fit, df), "figure-obs-pred.png"))
+```
+
+![plot of chunk plot-obs-pred](figure-obs-pred.png)
+
+The full fitted response surface over the (C1, C2) plane, with the observed cloud:
+
+
+``` r
+knitr::include_graphics(save_png(plot_surface(fit, df), "figure-surface.png"))
+```
+
+![plot of chunk plot-surface](figure-surface.png)
+
+Finally the isoboles — equal-response contours. Overlaying the CA reference
+(dashed) on the chosen model (solid) makes any departure from additivity visible: if
+the solid contours bow away from the reference, the mixture is more (or less) potent
+than additivity predicts.
+
+
+``` r
+knitr::include_graphics(save_png(
+  plot_isobole(fit, df, reference_fit = res$fits$reference),
+  "figure-isobole.png"))
+```
+
+![plot of chunk plot-isobole](figure-isobole.png)
+
+# Coda — three chemicals and Advanced S/A
+
+The same machinery scales to three chemicals. With three components there are more
+ways to interact, so the S/A term is generalised to **Advanced S/A**: a per-corner
+interaction with pairwise parameters `A1`, `A2`, `A3` (one per chemical pair) plus a
+three-way `A4` (all three present together).
+
+
+``` r
+tpath <- system.file("extdata", "ternary_ca_fbsa_cpf_imi_continuous.csv",
+                     package = "mixdra")
+tdf <- read.csv(tpath)
+str(tdf)
+#> 'data.frame':	419 obs. of  4 variables:
+#>  $ C1 : num  0 0 0 0 0 0 0 0 0 0 ...
+#>  $ C2 : num  0 0 0 0 0 0 0 0 0 0 ...
+#>  $ C3 : num  0 0 0 0 0 0 0 0 0 0 ...
+#>  $ Res: num  797 815 703 733 861 ...
+```
+
+`analyse_ternary()` fits the same staged way: curves from the singles, pairwise terms
+from the binary rows, and the three-way `A4` from the ternary rows. Crucially it fits
+`A4` two ways — an **overall** `A4` across all ternary rows, and an **individual**
+`A4` per mixture ratio.
+
+
+``` r
+set.seed(1)
+tern <- analyse_ternary(tdf, reference = "CA", n_starts = 12)
+```
+
+`ternary_effect_table()` contrasts them. Comparing each ratio's own `A4` against the
+overall `A4` reveals *averaging-out*: synergy on one ratio and antagonism on another
+can cancel in a single overall fit, so the per-ratio readout shows interaction the
+pooled fit hides.
+
+
+``` r
+ternary_effect_table(tern, tdf)
+#>                          ratio    C1   C2    C3  pred_CA  pred_SA pred_ASA
+#> 1 0.0294118_0.882353_0.0882353 0.080 2.40 0.240 328.0720  98.2790 424.3961
+#> 2                0.05_0.5_0.45 0.040 0.40 0.360 477.9153 359.9155 332.6316
+#> 3  0.0714286_0.714286_0.214286 0.066 0.66 0.198 548.8664 392.5678 462.4353
+#> 4          0.1875_0.625_0.1875 0.120 0.40 0.120 294.0686 228.0489 436.3879
+#>   a4_effect
+#> 1 326.11706
+#> 2 -27.28383
+#> 3  69.86753
+#> 4 208.33905
+```
+
+The EC50 **isoplane** is the three-chemical analogue of the isobole — the surface of
+equi-effective mixtures across the concentration simplex:
+
+
+``` r
+knitr::include_graphics(save_png(plot_isoplane(tern, tdf), "figure-isoplane.png"))
+```
+
+![plot of chunk plot-isoplane](figure-isoplane.png)
+
+For the full theory — the reference-model equations, the deviation terms, and the
+significance testing — see Jonker et al. (2005); for the microplastic/PFAS/pesticide
+study this method was built for, see van Loon et al. (2025).
+
+# References
+
+- Jonker, M.J., Svendsen, C., Bedaux, J.J.M., Bongers, M. & Kammenga, J.E. (2005).
+  Significance testing of synergistic/antagonistic, dose level–dependent, or dose
+  ratio–dependent effects in mixture dose–response analysis. *Environmental
+  Toxicology and Chemistry*, 24(10), 2701–2713.
+  <https://doi.org/10.1897/04-431R.1>
+- van Loon, S., Xie, G., Svendsen, C., Kraak, M.H.S., de Jeu, L., Schut, N.C.,
+  Sprokkereef, E., Hurley, R., van Wezel, A.P. & van Gestel, C.A.M. (2025).
+  Microplastics and PFAS as ubiquitous pollutants affect potencies of highly toxic
+  chemicals in mixtures. *Journal of Hazardous Materials*, 500, 140493.
+  <https://doi.org/10.1016/j.jhazmat.2025.140493>

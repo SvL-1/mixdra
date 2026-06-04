@@ -12,7 +12,9 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
   fig.path = "figure-",
-  echo = TRUE
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE
 )
 
 # Render a plotly object to a static PNG under vignettes/ and return the file
@@ -155,13 +157,13 @@ result_table(res)
 
 The fitted marginal curve for each chemical, with the observed points overlaid:
 
-```{r plot-curve-1, results = "hide"}
+```{r plot-curve-1}
 fit <- res$fits[[res$chosen]]
 knitr::include_graphics(save_png(plot_dose_response(fit, df, chem = 1),
                                  "figure-curve1.png"))
 ```
 
-```{r plot-curve-2, results = "hide"}
+```{r plot-curve-2}
 knitr::include_graphics(save_png(plot_dose_response(fit, df, chem = 2),
                                  "figure-curve2.png"))
 ```
@@ -169,13 +171,13 @@ knitr::include_graphics(save_png(plot_dose_response(fit, df, chem = 2),
 Observed-versus-predicted is the quickest global check of fit — points should hug
 the dashed 1:1 line:
 
-```{r plot-obs-pred, results = "hide"}
+```{r plot-obs-pred}
 knitr::include_graphics(save_png(plot_obs_pred(fit, df), "figure-obs-pred.png"))
 ```
 
 The full fitted response surface over the (C1, C2) plane, with the observed cloud:
 
-```{r plot-surface, results = "hide"}
+```{r plot-surface}
 knitr::include_graphics(save_png(plot_surface(fit, df), "figure-surface.png"))
 ```
 
@@ -184,7 +186,7 @@ Finally the isoboles — equal-response contours. Overlaying the CA reference
 the solid contours bow away from the reference, the mixture is more (or less) potent
 than additivity predicts.
 
-```{r plot-isobole, results = "hide"}
+```{r plot-isobole}
 knitr::include_graphics(save_png(
   plot_isobole(fit, df, reference_fit = res$fits$reference),
   "figure-isobole.png"))
@@ -226,7 +228,7 @@ ternary_effect_table(tern, tdf)
 The EC50 **isoplane** is the three-chemical analogue of the isobole — the surface of
 equi-effective mixtures across the concentration simplex:
 
-```{r plot-isoplane, results = "hide"}
+```{r plot-isoplane}
 knitr::include_graphics(save_png(plot_isoplane(tern, tdf), "figure-isoplane.png"))
 ```
 
