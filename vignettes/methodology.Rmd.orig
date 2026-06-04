@@ -189,3 +189,60 @@ knitr::include_graphics(save_png(
   plot_isobole(fit, df, reference_fit = res$fits$reference),
   "figure-isobole.png"))
 ```
+
+# Coda — three chemicals and Advanced S/A
+
+The same machinery scales to three chemicals. With three components there are more
+ways to interact, so the S/A term is generalised to **Advanced S/A**: a per-corner
+interaction with pairwise parameters `A1`, `A2`, `A3` (one per chemical pair) plus a
+three-way `A4` (all three present together).
+
+```{r load-ternary}
+tpath <- system.file("extdata", "ternary_ca_fbsa_cpf_imi_continuous.csv",
+                     package = "mixdra")
+tdf <- read.csv(tpath)
+str(tdf)
+```
+
+`analyse_ternary()` fits the same staged way: curves from the singles, pairwise terms
+from the binary rows, and the three-way `A4` from the ternary rows. Crucially it fits
+`A4` two ways — an **overall** `A4` across all ternary rows, and an **individual**
+`A4` per mixture ratio.
+
+```{r fit-ternary}
+set.seed(1)
+tern <- analyse_ternary(tdf, reference = "CA", n_starts = 12)
+```
+
+`ternary_effect_table()` contrasts them. Comparing each ratio's own `A4` against the
+overall `A4` reveals *averaging-out*: synergy on one ratio and antagonism on another
+can cancel in a single overall fit, so the per-ratio readout shows interaction the
+pooled fit hides.
+
+```{r ternary-effect-table}
+ternary_effect_table(tern, tdf)
+```
+
+The EC50 **isoplane** is the three-chemical analogue of the isobole — the surface of
+equi-effective mixtures across the concentration simplex:
+
+```{r plot-isoplane, results = "hide"}
+knitr::include_graphics(save_png(plot_isoplane(tern, tdf), "figure-isoplane.png"))
+```
+
+For the full theory — the reference-model equations, the deviation terms, and the
+significance testing — see Jonker et al. (2005); for the microplastic/PFAS/pesticide
+study this method was built for, see van Loon et al. (2025).
+
+# References
+
+- Jonker, M.J., Svendsen, C., Bedaux, J.J.M., Bongers, M. & Kammenga, J.E. (2005).
+  Significance testing of synergistic/antagonistic, dose level–dependent, or dose
+  ratio–dependent effects in mixture dose–response analysis. *Environmental
+  Toxicology and Chemistry*, 24(10), 2701–2713.
+  <https://doi.org/10.1897/04-431R.1>
+- van Loon, S., Xie, G., Svendsen, C., Kraak, M.H.S., de Jeu, L., Schut, N.C.,
+  Sprokkereef, E., Hurley, R., van Wezel, A.P. & van Gestel, C.A.M. (2025).
+  Microplastics and PFAS as ubiquitous pollutants affect potencies of highly toxic
+  chemicals in mixtures. *Journal of Hazardous Materials*, 500, 140493.
+  <https://doi.org/10.1016/j.jhazmat.2025.140493>
