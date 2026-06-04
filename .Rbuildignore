@@ -12,3 +12,5 @@
 ^.*\.output$
 ^status_check.*$
 ^MixTox.*\.xls.*$
+^vignettes/methodology\.Rmd\.orig$
+^vignettes/precompute\.R$

@@ -143,6 +143,9 @@ non-additivity, and nested models are compared by likelihood ratio so the report
 the one the data justify — not the most flattering one. See Jonker et al. (2005) for the full
 derivation.
 
+For a full worked walkthrough — fitting curves, comparing models, and reading the results on a
+real dataset — see the **methodology vignette** (`vignette("methodology", package = "mixdra")`).
+
 ## Validation & testing
 
 The engine is checked two ways:

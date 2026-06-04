@@ -19,10 +19,13 @@ Imports:
 Suggests:
     bslib,
     DT,
+    knitr,
     plotly,
     readxl,
+    rmarkdown,
     shiny,
     shinytest2,
     testthat (>= 3.0.0)
+VignetteBuilder: knitr
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.0.0
