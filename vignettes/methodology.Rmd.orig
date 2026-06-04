@@ -124,3 +124,21 @@ res <- analyse_mixture(df, reference = "CA", response = "continuous",
 names(res)
 names(res$fits)   # reference, SA, DR, DL
 ```
+
+# Step 4 — which interaction does the data support?
+
+Each deviation model nests its reference (set the interaction parameters to zero and
+you recover CA), so nested pairs can be compared by a **likelihood-ratio test**.
+`analyse_mixture()` builds the comparison table and applies the parsimony rule:
+prefer the simplest model the data do not reject.
+
+```{r comparison}
+res$comparison
+res$chosen
+```
+
+Read the table top-down: each row tests a model against its parent (the change in
+objective against the degrees of freedom it spent). A small *p*-value means the
+extra interaction parameter bought a real improvement; a large one means it did not,
+and the simpler parent stands. `res$chosen` is the model this rule selects — the
+interaction pattern the data actually justify, not the most flattering one.
