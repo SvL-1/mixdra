@@ -2,17 +2,20 @@
 # are fully unit-testable and run without the UI stack installed.
 
 #' Fixed column schema for a stage and response type
-#' @param stage "single" or "binary".
+#' @param stage "single", "binary", or "ternary".
 #' @param response "continuous" or "quantal".
 #' @return Character vector of required column names.
 #' @keywords internal
 upload_schema <- function(stage, response) {
-  stage <- match.arg(stage, c("single", "binary"))
+  stage <- match.arg(stage, c("single", "binary", "ternary"))
   response <- match.arg(response, c("continuous", "quantal"))
   if (stage == "single") {
     if (response == "continuous") c("Conc", "Res") else c("Conc", "Affected", "Exposed")
-  } else {
+  } else if (stage == "binary") {
     if (response == "continuous") c("C1", "C2", "Res") else c("C1", "C2", "Affected", "Exposed")
+  } else {
+    if (response == "continuous") c("C1", "C2", "C3", "Res")
+    else c("C1", "C2", "C3", "Affected", "Exposed")
   }
 }
 
@@ -33,7 +36,7 @@ template_df <- function(stage, response) {
     } else {
       data.frame(Conc = conc, Affected = c(0, 1, 2, 5, 8, 10), Exposed = rep(10, 6))
     }
-  } else {
+  } else if (stage == "binary") {
     # single-chemical series for each chemical + a few mixture rows
     c1 <- c(0, 0.1, 0.3, 1, 0, 0, 0, 0.1, 0.3, 1)
     c2 <- c(0, 0,   0,   0, 0.1, 0.3, 1, 0.1, 0.3, 1)
@@ -43,6 +46,21 @@ template_df <- function(stage, response) {
     } else {
       data.frame(C1 = c1, C2 = c2,
                  Affected = c(0, 2, 4, 8, 1, 3, 7, 3, 6, 9), Exposed = rep(10, 10))
+    }
+  } else {  # ternary: all tiers so the staged fit has data at every stage
+    rows <- rbind(
+      data.frame(C1 = 0,           C2 = 0,           C3 = 0),            # control
+      data.frame(C1 = c(0.1, 0.3, 1), C2 = 0,        C3 = 0),           # chem1 single
+      data.frame(C1 = 0,           C2 = c(0.1, 0.3, 1), C3 = 0),        # chem2 single
+      data.frame(C1 = 0,           C2 = 0,           C3 = c(0.1, 0.3, 1)), # chem3 single
+      data.frame(C1 = c(0.5, 0.5, 0), C2 = c(0.5, 0, 0.5), C3 = c(0, 0.5, 0.5)), # 3 binaries
+      data.frame(C1 = c(0.2, 0.4, 0.6), C2 = c(0.2, 0.4, 0.6), C3 = c(0.2, 0.4, 0.6)) # 1:1:1 ternary
+    )
+    tot <- rows$C1 + rows$C2 + rows$C3
+    if (response == "continuous") {
+      cbind(rows, Res = round(100 / (1 + tot), 1))          # illustrative decline
+    } else {
+      cbind(rows, Affected = pmin(round(10 * tot / (1 + tot)), 10), Exposed = 10)
     }
   }
 }
@@ -68,7 +86,7 @@ validate_upload <- function(df, stage, response) {
     errs <- c(errs, paste0("Non-numeric column(s): ", paste(non_num, collapse = ", "), "."))
 
   # Range checks only on numeric columns that are present.
-  conc_cols <- intersect(c("Conc", "C1", "C2"), present)
+  conc_cols <- intersect(c("Conc", "C1", "C2", "C3"), present)
   conc_ok <- conc_cols[vapply(df[conc_cols], is.numeric, logical(1))]
   if (length(conc_ok) && any(unlist(df[conc_ok]) < 0, na.rm = TRUE))
     errs <- c(errs, "Concentrations must be >= 0.")
@@ -87,6 +105,14 @@ validate_upload <- function(df, stage, response) {
       errs <- c(errs, "Need at least 4 distinct concentrations to fit a single-chemical curve.")
   }
 
+  if (stage == "ternary" && all(c("C1", "C2", "C3") %in% present) &&
+      all(vapply(df[c("C1", "C2", "C3")], is.numeric, logical(1)))) {
+    nz <- rowSums(as.matrix(df[c("C1", "C2", "C3")]) > 0)
+    if (!any(nz == 3, na.rm = TRUE))
+      errs <- c(errs, paste0("No ternary rows (all of C1, C2, C3 > 0); the ",
+                             "per-ratio A4 step needs at least one ternary mixture."))
+  }
+
   errs
 }
 
@@ -102,7 +128,7 @@ read_upload <- function(path) {
 #'
 #' The single-chemical template uses `Conc`; the engine expects `C1`.
 #' @param df Uploaded data frame.
-#' @param stage "single" or "binary".
+#' @param stage "single", "binary", or "ternary".
 #' @return The data frame with engine-ready column names.
 #' @keywords internal
 to_engine_df <- function(df, stage) {
@@ -145,6 +171,48 @@ assemble_curve_params <- function(fit1, fit2) {
     slope2 = fit2$par[["slope"]],
     ec501  = fit1$par[["ec50"]],
     ec502  = fit2$par[["ec50"]])
+}
+
+#' One chemical's single-compound series from a ternary frame
+#'
+#' Keeps rows where the OTHER TWO chemicals are 0 (so the shared control row is
+#' included), drops their columns, and renames this chemical's concentration
+#' column to `C1` — the shape a single-chemical fitter expects. The ternary
+#' analogue of [marginal_df()].
+#' @param df Ternary engine data frame (`C1`, `C2`, `C3`, response columns).
+#' @param chem 1, 2 or 3 — which chemical's marginal series to extract.
+#' @return A data frame with `C1` and the response columns.
+#' @keywords internal
+marginal_df3 <- function(df, chem) {
+  cols  <- paste0("C", 1:3)
+  this  <- paste0("C", chem)
+  other <- setdiff(cols, this)
+  keep  <- df[[other[1]]] == 0 & df[[other[2]]] == 0
+  out   <- df[keep, , drop = FALSE]
+  out[other] <- NULL
+  names(out)[names(out) == this] <- "C1"
+  rownames(out) <- NULL
+  out
+}
+
+#' Frozen ternary base-parameter vector from three single-chemical fits
+#'
+#' Builds the named vector [analyse_ternary()] holds fixed as its `base`: a
+#' shared `max` (mean of the three per-chemical fits, matching the engine's
+#' seeding) plus per-chemical `slope1/2/3` and `ec50_1/2/3`. Names match the
+#' ternary registry's base parameters (underscore `ec50_i`, unlike binary's
+#' `ec501`).
+#' @param fit1,fit2,fit3 Single-fit results (each `par = c(max, slope, ec50)`).
+#' @return A named numeric vector: `max`, `slope1-3`, `ec50_1-3`.
+#' @keywords internal
+assemble_curve_params3 <- function(fit1, fit2, fit3) {
+  c(max    = mean(c(fit1$par[["max"]], fit2$par[["max"]], fit3$par[["max"]])),
+    slope1 = fit1$par[["slope"]],
+    slope2 = fit2$par[["slope"]],
+    slope3 = fit3$par[["slope"]],
+    ec50_1 = fit1$par[["ec50"]],
+    ec50_2 = fit2$par[["ec50"]],
+    ec50_3 = fit3$par[["ec50"]])
 }
 
 #' Assemble lower/upper bound vectors from Advanced-panel inputs

@@ -19,3 +19,7 @@ test_that("run_app is exported and errors clearly when a dependency is missing",
   expect_match(body_txt, "bslib")
   expect_match(body_txt, "shiny")
 })
+
+test_that("app_ui includes the Ternary Mixture panel", {
+  expect_match(as.character(app_ui()), "ternary-fit_asa", fixed = TRUE)
+})
