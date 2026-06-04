@@ -1,0 +1,20 @@
+---
+title: "The Jonker method, worked end-to-end with mixdra"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{The Jonker method, worked end-to-end with mixdra}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+
+# Introduction
+
+_Scaffold — replaced in later tasks._
+
+
+``` r
+1 + 1
+#> [1] 2
+```

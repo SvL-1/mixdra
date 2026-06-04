@@ -1,0 +1,37 @@
+---
+title: "The Jonker method, worked end-to-end with mixdra"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{The Jonker method, worked end-to-end with mixdra}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "figure-",
+  echo = TRUE
+)
+
+# Render a plotly object to a static PNG under vignettes/ and return the file
+# name, so chunks can do: knitr::include_graphics(save_png(p, "name.png")).
+# Static PNGs keep the shipped vignette light and free of a JS dependency.
+save_png <- function(widget, file, vwidth = 700, vheight = 500) {
+  html <- tempfile(fileext = ".html")
+  htmlwidgets::saveWidget(widget, html, selfcontained = TRUE)
+  webshot2::webshot(html, file, vwidth = vwidth, vheight = vheight, delay = 2)
+  file
+}
+
+library(mixdra)
+```
+
+# Introduction
+
+_Scaffold — replaced in later tasks._
+
+```{r scaffold}
+1 + 1
+```
