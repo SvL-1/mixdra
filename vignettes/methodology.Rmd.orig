@@ -76,3 +76,22 @@ rbind(`chemical 1` = fit1$par, `chemical 2` = fit2$par)
 These per-chemical `max`, `slope`, and `EC50` values are exactly what the staged
 mixture fit (Step 3) will hold fixed: the curves come from the single-compound data,
 never from the mixture rows.
+
+# Step 2 — the additivity reference models
+
+Before asking whether two chemicals *interact*, we need a baseline for "no
+interaction". The method offers two:
+
+- **Concentration Addition (CA)** assumes the chemicals act through the same
+  mechanism and add up on the *concentration* (toxic-unit) scale: a mixture is as
+  toxic as the sum of each chemical's potency-scaled dose. CA predicts the mixture
+  response by solving, at each mixture point, for the equi-effective single dose.
+- **Independent Action (IA)** assumes independent mechanisms and combines on the
+  *effect* (probability) scale: the chemicals act on different sites, so their
+  fractional effects multiply.
+
+Neither has extra free parameters beyond the single-compound curves — they are pure
+predictions. `mixdra` fits both as the additivity baselines; departures from them
+are what the deviation models (Step 3) capture. This worked example uses CA as the
+reference throughout (it is the reference behind the source workbook); IA is fit the
+same way by passing `reference = "IA"`.
