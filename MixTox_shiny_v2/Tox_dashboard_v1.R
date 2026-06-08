@@ -8,17 +8,21 @@
 # ============================================================
 
 
-library(shiny)
-library(shinydashboard)
-library(DT)
-library(ggplot2)
-library(rhandsontable)
-library(drc)
-library(shinyjs)
-library(shinyWidgets)
-library(numDeriv)
-library(Rsolnp)
-library(nloptr)
+# ---- Install (if needed) and load required packages ----
+# Install any missing CRAN packages before loading them, so the app runs on a
+# fresh machine without the user having to install each dependency by hand.
+required_packages <- c(
+  "shiny", "shinydashboard", "DT", "ggplot2", "rhandsontable", "drc",
+  "shinyjs", "shinyWidgets", "numDeriv", "Rsolnp", "nloptr"
+)
+missing_packages <- required_packages[
+  !vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)
+]
+if (length(missing_packages)) {
+  message("Installing missing packages: ", paste(missing_packages, collapse = ", "))
+  install.packages(missing_packages, repos = "https://cloud.r-project.org")
+}
+invisible(lapply(required_packages, library, character.only = TRUE))
 
 # ---- Load external scripts ----
 # These source files contain the model functions and the separate app modules.

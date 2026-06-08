@@ -17,6 +17,64 @@
 
 
 # ============================================================
+# Paste parser
+# ============================================================
+# Turns the raw text a user pastes into a clean two-column data frame with
+# columns "Conc." and "Res.". It is deliberately forgiving, because users paste
+# in several ways:
+#   - two columns straight from Excel (tab-separated)
+#   - a single comma-separated column copied from a CSV
+#   - with or without a header row
+#   - with header names that are not exactly "Conc."/"Res."
+#
+# Strategy: auto-detect the separator from the first line, drop a non-numeric
+# first row as a header, then take the first two columns by POSITION and force
+# the names to "Conc."/"Res." so the downstream model always finds them.
+# On any unrecoverable problem it stop()s with a plain-English message that the
+# caller shows to the user.
+parse_pasted_dr <- function(text) {
+  text <- trimws(text %||% "")
+  if (!nzchar(text)) stop("Nothing was pasted. Paste two columns: concentration and response.")
+
+  lines <- strsplit(text, "\r?\n")[[1]]
+  lines <- lines[nzchar(trimws(lines))]
+  if (!length(lines)) stop("Nothing was pasted. Paste two columns: concentration and response.")
+
+  # Detect the separator from the first line: tab first, then comma, then any
+  # run of whitespace (read.table's sep = "" default).
+  first_line <- lines[1]
+  sep <- if (grepl("\t", first_line)) "\t" else if (grepl(",", first_line)) "," else ""
+
+  df <- tryCatch(
+    read.table(text = paste(lines, collapse = "\n"), header = FALSE,
+               sep = sep, stringsAsFactors = FALSE, fill = TRUE),
+    error = function(e) stop("Could not read the pasted data. Make sure it is two columns."))
+
+  if (ncol(df) < 2)
+    stop("Could not split the data into two columns. Paste a concentration and a response column (tab- or comma-separated).")
+
+  # A first row that is not fully numeric is treated as a header and dropped.
+  first_row_numeric <- suppressWarnings(
+    all(!is.na(as.numeric(as.character(unlist(df[1, 1:2, drop = TRUE]))))))
+  if (!first_row_numeric) df <- df[-1, , drop = FALSE]
+
+  df <- df[, 1:2, drop = FALSE]
+  names(df) <- c("Conc.", "Res.")
+  df$Conc. <- suppressWarnings(as.numeric(as.character(df$Conc.)))
+  df$Res.  <- suppressWarnings(as.numeric(as.character(df$Res.)))
+  if (anyNA(df$Conc.) || anyNA(df$Res.))
+    stop("The concentration and response columns must contain only numbers (and one optional header row).")
+
+  rownames(df) <- NULL
+  df
+}
+
+# Local null-coalescing helper (shiny exports `%||%`, but keep the module
+# self-contained so the parser works when sourced on its own).
+`%||%` <- function(a, b) if (is.null(a)) b else a
+
+
+# ============================================================
 # Single Chemical UI
 # ============================================================
 # This function defines what the Single Chemical page looks like.
@@ -200,21 +258,29 @@ singleChemicalServer <- function(id, chem_names, sgl_values) {
         #   3. The raw paste area is hidden
         #   4. The data are displayed as an editable table
         observeEvent(input[[convert]], {
-          
+
           # Make sure the user pasted something before continuing.
           req(input[[paste_id]])
-          
-          # Read the pasted data.
-          # The current setup assumes the data are tab-separated and include column headers.
-          df <- read.table(text = input[[paste_id]], header = TRUE, sep = "\t")
-          
+
+          # Parse the pasted text into clean Conc./Res. columns. The parser
+          # auto-detects tab vs comma and an optional header; on failure it
+          # stop()s with a message we show to the user instead of failing
+          # silently.
+          df <- tryCatch(
+            parse_pasted_dr(input[[paste_id]]),
+            error = function(e) {
+              showNotification(conditionMessage(e), type = "error", duration = 8)
+              NULL
+            })
+          if (is.null(df)) return()
+
           # Store the data for the current chemical.
           # The index is converted to character because reactiveValues stores named elements.
           sgl_values[[as.character(idx)]]$df <- df
-          
+
           # Hide the raw paste area after conversion to keep the UI clean.
           shinyjs::hide(paste_block)
-          
+
           # Show the converted data as an editable table.
           output[[table]] <- renderRHandsontable({
             rhandsontable(df)
@@ -231,29 +297,50 @@ singleChemicalServer <- function(id, chem_names, sgl_values) {
         #   4. Plots and summary tables are created
         #   5. Results are stored in sgl_values
         observeEvent(input[[fit]], {
-          
+
+          # The user must convert the pasted data into a table first.
+          if (is.null(input[[table]])) {
+            showNotification("Convert the pasted data into a table before fitting.",
+                             type = "warning", duration = 8)
+            return()
+          }
+
           # Read the current editable table.
           # This means any manual edits made by the user are included.
-          df <- hot_to_r(input[[table]])
-          
-          
+          df <- tryCatch(hot_to_r(input[[table]]), error = function(e) NULL)
+
+          # Validate the table before fitting so problems are reported, not swallowed.
+          if (is.null(df) || !all(c("Conc.", "Res.") %in% names(df))) {
+            showNotification("The table needs columns 'Conc.' and 'Res.'. Re-paste and convert the data.",
+                             type = "error", duration = 8)
+            return()
+          }
+          df$Conc. <- suppressWarnings(as.numeric(df$Conc.))
+          df$Res.  <- suppressWarnings(as.numeric(df$Res.))
+          if (anyNA(df$Conc.) || anyNA(df$Res.)) {
+            showNotification("Concentration and response values must be numeric.",
+                             type = "error", duration = 8)
+            return()
+          }
+
           # ---- Fit the dose-response model ----
           # The model uses:
           #   Res.  as the response variable
           #   Conc. as the concentration variable
           #
-          # tryCatch() prevents the whole app from crashing if the model fails.
-          # If fitting fails, fit_result becomes NULL.
-          fit_result <- tryCatch({
-            drm(Res. ~ Conc., data = df, fct = LL.3())
-          }, error = function(e) NULL)
-          
+          # tryCatch() prevents the whole app from crashing if the model fails;
+          # we keep the error message so we can show it to the user below.
+          fit_err <- NULL
+          fit_result <- tryCatch(
+            drm(Res. ~ Conc., data = df, fct = LL.3()),
+            error = function(e) { fit_err <<- conditionMessage(e); NULL })
+
           # Extract the model coefficients.
           # If this step fails, coefs becomes NULL.
-          coefs <- tryCatch({
-            coef(summary(fit_result))
-          }, error = function(e) NULL)
-          
+          coefs <- tryCatch(
+            coef(summary(fit_result)),
+            error = function(e) { if (is.null(fit_err)) fit_err <<- conditionMessage(e); NULL })
+
           # Continue only if model coefficients were successfully extracted.
           # The LL.3 model should return three parameters.
           if (!is.null(coefs) && nrow(coefs) >= 3) {
@@ -383,6 +470,13 @@ singleChemicalServer <- function(id, chem_names, sgl_values) {
             sgl_values[[as.character(idx)]]$n <- NULL
             sgl_values[[as.character(idx)]]$pred_df <- NULL
             sgl_values[[as.character(idx)]]$residuals <- NULL
+
+            # Tell the user why nothing appeared instead of failing silently.
+            showNotification(
+              paste0("Model fitting failed",
+                     if (!is.null(fit_err)) paste0(": ", fit_err) else
+                       " (the log-logistic curve could not be fitted to these data)."),
+              type = "error", duration = 10)
           }
         })
         
