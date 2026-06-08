@@ -21,6 +21,53 @@
 
 
 # ============================================================
+# Paste parser (binary: three columns)
+# ============================================================
+# Turns pasted text into a clean data frame with columns C1, C2, Res.
+# Like the single-chemical parser, it is forgiving about how users paste:
+#   - three columns straight from Excel (tab-separated)
+#   - comma-separated columns copied from a CSV
+#   - with or without a header row, and with arbitrary header names
+# It auto-detects the separator, drops a non-numeric first row as a header, then
+# takes the first three columns BY POSITION and forces the names C1/C2/Res. so
+# the model always finds them. On any unrecoverable problem it stop()s with a
+# plain-English message the caller shows to the user.
+parse_pasted_binary <- function(text) {
+  text <- trimws(if (is.null(text)) "" else text)
+  if (!nzchar(text)) stop("Nothing was pasted. Paste three columns: C1, C2 and response.")
+
+  lines <- strsplit(text, "\r?\n")[[1]]
+  lines <- lines[nzchar(trimws(lines))]
+  if (!length(lines)) stop("Nothing was pasted. Paste three columns: C1, C2 and response.")
+
+  first_line <- lines[1]
+  sep <- if (grepl("\t", first_line)) "\t" else if (grepl(",", first_line)) "," else ""
+
+  df <- tryCatch(
+    read.table(text = paste(lines, collapse = "\n"), header = FALSE, sep = sep,
+               strip.white = TRUE, stringsAsFactors = FALSE, fill = TRUE,
+               comment.char = ""),
+    error = function(e) stop("Could not read the pasted data. Make sure it is three columns."))
+
+  if (ncol(df) < 3)
+    stop("Could not split the data into three columns. Paste C1, C2 and a response column (tab- or comma-separated).")
+
+  first_row_numeric <- suppressWarnings(
+    all(!is.na(as.numeric(as.character(unlist(df[1, 1:3, drop = TRUE]))))))
+  if (!first_row_numeric) df <- df[-1, , drop = FALSE]
+
+  df <- df[, 1:3, drop = FALSE]
+  names(df) <- c("C1", "C2", "Res.")
+  for (col in names(df)) df[[col]] <- suppressWarnings(as.numeric(as.character(df[[col]])))
+  if (anyNA(df$C1) || anyNA(df$C2) || anyNA(df$Res.))
+    stop("The C1, C2 and response columns must contain only numbers (and one optional header row).")
+
+  rownames(df) <- NULL
+  df
+}
+
+
+# ============================================================
 # Get starting values from fitted single-chemical models
 # ============================================================
 # This helper function retrieves the fitted parameters from the
@@ -362,14 +409,16 @@ fit_single_model <- function(df, init_vals, fix_flags, model_fun) {
   SSR_opt2 <- sum((df$Res. - preds_opt2)^2)
   cat(sprintf("  Optimized SSR (all data): %.3f\n\n", SSR_opt2))
   
-  # ---- Return final fitted parameter values ----
-  # The result is returned as a named vector.
-  #
-  # NOTE:
-  # Later in the code, observeFitSingleModel() expects a list containing
-  # params, preds, residuals, and ssr. This function currently only returns
-  # the parameter vector. That mismatch needs to be fixed.
-  return(par2)
+  # ---- Return final fitted results ----
+  # observeFitSingleModel() expects a list with params, preds, residuals and
+  # ssr, so return that structure (all values are already computed above)
+  # instead of a bare vector.
+  list(
+    params    = par2,
+    preds     = preds_opt2,
+    residuals = df$Res. - preds_opt2,
+    ssr       = SSR_opt2
+  )
 }
 
 
@@ -422,7 +471,16 @@ observeFitSingleModel <- function(input, output, session, bin_idx, bin_values, s
     
     # Get starting values from the corresponding fitted single-chemical models.
     initials <- get_initials_from_singles(bin_idx, sgl_values)
-    
+
+    # The binary fit needs starting values from BOTH single-chemical models.
+    # If either is missing, tell the user instead of failing silently.
+    if (is.null(initials)) {
+      showNotification(
+        "Fit both single-chemical models (Single Chemical tab) before fitting this binary mixture.",
+        type = "warning", duration = 10)
+      return()
+    }
+
     # Read any manual parameter values entered by the user.
     overrides <- get_param_overrides("single", names(initials), bin_idx, input)
     
@@ -440,18 +498,23 @@ observeFitSingleModel <- function(input, output, session, bin_idx, bin_values, s
       isTRUE(input[[paste0("fix_single_", param, "_", bin_idx)]])
     })
     
-    # Fit the model.
+    # Fit the model. Any failure (e.g. the optimiser erroring) is caught and
+    # reported to the user instead of crashing to the console.
     # NOTE:
-    # The function receives model_fun as an argument, but currently calls CA_bi_vec directly instead of using model_fun. 
-    fit_result <- fit_single_model(df, initials, fix_flags, CA_bi_vec)
-    if (is.null(fit_result)) return()
-    
-    print("✅ Fit complete for bin_idx: ", quote = FALSE)
+    # The function receives model_fun as an argument, but currently calls CA_bi_vec directly instead of using model_fun.
+    fit_err <- NULL
+    fit_result <- tryCatch(
+      fit_single_model(df, initials, fix_flags, CA_bi_vec),
+      error = function(e) { fit_err <<- conditionMessage(e); NULL })
+    if (is.null(fit_result)) {
+      showNotification(
+        paste0("Binary model fitting failed",
+               if (!is.null(fit_err)) paste0(": ", fit_err) else "."),
+        type = "error", duration = 10)
+      return()
+    }
 
-    # NOTE:
-    # This currently assumes fit_result has a $params element.
-    # But fit_single_model() currently returns only a named vector.
-    # This will break unless fit_single_model() is changed.
+    cat("✅ Fit complete for bin_idx:", bin_idx, "\n")
     print(fit_result$params)
     showNotification(paste0("Single model fit completed for combo ", bin_idx), type = "message")
     
@@ -852,49 +915,44 @@ binaryMixtureModuleServer <- function(id, chem_names, sgl_values) {
         #   4. The data are displayed as an editable table
         observeEvent(input[[convert]], {
           req(input[[paste_id]])
-          
-          # Read tab-separated data.
-          # Expected columns:
-          #   C1
-          #   C2
-          #   Res.
-          df <- tryCatch({
-            read.table(text = input[[paste_id]],
-                       header = TRUE,
-                       sep = "\t",
-                       strip.white = TRUE,
-                       stringsAsFactors = FALSE,
-                       fill = TRUE,
-                       comment.char = "")
-          })
-          
+
+          # Parse the pasted text into clean C1/C2/Res. columns. The parser
+          # auto-detects tab vs comma and an optional header; on failure it
+          # stop()s with a message we show to the user instead of failing
+          # silently.
+          df <- tryCatch(
+            parse_pasted_binary(input[[paste_id]]),
+            error = function(e) {
+              showNotification(conditionMessage(e), type = "error", duration = 8)
+              NULL
+            })
+          if (is.null(df)) return()
+
           # Store the binary mixture data for this combination.
           bin_values[[bin_idx]]$data <- df
-          
+
           # Hide the raw paste area after conversion.
           shinyjs::hide(paste_block)
-          
+
           # Display the converted data as an editable table.
           output[[table]] <- renderRHandsontable({
             rhandsontable(df)
           })
-          
-          # Set up the observer for fitting the Single Chemical model.
-          #
-          # NOTE:
-          # This observer is currently created only after data conversion.
-          # If the user converts data multiple times, this can create multiple observers for the same fit button.
-          # It would be cleaner to move observeFitSingleModel() outside this observeEvent.
-          observeFitSingleModel(
-            input = input,
-            output = output,
-            session = session,
-            bin_idx = bin_idx,
-            bin_values = bin_values,
-            sgl_values = sgl_values,
-            model_fun = CA_bi_vec
-          )
         })
+
+        # Set up the observer for fitting the Single Chemical model ONCE per
+        # binary combination. (Previously this lived inside the convert handler,
+        # so re-converting the data registered duplicate fit observers and the
+        # fit ran multiple times per click.)
+        observeFitSingleModel(
+          input = input,
+          output = output,
+          session = session,
+          bin_idx = bin_idx,
+          bin_values = bin_values,
+          sgl_values = sgl_values,
+          model_fun = CA_bi_vec
+        )
       })
     })
   })
