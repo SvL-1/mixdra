@@ -61,8 +61,14 @@ dr_curve_data <- function(fit, df, chem = 1) {
   pos  <- conc[conc > 0]
   ctrl_x <- control_offset(conc)
   # Start the grid at the control marker (when present) so the fitted line
-  # visually reaches it, otherwise at the lowest positive dose.
-  grid <- seq(if (is.na(ctrl_x)) min(pos) else ctrl_x, max(conc), length.out = 200)
+  # visually reaches it, otherwise at the lowest positive dose. Sample on a
+  # log scale: the curve is almost always viewed on a log x-axis, and over a
+  # wide dose range a linear grid puts nearly all its points at high doses
+  # where the curve is already flat -- leaving the low-dose bend joined by a
+  # single straight segment (the "fitted as a straight line" artefact). Both
+  # bounds are strictly positive, so log spacing is always defined.
+  lo   <- if (is.na(ctrl_x)) min(pos) else ctrl_x
+  grid <- exp(seq(log(lo), log(max(conc)), length.out = 200))
   list(curve     = data.frame(conc = grid, response = ll3_predict(grid, mx, sl, ec)),
        observed  = data.frame(conc = conc, response = resp),
        control_x = ctrl_x,
