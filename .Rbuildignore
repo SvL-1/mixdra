@@ -1,6 +1,5 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
-^MixTox_shiny_v2$
 ^papers$
 ^docs$
 ^tools$

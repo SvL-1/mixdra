@@ -7,11 +7,12 @@
 
 # Binary (2-chemical) mixture model functions.
 #
-# Ported from MixTox_shiny_v2/functions/model_functions.R. Each source
-# function already takes explicit named arguments; the only change here is
-# renaming them to the package's lower-case convention. The bodies are
-# reproduced verbatim (via deparse of the source), so the maths is identical
-# (cross-checked numerically by tools/port_models.R: maxdiff == 0).
+# Originally ported from Sam's MixTox_shiny_v2 prototype (functions/
+# model_functions.R), since retired. Each source function already took explicit
+# named arguments; the only change here was renaming them to the package's
+# lower-case convention. The bodies are reproduced verbatim (via deparse of the
+# source), so the maths is identical (the port was cross-checked numerically at
+# the time: maxdiff == 0).
 
 #' ca_bi: binary (2-chemical) mixture predictor (ported verbatim from CA_bi)
 #'
@@ -416,11 +417,12 @@ ia_dl_bi_vec <- Vectorize(ia_dl_bi, vectorize.args = c("c1", "c2"))
 
 # Ternary (3-chemical) mixture model functions.
 #
-# Ported from MixTox_shiny_v2/functions/model_functions.R. Each source
-# function already takes explicit named arguments; the only change here is
-# renaming them to the package's lower-case convention. The bodies are
-# reproduced verbatim (via deparse of the source), so the maths is identical
-# (cross-checked numerically by tools/port_models.R: maxdiff == 0).
+# Originally ported from Sam's MixTox_shiny_v2 prototype (functions/
+# model_functions.R), since retired. Each source function already took explicit
+# named arguments; the only change here was renaming them to the package's
+# lower-case convention. The bodies are reproduced verbatim (via deparse of the
+# source), so the maths is identical (the port was cross-checked numerically at
+# the time: maxdiff == 0).
 
 #' ca_tri: ternary (3-chemical) mixture predictor (ported verbatim from CA)
 #'
