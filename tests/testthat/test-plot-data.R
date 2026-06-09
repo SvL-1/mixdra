@@ -55,6 +55,25 @@ test_that("dr_curve_data reports control_x with no fit (raw points)", {
   expect_equal(d$observed$conc, df$C1)
 })
 
+test_that("dr_curve_data samples the curve densely in the low-dose bend (issue #6)", {
+  # Sam's chlorfenapyr data spans ~9 decades (1e-6 .. 900) but the whole sigmoid
+  # lives below conc ~5. A linear grid put only ~2 of 200 points there, so the
+  # bend was drawn as a single straight segment on the log x-axis. A log-spaced
+  # grid keeps the low-dose region well sampled regardless of range.
+  csv <- testthat::test_path("fixtures", "single", "single_chlorfenapyr_continuous.csv")
+  df  <- to_engine_df(read_upload(csv), "single")
+  fit <- analyse_single(df)
+  d   <- dr_curve_data(fit, df)
+
+  expect_gt(sum(d$curve$conc < 5), 100)            # was 2 with a linear grid
+  # grid is geometric: successive ratios are (near) constant
+  ratios <- d$curve$conc[-1] / d$curve$conc[-length(d$curve$conc)]
+  expect_lt(diff(range(ratios)), 1e-6)
+  # bounds unchanged: still spans lowest dose to highest dose
+  expect_equal(min(d$curve$conc), min(df$C1))
+  expect_equal(max(d$curve$conc), max(df$C1))
+})
+
 test_that("obs_pred_data returns fit$pred for a mixture fit", {
   fit <- list(kind = "mixture", pred = c(0.9, 0.5, 0.2))
   df <- data.frame(C1 = c(0, 1, 2), C2 = 0, Affected = c(9, 5, 2), Exposed = rep(10, 3))
