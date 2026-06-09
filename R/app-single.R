@@ -1,4 +1,4 @@
-# Single Chemical stage: upload one chemical's dose-response data, then either
+# Single Stressor stage: upload one stressor's dose-response data, then either
 # Autofit a three-parameter log-logistic curve via analyse_single() or Simulate
 # the curve for caller-entered parameter values via eval_single(). Shows the
 # curve, observed-vs-predicted, an editable parameter grid with bounds, and a
@@ -6,18 +6,21 @@
 
 #' Concentration-axis label from the shared meta store
 #'
-#' With `chem_field` (e.g. "chem1") uses that chemical's name; without it uses a
-#' generic "Concentration". Appends the unit when present. Used by the single
-#' stage (generic) and the binary stage (per chemical).
+#' With `chem_field` (e.g. "chem1") uses that stressor's name and its matching
+#' per-stressor unit (`unit1`/`unit2`/`unit3`). Without `chem_field` (the Single
+#' Stressor tab, which has no named stressor) it uses a generic "Concentration"
+#' with no unit. Used by the single stage (generic) and the binary/ternary
+#' stages (per stressor).
 #' @keywords internal
 axis_label <- function(meta, chem_field = NULL) {
-  nm <- if (!is.null(chem_field)) meta[[chem_field]] else NULL
-  unit <- meta$unit
+  if (is.null(chem_field)) return("Concentration")
+  nm   <- meta[[chem_field]]
+  unit <- meta[[sub("^chem", "unit", chem_field)]]   # "chem1" -> "unit1"
   base <- if (!is.null(nm) && nzchar(nm)) nm else "Concentration"
   if (!is.null(unit) && nzchar(unit)) paste0(base, " (", unit, ")") else base
 }
 
-#' Single Chemical stage UI
+#' Single Stressor stage UI
 #' @param id Module id.
 #' @keywords internal
 single_ui <- function(id) {
@@ -39,7 +42,7 @@ single_ui <- function(id) {
   )
 }
 
-#' Single Chemical stage server
+#' Single Stressor stage server
 #' @param id Module id.
 #' @param meta Shared reactiveValues for experiment metadata.
 #' @keywords internal

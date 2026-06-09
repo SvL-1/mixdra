@@ -41,7 +41,7 @@ interaction_help <- function(reference, deviation) {
       "<b>No interaction term.</b> The mixture follows the ", ref,
       " reference exactly."))),
     SA = shiny::tagList(
-      shiny::tags$p(shiny::tags$b("Similar action (S/A): "),
+      shiny::tags$p(shiny::tags$b("Synergism/Antagonism (S/A): "),
                     shiny::tags$code(shiny::HTML("F = a&middot;&prod;z"))),
       shiny::tags$p(shiny::tags$small(
         shiny::tags$code("a"),
@@ -120,7 +120,7 @@ binary_ui <- function(id) {
     # (Stage 2) appears automatically once both curves are fitted.
     bslib::card(
       bslib::card_header("Stage 1 · Single curves"),
-      shiny::p("Fit each chemical's dose-response curve (Autofit or Simulate). ",
+      shiny::p("Fit each stressor's dose-response curve (Autofit or Simulate). ",
                "These curves are held fixed when the interaction models are ",
                "compared below. The comparison workspace appears once both are fitted."),
       # One row per chemical, stacked vertically (sets up the ternary case --
@@ -140,7 +140,7 @@ binary_ui <- function(id) {
     # "Optimize all params (joint)" appends a joint-refined block of rows.
     bslib::card(
       bslib::card_header("Stage 2 · Interaction models"),
-      shiny::p("Fit both single-chemical curves in Stage 1, then ",
+      shiny::p("Fit both single-stressor curves in Stage 1, then ",
                shiny::tags$b("Fit interaction models"), " to fill the table ",
                "(reference → S/A → DR/DL, curves held fixed from the singles). ",
                "Click a row to inspect that model; the best is highlighted."),
@@ -205,10 +205,10 @@ binary_server <- function(id, meta) {
     })
 
     output$chem1_title <- shiny::renderText({
-      nm <- meta$chem1; if (!is.null(nm) && nzchar(nm)) nm else "Chemical 1"
+      nm <- meta$chem1; if (!is.null(nm) && nzchar(nm)) nm else "Stressor 1"
     })
     output$chem2_title <- shiny::renderText({
-      nm <- meta$chem2; if (!is.null(nm) && nzchar(nm)) nm else "Chemical 2"
+      nm <- meta$chem2; if (!is.null(nm) && nzchar(nm)) nm else "Stressor 2"
     })
 
     # Data source: the user's upload, or -- before any upload -- a bundled
@@ -561,7 +561,16 @@ binary_server <- function(id, meta) {
           return(NA_real_)
         i <- which(cmp$model == e$model); if (length(i)) round(cmp$p[i[[1]]], 4) else NA_real_
       }
-      vlabel <- function(e) if (isTRUE(e$separator)) "─ Optimized (joint) ─" else e$model
+      # The "reference" row shows the chosen additivity model by name so the
+      # table reads in the user's terms (Concentration addition / Independent
+      # action) rather than the internal "reference" key.
+      ref_label <- if (identical(input$reference, "IA")) "Independent action"
+                   else "Concentration addition"
+      vlabel <- function(e) {
+        if (isTRUE(e$separator)) return("─ Optimized (joint) ─")
+        if (identical(e$model, "reference")) return(ref_label)
+        e$model
+      }
       vhl <- function(e) {
         if (isTRUE(e$separator)) return("sep")
         if (identical(e$variant, "staged") && !is.null(chosen) &&

@@ -58,7 +58,7 @@ ternary_ui <- function(id) {
     # Stage 1 -- three single-chemical curve panels.
     bslib::card(
       bslib::card_header("Stage 1 · Single curves"),
-      shiny::p("Fit each chemical's dose-response curve (Autofit or Simulate). ",
+      shiny::p("Fit each stressor's dose-response curve (Autofit or Simulate). ",
                "These curves are held fixed as the base for the staged ",
                "Advanced-S/A fit below, which appears once all three are fitted."),
       shiny::div(shiny::h5(shiny::textOutput(ns("chem1_title"))),
@@ -126,7 +126,7 @@ ternary_server <- function(id, meta) {
     })
 
     chem_title <- function(field, n) shiny::renderText({
-      nm <- meta[[field]]; if (!is.null(nm) && nzchar(nm)) nm else paste("Chemical", n)
+      nm <- meta[[field]]; if (!is.null(nm) && nzchar(nm)) nm else paste("Stressor", n)
     })
     output$chem1_title <- chem_title("chem1", 1)
     output$chem2_title <- chem_title("chem2", 2)

@@ -11,7 +11,7 @@ app_ui <- function() {
     # panels + two gated stages).
     fillable = FALSE,
     bslib::nav_panel("Introduction", intro_ui("intro")),
-    bslib::nav_panel("Single Chemical", single_ui("single")),
+    bslib::nav_panel("Single Stressor", single_ui("single")),
     bslib::nav_panel("Binary Mixture", binary_ui("binary")),
     bslib::nav_panel("Ternary Mixture", ternary_ui("ternary"))
   )
@@ -29,7 +29,7 @@ app_server <- function(input, output, session) {
 
 #' Launch the mixdra Shiny app
 #'
-#' Starts the interactive app (Introduction, Single Chemical, Binary Mixture,
+#' Starts the interactive app (Introduction, Single Stressor, Binary Mixture,
 #' Ternary Mixture).
 #' The UI stack (`shiny`, `bslib`, `plotly`, `DT`) is a set of Suggested
 #' dependencies; this function stops with an install hint if any are missing.
