@@ -28,6 +28,33 @@ test_that("dr_curve_data with no fit returns raw points only (no curve)", {
   expect_equal(dr_curve_data(NULL, q)$observed$response, q$Affected / q$Exposed)
 })
 
+test_that("dr_curve_data offsets controls to min(positive)/10 for the log axis", {
+  fit <- list(kind = "single", par = c(max = 10, slope = 2, ec50 = 1))
+  df <- data.frame(C1 = c(0, 0.5, 1, 2), Res = c(10, 8, 5, 2))
+  d <- dr_curve_data(fit, df)
+  expect_equal(d$control_x, 0.5 / 10)        # min positive conc is 0.5
+  # the fitted curve reaches down to the control marker, not just the lowest dose
+  expect_equal(min(d$curve$conc), 0.5 / 10)
+  # observed concentrations are untouched (0 preserved for the linear axis)
+  expect_equal(d$observed$conc, df$C1)
+})
+
+test_that("dr_curve_data sets control_x to NA when there is no control row", {
+  fit <- list(kind = "single", par = c(max = 10, slope = 2, ec50 = 1))
+  df <- data.frame(C1 = c(0.5, 1, 2, 4), Res = c(8, 5, 2, 1))
+  d <- dr_curve_data(fit, df)
+  expect_true(is.na(d$control_x))
+  expect_equal(min(d$curve$conc), 0.5)
+})
+
+test_that("dr_curve_data reports control_x with no fit (raw points)", {
+  df <- data.frame(C1 = c(0, 0.5, 1, 2), Res = c(10, 8, 5, 2))
+  d <- dr_curve_data(NULL, df)
+  expect_null(d$curve)
+  expect_equal(d$control_x, 0.5 / 10)
+  expect_equal(d$observed$conc, df$C1)
+})
+
 test_that("obs_pred_data returns fit$pred for a mixture fit", {
   fit <- list(kind = "mixture", pred = c(0.9, 0.5, 0.2))
   df <- data.frame(C1 = c(0, 1, 2), C2 = 0, Affected = c(9, 5, 2), Exposed = rep(10, 3))

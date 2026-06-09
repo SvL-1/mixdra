@@ -14,8 +14,11 @@ to plot the observed points alone (no fitted curve).}
 
 \item{chem}{Index of the chemical whose marginal to draw (mixtures only).}
 
-\item{log_x}{Use a log10 concentration axis (default \code{TRUE}). Control points
-at concentration 0 are not shown on a log axis.}
+\item{log_x}{Use a log10 concentration axis (default \code{TRUE}). On a log axis
+control points (concentration 0) cannot sit at their true position, so they
+are drawn as a separate "control" series one decade below the lowest dose
+and the tick there is labelled "0 (control)". On a linear axis controls keep
+their true position at 0.}
 }
 \value{
 A plotly object.

@@ -21,14 +21,24 @@ obs_response <- function(df) {
 #' @param df The data frame the fit was built from.
 #' @param chem Index of the chemical whose marginal to draw (mixtures only).
 #' @return A list: `curve` (data frame conc/response, or `NULL` when `fit` is
-#'   `NULL`), `observed` (data frame conc/response), `chem` (the concentration
-#'   column name).
+#'   `NULL`), `observed` (data frame conc/response, control rows at conc 0
+#'   preserved), `control_x` (the x-position at which to draw control points on a
+#'   log axis -- one decade below the lowest positive dose, or `NA` when there is
+#'   no control row), `chem` (the concentration column name).
 #' @keywords internal
 dr_curve_data <- function(fit, df, chem = 1) {
+  # On a log axis log10(0) = -Inf, so control points (conc 0) cannot be drawn at
+  # their true position. Offset them one decade below the lowest positive dose so
+  # they stay visible; the renderer flags that x as the control tick.
+  control_offset <- function(conc) {
+    pos <- conc[conc > 0]
+    if (any(conc == 0) && length(pos)) min(pos) / 10 else NA_real_
+  }
   if (is.null(fit)) {
-    return(list(curve    = NULL,
-                observed = data.frame(conc = df$C1, response = obs_response(df)),
-                chem     = "C1"))
+    return(list(curve     = NULL,
+                observed  = data.frame(conc = df$C1, response = obs_response(df)),
+                control_x = control_offset(df$C1),
+                chem      = "C1"))
   }
   if (isTRUE(fit$kind == "single")) {
     conc_col <- "C1"
@@ -49,10 +59,14 @@ dr_curve_data <- function(fit, df, chem = 1) {
   conc <- df[[conc_col]][keep]
   resp <- obs_response(df)[keep]
   pos  <- conc[conc > 0]
-  grid <- seq(min(pos), max(conc), length.out = 200)
-  list(curve    = data.frame(conc = grid, response = ll3_predict(grid, mx, sl, ec)),
-       observed = data.frame(conc = conc, response = resp),
-       chem     = conc_col)
+  ctrl_x <- control_offset(conc)
+  # Start the grid at the control marker (when present) so the fitted line
+  # visually reaches it, otherwise at the lowest positive dose.
+  grid <- seq(if (is.na(ctrl_x)) min(pos) else ctrl_x, max(conc), length.out = 200)
+  list(curve     = data.frame(conc = grid, response = ll3_predict(grid, mx, sl, ec)),
+       observed  = data.frame(conc = conc, response = resp),
+       control_x = ctrl_x,
+       chem      = conc_col)
 }
 
 #' Observed vs predicted response for any fit

@@ -19,22 +19,48 @@ require_plotly <- function() {
 #'   to plot the observed points alone (no fitted curve).
 #' @param df The data frame the fit was built from.
 #' @param chem Index of the chemical whose marginal to draw (mixtures only).
-#' @param log_x Use a log10 concentration axis (default `TRUE`). Control points
-#'   at concentration 0 are not shown on a log axis.
+#' @param log_x Use a log10 concentration axis (default `TRUE`). On a log axis
+#'   control points (concentration 0) cannot sit at their true position, so they
+#'   are drawn as a separate "control" series one decade below the lowest dose
+#'   and the tick there is labelled "0 (control)". On a linear axis controls keep
+#'   their true position at 0.
 #' @return A plotly object.
 #' @export
 plot_dose_response <- function(fit, df, chem = 1, log_x = TRUE) {
   require_plotly()
   d <- dr_curve_data(fit, df, chem)
   p <- plotly::plot_ly()
-  p <- plotly::add_markers(p, x = d$observed$conc, y = d$observed$response,
-                           name = "observed", marker = list(color = "black", size = 6))
+  obs <- d$observed
+  show_control <- log_x && !is.na(d$control_x)
+  if (show_control) {
+    # Split controls off and redraw them at the offset; the rest stay at their
+    # true concentration. Open circles distinguish the controls from real doses.
+    is_ctrl <- obs$conc == 0
+    p <- plotly::add_markers(p, x = obs$conc[!is_ctrl], y = obs$response[!is_ctrl],
+                             name = "observed", marker = list(color = "black", size = 6))
+    p <- plotly::add_markers(p, x = rep(d$control_x, sum(is_ctrl)), y = obs$response[is_ctrl],
+                             name = "control",
+                             marker = list(color = "black", size = 7,
+                                           symbol = "circle-open"))
+  } else {
+    p <- plotly::add_markers(p, x = obs$conc, y = obs$response,
+                             name = "observed", marker = list(color = "black", size = 6))
+  }
   if (!is.null(d$curve))
     p <- plotly::add_lines(p, x = d$curve$conc, y = d$curve$response,
                            name = "fitted", line = list(color = "steelblue"))
-  plotly::layout(p,
-    xaxis = list(title = d$chem, type = if (log_x) "log" else "linear"),
-    yaxis = list(title = "response"))
+  xaxis <- list(title = d$chem, type = if (log_x) "log" else "linear")
+  ann <- NULL
+  if (show_control) {
+    # Label the offset position so readers know it is the control, not a real
+    # dose. An annotation (rather than a custom tick) leaves the auto log ticks
+    # intact; on a log axis the x data-coordinate is the log10 of the value.
+    ann <- list(list(x = log10(d$control_x), y = 0, yref = "paper",
+                     yanchor = "top", yshift = -8, showarrow = FALSE,
+                     text = "0 (control)", font = list(size = 10)))
+  }
+  plotly::layout(p, xaxis = xaxis, yaxis = list(title = "response"),
+                 annotations = ann)
 }
 
 #' Plot observed vs predicted response
