@@ -26,10 +26,10 @@ single_model_equation <- function() {
 param_row <- function(ns, param, label, meaning, hi_default = NA) {
   shiny::fluidRow(
     shiny::column(2, shiny::tags$b(label)),
-    shiny::column(4, shiny::tags$small(meaning)),
+    shiny::column(3, shiny::tags$small(meaning)),
     shiny::column(2, shiny::numericInput(ns(paste0("lo_", param)), NULL, value = NA)),
     shiny::column(2, shiny::numericInput(ns(paste0("hi_", param)), NULL, value = hi_default)),
-    shiny::column(2, shiny::numericInput(ns(paste0("val_", param)), NULL, value = NA))
+    shiny::column(3, shiny::numericInput(ns(paste0("val_", param)), NULL, value = NA))
   )
 }
 
@@ -46,10 +46,10 @@ param_row <- function(ns, param, label, meaning, hi_default = NA) {
 interaction_param_row <- function(ns, param, label, meaning) {
   shiny::fluidRow(
     shiny::column(2, shiny::tags$b(label)),
-    shiny::column(4, shiny::tags$small(meaning)),
+    shiny::column(3, shiny::tags$small(meaning)),
     shiny::column(2, shiny::tags$small("—")),
     shiny::column(2, shiny::tags$small("—")),
-    shiny::column(2, shiny::numericInput(ns(paste0("val_", param)), NULL, value = NA))
+    shiny::column(3, shiny::numericInput(ns(paste0("val_", param)), NULL, value = NA))
   )
 }
 
@@ -71,15 +71,14 @@ curve_fit_ui <- function(id) {
       single_model_equation(),
       shiny::fluidRow(
         shiny::column(2, shiny::tags$small(shiny::tags$b("Parameter"))),
-        shiny::column(4, shiny::tags$small(shiny::tags$b("Meaning"))),
-        shiny::column(2, shiny::tags$small(shiny::tags$b("Lower"))),
-        shiny::column(2, shiny::tags$small(shiny::tags$b("Upper"))),
-        shiny::column(2, shiny::tags$small(shiny::tags$b("Value")))
+        shiny::column(3, shiny::tags$small(shiny::tags$b("Meaning"))),
+        shiny::column(2, shiny::tags$small(shiny::tags$b("Lower constraint"))),
+        shiny::column(2, shiny::tags$small(shiny::tags$b("Upper constraint"))),
+        shiny::column(3, shiny::tags$small(shiny::tags$b("Value")))
       ),
-      param_row(ns, "max", "max", "Response at C = 0 (control / upper plateau)."),
-      param_row(ns, "slope", "slope", "Steepness of the decline (> 0 = decreasing).",
-                hi_default = 50),
-      param_row(ns, "ec50", "EC50", "Concentration that halves the response."),
+      param_row(ns, "max", "max", "Upper asymptote."),
+      param_row(ns, "slope", "slope", "Steepness of the curve."),
+      param_row(ns, "ec50", "EC50", "50% Effect concentration."),
       shiny::tags$small(shiny::HTML(
         "SSR = &Sigma; (y &minus; &#375;)&sup2; &nbsp;&nbsp;(&#375; = model prediction)")),
       shiny::uiOutput(ns("diagnostics")),

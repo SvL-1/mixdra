@@ -13,15 +13,18 @@ intro_ui <- function(id) {
       shiny::textInput(ns("expID"), "Experiment ID"),
       shiny::textInput(ns("species"), "Species"),
       shiny::textInput(ns("endpoint"), "Endpoint"),
-      shiny::helpText("Enter chemical names in the order used throughout the app."),
-      shiny::textInput(ns("chem1"), "Chemical 1 name"),
-      shiny::textInput(ns("chem2"), "Chemical 2 name"),
-      shiny::textInput(ns("chem3"), "Chemical 3 name (ternary)"),
-      shiny::textInput(ns("unit"), "Concentration unit (e.g. mg/L)")
+      shiny::helpText("Enter stressor names in the order used throughout the app, ",
+                      "with the unit for each."),
+      shiny::textInput(ns("chem1"), "Stressor 1 name"),
+      shiny::textInput(ns("unit1"), "Stressor 1 unit (e.g. mg/L)"),
+      shiny::textInput(ns("chem2"), "Stressor 2 name"),
+      shiny::textInput(ns("unit2"), "Stressor 2 unit (e.g. mg/L)"),
+      shiny::textInput(ns("chem3"), "Stressor 3 name (ternary)"),
+      shiny::textInput(ns("unit3"), "Stressor 3 unit (e.g. mg/L)")
     ),
     bslib::card(
       bslib::card_header("Welcome"),
-      shiny::p("Upload concentration-response data on the Single Chemical and ",
+      shiny::p("Upload concentration-response data on the Single Stressor and ",
                "Binary Mixture tabs. The experiment details entered here are used ",
                "to label plots and axes.")
     )
@@ -41,7 +44,9 @@ intro_server <- function(id, meta) {
       meta$chem1    <- input$chem1
       meta$chem2    <- input$chem2
       meta$chem3    <- input$chem3
-      meta$unit     <- input$unit
+      meta$unit1    <- input$unit1
+      meta$unit2    <- input$unit2
+      meta$unit3    <- input$unit3
     })
   })
 }

@@ -5,11 +5,13 @@ test_that("intro_server writes form inputs into the shared meta store", {
   meta <- shiny::reactiveValues()
   shiny::testServer(intro_server, args = list(meta = meta), {
     session$setInputs(expID = "E1", species = "Daphnia", endpoint = "reproduction",
-                      chem1 = "CPF", chem2 = "MPs", unit = "mg/L")
+                      chem1 = "CPF", chem2 = "MPs",
+                      unit1 = "mg/kg", unit2 = "particles/kg")
     expect_equal(meta$expID, "E1")
     expect_equal(meta$chem1, "CPF")
     expect_equal(meta$chem2, "MPs")
-    expect_equal(meta$unit, "mg/L")
+    expect_equal(meta$unit1, "mg/kg")
+    expect_equal(meta$unit2, "particles/kg")
     expect_equal(meta$endpoint, "reproduction")
   })
 })
@@ -18,6 +20,13 @@ test_that("intro_ui builds a Shiny UI fragment", {
   ui <- intro_ui("intro")
   expect_true(inherits(ui, "shiny.tag") || inherits(ui, "shiny.tag.list") ||
               inherits(ui, "bslib_fragment"))
+})
+
+test_that("axis_label uses the per-stressor name + unit, plain for the single tab", {
+  meta <- list(chem1 = "CPF", unit1 = "mg/kg", unit2 = "")
+  expect_equal(axis_label(meta, "chem1"), "CPF (mg/kg)")     # named + unit
+  expect_equal(axis_label(meta, "chem2"), "Concentration")   # no name, no unit
+  expect_equal(axis_label(meta), "Concentration")            # single tab: no unit
 })
 
 test_that("single_server surfaces validation errors and withholds a fit", {
