@@ -15,6 +15,27 @@ test_that("plot_dose_response builds a plotly object from raw data (no fit)", {
   expect_s3_class(p, "plotly")
 })
 
+test_that("plot_dose_response draws controls at the offset on a log axis", {
+  skip_if_not_installed("plotly")
+  fit <- list(kind = "single", par = c(max = 10, slope = 2, ec50 = 1))
+  df <- data.frame(C1 = c(0, 0.5, 1, 2), Res = c(10, 8, 5, 2))
+  p <- plotly::plotly_build(plot_dose_response(fit, df, log_x = TRUE))
+  ctrl <- Filter(function(tr) isTRUE(tr$name == "control"), p$x$data)
+  expect_length(ctrl, 1)
+  expect_equal(unique(ctrl[[1]]$x), 0.5 / 10)   # offset = min(positive)/10
+})
+
+test_that("plot_dose_response keeps controls at 0 on a linear axis", {
+  skip_if_not_installed("plotly")
+  fit <- list(kind = "single", par = c(max = 10, slope = 2, ec50 = 1))
+  df <- data.frame(C1 = c(0, 0.5, 1, 2), Res = c(10, 8, 5, 2))
+  p <- plotly::plotly_build(plot_dose_response(fit, df, log_x = FALSE))
+  expect_equal(p$x$layout$xaxis$type, "linear")
+  # no separate "control" trace; the control sits at its true x = 0
+  obs <- Filter(function(tr) isTRUE(tr$name == "observed"), p$x$data)
+  expect_true(0 %in% obs[[1]]$x)
+})
+
 test_that("plot_obs_pred builds a plotly object", {
   skip_if_not_installed("plotly")
   fit <- list(kind = "mixture", pred = c(0.9, 0.5, 0.2))

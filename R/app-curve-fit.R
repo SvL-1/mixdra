@@ -88,7 +88,12 @@ curve_fit_ui <- function(id) {
       )
     ),
     bslib::card(bslib::card_header("Dose-response curve"),
-                plotly::plotlyOutput(ns("dr")))
+                plotly::plotlyOutput(ns("dr")),
+                shiny::checkboxInput(
+                  ns("log_x"), "Logarithmic x-axis", value = TRUE),
+                shiny::tags$small(shiny::tags$em(
+                  "Controls (concentration 0) are shown left of the lowest dose ",
+                  "on a log axis; untick for a linear axis to place them at 0.")))
   )
 }
 
@@ -160,7 +165,7 @@ curve_fit_server <- function(id, fit_df, meta, chem_field = NULL) {
     output$dr <- plotly::renderPlotly({
       df <- fit_df()
       shiny::req(!is.null(df), nrow(df) > 0)
-      p <- plot_dose_response(current_fit(), df)
+      p <- plot_dose_response(current_fit(), df, log_x = !isFALSE(input$log_x))
       plotly::layout(p, xaxis = list(title = axis_label(meta, chem_field)),
                      yaxis = list(title = if (!is.null(meta$endpoint) && nzchar(meta$endpoint))
                                             meta$endpoint else "Response"))

@@ -17,8 +17,10 @@ uses the \code{C1} column (as produced for the Single tab and each marginal).}
 }
 \value{
 A list: \code{curve} (data frame conc/response, or \code{NULL} when \code{fit} is
-\code{NULL}), \code{observed} (data frame conc/response), \code{chem} (the concentration
-column name).
+\code{NULL}), \code{observed} (data frame conc/response, control rows at conc 0
+preserved), \code{control_x} (the x-position at which to draw control points on a
+log axis -- one decade below the lowest positive dose, or \code{NA} when there is
+no control row), \code{chem} (the concentration column name).
 }
 \description{
 When every other chemical is at 0, both CA and IA reduce to the single
