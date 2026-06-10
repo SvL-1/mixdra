@@ -7,10 +7,11 @@
 #' Concentration-axis label from the shared meta store
 #'
 #' With `chem_field` (e.g. "chem1") uses that stressor's name and its matching
-#' per-stressor unit (`unit1`/`unit2`/`unit3`). Without `chem_field` (the Single
-#' Stressor tab, which has no named stressor) it uses a generic "Concentration"
-#' with no unit. Used by the single stage (generic) and the binary/ternary
-#' stages (per stressor).
+#' per-stressor unit (`unit1`/`unit2`/`unit3`). The Single Stressor tab passes
+#' `"chem0"`/`"unit0"`, the name and unit entered on that tab. When the name is
+#' blank (any field) it falls back to a generic "Concentration"; when only the
+#' unit is set the unit is still appended. Used by the single stage and the
+#' binary/ternary stages (per stressor).
 #' @keywords internal
 axis_label <- function(meta, chem_field = NULL) {
   if (is.null(chem_field)) return("Concentration")
@@ -28,6 +29,9 @@ single_ui <- function(id) {
   bslib::layout_sidebar(
     sidebar = bslib::sidebar(
       width = 360,
+      shiny::textInput(ns("name"), "Stressor name"),
+      shiny::textInput(ns("unit"), "Stressor unit (e.g. mg/L)"),
+      shiny::helpText("Used to label the dose-response axis."),
       shiny::radioButtons(ns("response"), "Response type",
                           c("Continuous" = "continuous", "Quantal" = "quantal")),
       shiny::helpText(
@@ -48,6 +52,13 @@ single_ui <- function(id) {
 #' @keywords internal
 single_server <- function(id, meta) {
   shiny::moduleServer(id, function(input, output, session) {
+
+    # The single tab's own stressor name + unit feed the dose-response axis via
+    # the "chem0"/"unit0" meta fields (axis_label's per-stressor convention).
+    shiny::observe({
+      meta$chem0 <- input$name
+      meta$unit0 <- input$unit
+    })
 
     output$template <- shiny::downloadHandler(
       filename = function() paste0("single_", input$response, "_template.csv"),
@@ -76,6 +87,6 @@ single_server <- function(id, meta) {
       to_engine_df(parsed(), "single")
     })
 
-    curve_fit_server("curve", fit_df = fit_df, meta = meta)
+    curve_fit_server("curve", fit_df = fit_df, meta = meta, chem_field = "chem0")
   })
 }

@@ -23,10 +23,22 @@ test_that("intro_ui builds a Shiny UI fragment", {
 })
 
 test_that("axis_label uses the per-stressor name + unit, plain for the single tab", {
-  meta <- list(chem1 = "CPF", unit1 = "mg/kg", unit2 = "")
+  meta <- list(chem1 = "CPF", unit1 = "mg/kg", unit2 = "",
+               chem0 = "Heat", unit0 = "C")
   expect_equal(axis_label(meta, "chem1"), "CPF (mg/kg)")     # named + unit
   expect_equal(axis_label(meta, "chem2"), "Concentration")   # no name, no unit
-  expect_equal(axis_label(meta), "Concentration")            # single tab: no unit
+  expect_equal(axis_label(meta, "chem0"), "Heat (C)")        # single tab: own name + unit
+  expect_equal(axis_label(meta), "Concentration")            # no field: generic fallback
+})
+
+test_that("single_server feeds its stressor name + unit into the axis-label meta fields", {
+  meta <- shiny::reactiveValues()
+  shiny::testServer(single_server, args = list(meta = meta), {
+    session$setInputs(name = "Heat", unit = "C")
+    expect_equal(meta$chem0, "Heat")
+    expect_equal(meta$unit0, "C")
+    expect_equal(axis_label(meta, "chem0"), "Heat (C)")
+  })
 })
 
 test_that("single_server surfaces validation errors and withholds a fit", {
