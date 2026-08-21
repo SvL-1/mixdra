@@ -3,25 +3,49 @@
 # and the ternary stage hold them fixed. Each stressor gets its own curve_fit
 # panel, reused verbatim from the standalone Single Stressor tab.
 
+#' Joint single-stressor fit for a campaign
+#'
+#' Fits every single-stressor arm together with ONE shared `max`, exactly as the
+#' engine's own Stage 1 does (`fit_ternary_asa()`), rather than fitting each
+#' stressor separately and averaging their asymptotes. A campaign has one control
+#' group, so the upper asymptote is a single quantity estimated once from all the
+#' single-stressor arms — and this is what the reference workbook does, which
+#' keeps campaign numbers comparable with Excel.
+#' @param df Campaign engine frame (`C1`, `C2`, optionally `C3`, response cols).
+#' @param chems Integer stressor indices, from [campaign_chems()].
+#' @param reference "CA" or "IA".
+#' @param response "continuous" or "quantal" (mapped to the engine's "binary").
+#' @return A named numeric vector of base curve parameters.
+#' @keywords internal
+campaign_fit_base <- function(df, chems, reference, response) {
+  # The engine infers the stressor count from the concentration columns PRESENT,
+  # so drop any column this campaign never doses -- otherwise a leftover all-zero
+  # C3 makes a two-stressor campaign fit as a three-stressor one.
+  keep <- c(paste0("C", chems),
+            intersect(c("Res", "Affected", "Exposed"), names(df)))
+  d <- df[keep]
+  names(d)[seq_along(chems)] <- paste0("C", seq_along(chems))
+
+  resp <- if (identical(response, "quantal")) "binary" else "continuous"
+  cls  <- classify_rows(d)
+  singles <- d[cls %in% c("control", "single"), , drop = FALSE]
+
+  params <- model_spec(reference, "reference", length(chems))$params
+  seed   <- seed_from_singles(d, resp)
+  fit <- fit_model(singles, reference, "reference", resp, start = seed,
+                   n_starts = 1, time_limit = 30)
+  fit$par[params]
+}
+
 #' The campaign's frozen base-parameter vector
 #'
-#' `NULL` until every stressor in the campaign has a fitted curve. Returns the
-#' binary parameter names (`ec501`/`ec502`) for a two-stressor campaign and the
-#' ternary ones (`ec50_1`..`ec50_3`) for a three-stressor campaign, matching the
-#' registries the downstream fits use.
+#' The result of the joint single-stressor fit, stored by [singles_server()] when
+#' the user runs it. `NULL` until then. Downstream stages read this and never
+#' re-derive it.
 #' @param store The campaign store.
 #' @return A named numeric vector, or `NULL`.
 #' @keywords internal
-campaign_base <- function(store) {
-  chems <- store$chems
-  if (is.null(chems)) return(NULL)
-  fits <- lapply(as.character(chems), function(k) store$singles[[k]])
-  if (any(vapply(fits, is.null, logical(1)))) return(NULL)
-  if (length(fits) == 3)
-    assemble_curve_params3(fits[[1]], fits[[2]], fits[[3]])
-  else
-    assemble_curve_params(fits[[1]], fits[[2]])
-}
+campaign_base <- function(store) store$base
 
 #' Singles stage UI
 #' @param id Module id.
@@ -33,6 +57,13 @@ singles_ui <- function(id) {
     shiny::p("Fit each stressor's dose-response curve (Autofit or Simulate). ",
              "These curves are fitted once here and held fixed by every stage ",
              "below, so one stressor has exactly one EC50 for the whole campaign."),
+    shiny::actionButton(ns("fit_singles"), "Fit single-stressor curves",
+                        class = "btn-primary"),
+    shiny::helpText(shiny::tags$small(
+      "Fits all single-stressor arms together with one shared upper asymptote ",
+      "(the campaign has one control group). These values are held fixed by ",
+      "every stage below.")),
+    shiny::uiOutput(ns("base_readout")),
     shiny::uiOutput(ns("panels"))
   )
 }
@@ -72,6 +103,30 @@ singles_server <- function(id, store) {
         store$singles[[as.character(kk)]] <- fit()
         campaign_bump_base(store)
       }, ignoreNULL = TRUE)
+    })
+
+    shiny::observeEvent(input$fit_singles, {
+      shiny::req(store$raw, store$chems)
+      b <- tryCatch(
+        campaign_fit_base(store$raw, store$chems, store$reference %||% "CA",
+                          store$response %||% "continuous"),
+        error = function(e) {
+          shiny::showNotification(paste0("Single-stressor fit failed: ",
+                                         conditionMessage(e)), type = "error")
+          NULL
+        })
+      if (!is.null(b)) {
+        store$base <- b
+        campaign_bump_base(store)
+      }
+    })
+
+    output$base_readout <- shiny::renderUI({
+      b <- campaign_base(store)
+      if (is.null(b)) return(shiny::tags$small("Not fitted yet."))
+      shiny::tags$small(shiny::HTML(paste0(
+        "<b>Campaign base (shared max):</b> ",
+        paste(sprintf("%s = %.4g", names(b), b), collapse = " &middot; "))))
     })
   })
 }

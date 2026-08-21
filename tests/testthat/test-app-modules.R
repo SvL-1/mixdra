@@ -331,37 +331,46 @@ test_that("campaign_ui builds a Shiny UI fragment", {
               inherits(ui, "bslib_fragment"))
 })
 
-test_that("campaign_base returns NULL until every single is fitted", {
-  store <- shiny::reactiveValues(n_chem = 3L, chems = c(1L, 2L, 3L),
-                                 singles = list())
-  # campaign_base() reads store's reactiveValues plainly (no isolate()) so
-  # that shiny::reactive(campaign_base(store)) picks up a dependency on them
-  # and re-evaluates once the last single is fitted; isolate() here at the
-  # test call site is what a bare reactiveValues read outside a reactive
-  # consumer requires, not something campaign_base() itself should do.
-  expect_null(shiny::isolate(campaign_base(store)))
+test_that("campaign_fit_base reproduces the engine's own Stage-1 joint fit", {
+  df <- to_engine_df(read_upload(system.file(
+    "extdata", "ternary_ca_fbsa_cpf_imi_continuous.csv", package = "mixdra")), "campaign")
 
-  fake <- function(m, s, e) list(par = c(max = m, slope = s, ec50 = e))
-  store$singles <- list(`1` = fake(100, 2, 1), `2` = fake(100, 3, 2))
-  expect_null(shiny::isolate(campaign_base(store)))
+  got <- campaign_fit_base(df, c(1L, 2L, 3L), "CA", "continuous")
+  ref <- analyse_ternary(df, reference = "CA", response = "continuous",
+                         n_starts = 1)$base
 
-  store$singles <- list(`1` = fake(100, 2, 1), `2` = fake(100, 3, 2),
-                        `3` = fake(100, 4, 4))
-  b <- shiny::isolate(campaign_base(store))
-  expect_equal(sort(names(b)),
-               sort(c("max", "slope1", "slope2", "slope3",
-                      "ec50_1", "ec50_2", "ec50_3")))
-  expect_equal(unname(b[["ec50_3"]]), 4)
-  expect_equal(unname(b[["max"]]), 100)
+  expect_equal(sort(names(got)), sort(names(ref)))
+  expect_equal(unname(got[names(ref)]), unname(ref), tolerance = 1e-4)
+  expect_equal(unname(got[["max"]]), 872.2, tolerance = 1e-2)   # workbook value
 })
 
-test_that("campaign_base uses the binary parameter names for a 2-stressor campaign", {
-  fake <- function(m, s, e) list(par = c(max = m, slope = s, ec50 = e))
-  store <- shiny::reactiveValues(
-    n_chem = 2L, chems = c(1L, 2L),
-    singles = list(`1` = fake(100, 2, 1), `2` = fake(100, 3, 2)))
-  expect_equal(sort(names(shiny::isolate(campaign_base(store)))),
+test_that("campaign_fit_base uses binary parameter names for two stressors", {
+  df <- to_engine_df(read_upload(system.file(
+    "extdata", "ternary_ca_fbsa_cpf_imi_continuous.csv", package = "mixdra")), "campaign")
+  two <- df[df$C3 == 0, c("C1", "C2", "Res")]
+
+  got <- campaign_fit_base(two, c(1L, 2L), "CA", "continuous")
+  expect_equal(sort(names(got)),
                sort(c("max", "slope1", "slope2", "ec501", "ec502")))
+})
+
+test_that("campaign_fit_base ignores a present-but-never-dosed third column", {
+  df <- to_engine_df(read_upload(system.file(
+    "extdata", "ternary_ca_fbsa_cpf_imi_continuous.csv", package = "mixdra")), "campaign")
+  two <- df[df$C3 == 0, ]                    # keeps the all-zero C3 column
+  expect_equal(campaign_chems(two), c(1L, 2L))
+
+  got <- campaign_fit_base(two, campaign_chems(two), "CA", "continuous")
+  expect_false(any(grepl("3", names(got))))  # no slope3 / ec50_3 leaked in
+})
+
+test_that("campaign_base reads the stored joint fit, not the panel fits", {
+  store <- shiny::reactiveValues(base = c(max = 1, slope1 = 2, ec501 = 3),
+                                 singles = list())
+  expect_equal(unname(shiny::isolate(campaign_base(store))[["max"]]), 1)
+
+  store$base <- NULL
+  expect_null(shiny::isolate(campaign_base(store)))
 })
 
 test_that("singles_server starts with no fits and does not invent one", {
