@@ -128,6 +128,8 @@ campaign_server <- function(id, meta) {
 
     output$stages <- shiny::renderUI(campaign_stage_nav(session$ns, store))
 
+    singles_server("singles", store)
+
     invisible(store)
   })
 }

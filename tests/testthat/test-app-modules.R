@@ -316,3 +316,53 @@ test_that("campaign_ui builds a Shiny UI fragment", {
   expect_true(inherits(ui, "shiny.tag") || inherits(ui, "shiny.tag.list") ||
               inherits(ui, "bslib_fragment"))
 })
+
+test_that("campaign_base returns NULL until every single is fitted", {
+  store <- shiny::reactiveValues(n_chem = 3L, chems = c(1L, 2L, 3L),
+                                 singles = list())
+  expect_null(campaign_base(store))
+
+  fake <- function(m, s, e) list(par = c(max = m, slope = s, ec50 = e))
+  store$singles <- list(`1` = fake(100, 2, 1), `2` = fake(100, 3, 2))
+  expect_null(campaign_base(store))
+
+  store$singles <- list(`1` = fake(100, 2, 1), `2` = fake(100, 3, 2),
+                        `3` = fake(100, 4, 4))
+  b <- campaign_base(store)
+  expect_equal(sort(names(b)),
+               sort(c("max", "slope1", "slope2", "slope3",
+                      "ec50_1", "ec50_2", "ec50_3")))
+  expect_equal(unname(b[["ec50_3"]]), 4)
+  expect_equal(unname(b[["max"]]), 100)
+})
+
+test_that("campaign_base uses the binary parameter names for a 2-stressor campaign", {
+  fake <- function(m, s, e) list(par = c(max = m, slope = s, ec50 = e))
+  store <- shiny::reactiveValues(
+    n_chem = 2L, chems = c(1L, 2L),
+    singles = list(`1` = fake(100, 2, 1), `2` = fake(100, 3, 2)))
+  expect_equal(sort(names(campaign_base(store))),
+               sort(c("max", "slope1", "slope2", "ec501", "ec502")))
+})
+
+test_that("singles_server starts with no fits and does not invent one", {
+  # The store-write and version-bump behaviour is covered by the
+  # campaign_bump_base unit test in Task 3; driving nested curve_fit_server
+  # modules through testServer is not worth the harness cost here. The Step 6
+  # manual app check is what confirms a fit reaches the store.
+  store <- shiny::reactiveValues(
+    n_chem = 2L, chems = c(1L, 2L), base_version = 0L, singles = list(),
+    raw = data.frame(C1 = c(0, 1, 2, 3, 0, 0, 0),
+                     C2 = c(0, 0, 0, 0, 1, 2, 3),
+                     Res = c(100, 80, 60, 40, 90, 70, 50)))
+  shiny::testServer(singles_server, args = list(store = store), {
+    expect_equal(length(store$singles), 0)
+    expect_equal(store$base_version, 0L)
+  })
+})
+
+test_that("singles_ui builds a Shiny UI fragment", {
+  ui <- singles_ui("s")
+  expect_true(inherits(ui, "shiny.tag") || inherits(ui, "shiny.tag.list") ||
+              inherits(ui, "bslib_fragment"))
+})
