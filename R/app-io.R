@@ -163,26 +163,6 @@ to_engine_df <- function(df, stage) {
   df
 }
 
-#' One chemical's single-compound series from a binary frame
-#'
-#' Keeps the rows where the *other* chemical's concentration is 0 (so the shared
-#' control row is included), drops the other concentration column, and renames
-#' this chemical's concentration column to `C1`. The result has the shape a
-#' single-chemical fitter expects (`C1` + response columns).
-#' @param df Binary engine data frame (`C1`, `C2`, response columns).
-#' @param chem 1 or 2 — which chemical's marginal series to extract.
-#' @return A data frame with `C1` and the response columns.
-#' @keywords internal
-marginal_df <- function(df, chem) {
-  this  <- paste0("C", chem)
-  other <- paste0("C", if (chem == 1) 2 else 1)
-  out <- df[df[[other]] == 0, , drop = FALSE]
-  out[[other]] <- NULL
-  names(out)[names(out) == this] <- "C1"
-  rownames(out) <- NULL
-  out
-}
-
 #' Frozen curve-parameter vector from two single-chemical fits
 #'
 #' Builds the named vector `analyse_mixture(start = …)` holds fixed: a shared
@@ -198,28 +178,6 @@ assemble_curve_params <- function(fit1, fit2) {
     slope2 = fit2$par[["slope"]],
     ec501  = fit1$par[["ec50"]],
     ec502  = fit2$par[["ec50"]])
-}
-
-#' One chemical's single-compound series from a ternary frame
-#'
-#' Keeps rows where the OTHER TWO chemicals are 0 (so the shared control row is
-#' included), drops their columns, and renames this chemical's concentration
-#' column to `C1` — the shape a single-chemical fitter expects. The ternary
-#' analogue of [marginal_df()].
-#' @param df Ternary engine data frame (`C1`, `C2`, `C3`, response columns).
-#' @param chem 1, 2 or 3 — which chemical's marginal series to extract.
-#' @return A data frame with `C1` and the response columns.
-#' @keywords internal
-marginal_df3 <- function(df, chem) {
-  cols  <- paste0("C", 1:3)
-  this  <- paste0("C", chem)
-  other <- setdiff(cols, this)
-  keep  <- df[[other[1]]] == 0 & df[[other[2]]] == 0
-  out   <- df[keep, , drop = FALSE]
-  out[other] <- NULL
-  names(out)[names(out) == this] <- "C1"
-  rownames(out) <- NULL
-  out
 }
 
 #' Frozen ternary base-parameter vector from three single-chemical fits
@@ -288,7 +246,7 @@ slice_to_chems <- function(df, keep) {
 #' Keeps the rows where every OTHER stressor is 0 (so the shared control row is
 #' included), drops their columns, and renames this stressor's concentration
 #' column to `C1` — the shape a single-stressor fitter expects. Generalises
-#' [marginal_df()] / [marginal_df3()] to 2- or 3-stressor frames.
+#' the old per-arity marginal-series extraction to 2- or 3-stressor frames.
 #' @inheritParams campaign_chems
 #' @param chem 1, 2 or 3 — which stressor's series to extract.
 #' @return A data frame with `C1` and the response columns.

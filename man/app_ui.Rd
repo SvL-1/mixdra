@@ -7,8 +7,10 @@
 app_ui()
 }
 \description{
-Introduction, Single Stressor and Campaign are the permanent tabs; Binary
-Mixture and Ternary Mixture are legacy per-mixture tabs kept only until a
-later task retires them in favour of the Campaign sub-tabs.
+Introduction, Single Stressor and Campaign are the app's three tabs. The
+legacy standalone Binary Mixture and Ternary Mixture tabs were retired in
+favour of the Campaign's per-pair sub-tabs and ternary sub-tab, which reuse
+the same \code{\link[=pair_workspace_ui]{pair_workspace_ui()}}/\code{\link[=pair_workspace_server]{pair_workspace_server()}} and
+\code{\link[=ternary_ui]{ternary_ui()}}/\code{\link[=ternary_server]{ternary_server()}} modules.
 }
 \keyword{internal}

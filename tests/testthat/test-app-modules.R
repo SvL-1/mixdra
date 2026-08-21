@@ -65,9 +65,9 @@ test_that("pair_workspace_server: Fit-interactions fills the staged block, Optim
   skip_if_not(file.exists(csv), "binary fixture missing")
   df <- to_engine_df(read_upload(csv), "binary")
 
-  # `base` mirrors the frozen curve-parameter vector binary_server builds from
-  # the two Stage-1 curve fits (assemble_curve_params(fit1, fit2)); mutating
-  # this reactiveVal mid-test stands in for a Stage-1 curve edit.
+  # `base` mirrors the frozen curve-parameter vector a campaign pair builds
+  # from the two Stage-1 curve fits (assemble_curve_params(fit1, fit2));
+  # mutating this reactiveVal mid-test stands in for a Stage-1 curve edit.
   base_rv <- shiny::reactiveVal(
     assemble_curve_params(list(par = c(max = 700, slope = 2, ec50 = 1)),
                           list(par = c(max = 600, slope = 1, ec50 = 5))))
@@ -144,48 +144,6 @@ test_that("a bundled example dataset ships and validates as binary continuous", 
   df <- read_upload(ex)
   expect_length(validate_upload(df, "binary", "continuous"), 0)
   expect_true(all(c("C1", "C2", "Res") %in% names(df)))
-})
-
-test_that("binary_server falls back to the bundled example before any upload", {
-  skip_on_cran()
-  ex <- system.file("extdata", "binary_ca_cpf_imi_fbsa_continuous.csv", package = "mixdra")
-  skip_if_not(nzchar(ex) && file.exists(ex), "bundled example not installed")
-  meta <- shiny::reactiveValues(chem1 = "CPF", chem2 = "IMI")
-  shiny::testServer(binary_server, args = list(meta = meta), {
-    session$setInputs(response = "continuous", reference = "CA")
-    expect_length(errs(), 0)                 # no upload, yet valid
-    expect_gt(nrow(engine_df()), 0)          # data is available
-  })
-})
-
-test_that("binary_ui: always-visible table + Fit/Optimize buttons, then diagnostics", {
-  html <- as.character(binary_ui("binary"))
-  expect_false(grepl("Freeze curves", html, fixed = TRUE))
-  # Stage 2 + 3 now live in the pair_workspace_ui module, nested under "work".
-  expect_match(html, "binary-work-results", fixed = TRUE)
-  expect_match(html, "binary-work-fit_interactions", fixed = TRUE)
-  expect_match(html, "Fit interaction models", fixed = TRUE)
-  expect_match(html, "binary-work-alpha", fixed = TRUE)
-  expect_match(html, "threshold for the model comparison", fixed = TRUE)
-  expect_match(html, "binary-work-optimize_all", fixed = TRUE)
-  expect_match(html, "Optimize all params (joint)", fixed = TRUE)
-  expect_match(html, "binary-work-refine_readout", fixed = TRUE)
-  expect_match(html, "binary-work-refined_badge", fixed = TRUE)
-  expect_match(html, "binary-work-interaction_help", fixed = TRUE)
-  expect_match(html, "binary-work-objective", fixed = TRUE)
-  # Stage 3: diagnostics
-  expect_match(html, "binary-work-surface", fixed = TRUE)
-  expect_match(html, "binary-work-isobole", fixed = TRUE)
-  expect_match(html, "binary-work-op", fixed = TRUE)
-  expect_match(html, "binary-work-cis", fixed = TRUE)
-  expect_match(html, "binary-work-n_starts", fixed = TRUE)
-  # the manual path + compare-all button + model picker are gone
-  expect_false(grepl("binary-compare_all", html, fixed = TRUE))
-  expect_false(grepl("binary-model", html, fixed = TRUE))
-  expect_false(grepl("binary-autofit", html, fixed = TRUE))
-  expect_false(grepl("binary-simulate", html, fixed = TRUE))
-  expect_false(grepl("binary-val_a", html, fixed = TRUE))
-  expect_false(grepl("binary-find_best", html, fixed = TRUE))
 })
 
 test_that("pair_workspace_ui builds a Shiny UI fragment", {

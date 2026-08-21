@@ -43,8 +43,8 @@ unchanged outside the campaign tab.}
 }
 \description{
 Fits and displays the interaction-model comparison for one stressor pair,
-given the frozen single-stressor curves. Extracted from the binary tab's
-server so it can be instantiated once per stressor pair; \code{binary_server}
-still owns the upload and the two single-curve fitters and delegates here.
+given the frozen single-stressor curves. Extracted from the legacy binary
+tab's server so it can be instantiated once per stressor pair; each caller
+owns the upload and the two single-curve fitters and delegates here.
 }
 \keyword{internal}

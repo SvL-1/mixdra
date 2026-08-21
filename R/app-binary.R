@@ -1,6 +1,6 @@
-# Binary Mixture stage: upload the full binary dataset (single-chemical series +
-# mixture rows) and fit each chemical's curve. "Fit interaction models" fills the
-# Stage-2 comparison table -- CA/IA reference + SA/DR/DL fit via the staged method
+# Pair interaction workspace: given a pair's engine data (single-chemical series +
+# mixture rows) and its two frozen single-stressor curves, "Fit interaction models"
+# fills the Stage-2 comparison table -- CA/IA reference + SA/DR/DL fit via the staged method
 # (curves fixed from the single compounds, only a/b per model), compared by LR
 # test with the parsimonious winner highlighted. Click a row to inspect that model
 # (Stage 3 diagnostics). "Optimize all params (joint)" re-fits every parameter of
@@ -160,133 +160,12 @@ pair_workspace_ui <- function(id) {
   )
 }
 
-#' Binary Mixture stage UI
-#' @param id Module id.
-#' @keywords internal
-binary_ui <- function(id) {
-  ns <- shiny::NS(id)
-  bslib::layout_sidebar(
-    sidebar = bslib::sidebar(
-      width = 380,
-      shiny::radioButtons(ns("response"), "Response type",
-                          c("Continuous" = "continuous", "Quantal" = "quantal")),
-      shiny::radioButtons(ns("reference"), "Reference model",
-                          c("Concentration addition (CA)" = "CA",
-                            "Independent action (IA)" = "IA")),
-      shiny::downloadButton(ns("template"), "Download template"),
-      shiny::fileInput(ns("file"), "Upload CSV", accept = ".csv"),
-      shiny::helpText(shiny::tags$small(
-        "An example dataset (CPF + IMI, continuous) is loaded until you upload your own.")),
-      shiny::uiOutput(ns("errors"))
-    ),
-    bslib::card(
-      bslib::card_header("Stage 1 · Single curves"),
-      shiny::p("Fit each stressor's dose-response curve (Autofit or Simulate). ",
-               "These curves are held fixed when the interaction models are ",
-               "compared below."),
-      shiny::div(shiny::h5(shiny::textOutput(ns("chem1_title"))),
-                 curve_fit_ui(ns("chem1"))),
-      shiny::div(class = "mt-4",
-                 shiny::h5(shiny::textOutput(ns("chem2_title"))),
-                 curve_fit_ui(ns("chem2"))),
-      shiny::uiOutput(ns("reveal_note"))
-    ),
-    pair_workspace_ui(ns("work"))
-  )
-}
-
-#' Binary Mixture stage server
-#' @param id Module id.
-#' @param meta Shared reactiveValues for experiment metadata.
-#' @keywords internal
-binary_server <- function(id, meta) {
-  shiny::moduleServer(id, function(input, output, session) {
-
-    output$template <- shiny::downloadHandler(
-      filename = function() paste0("binary_", input$response, "_template.csv"),
-      content  = function(file)
-        utils::write.csv(template_df("binary", input$response), file, row.names = FALSE)
-    )
-
-    output$chem1_title <- shiny::renderText({
-      nm <- meta$chem1; if (!is.null(nm) && nzchar(nm)) nm else "Stressor 1"
-    })
-    output$chem2_title <- shiny::renderText({
-      nm <- meta$chem2; if (!is.null(nm) && nzchar(nm)) nm else "Stressor 2"
-    })
-
-    # Data source: the user's upload, or -- before any upload -- a bundled
-    # example dataset (CPF + IMI, continuous) so the tab is usable on open.
-    # `system.file` resolves under inst/ in dev and the install tree.
-    upload_path <- shiny::reactive({
-      if (!is.null(input$file)) return(input$file$datapath)
-      ex <- system.file("extdata", "binary_ca_cpf_imi_fbsa_continuous.csv", package = "mixdra")
-      if (nzchar(ex)) ex else NULL
-    })
-    parsed <- shiny::reactive({
-      shiny::req(upload_path()); read_upload(upload_path())
-    })
-    errs <- shiny::reactive({
-      shiny::req(upload_path()); validate_upload(parsed(), "binary", input$response)
-    })
-    output$errors <- shiny::renderUI({
-      e <- errs()
-      if (length(e)) shiny::div(class = "text-danger",
-                                lapply(e, function(x) shiny::tags$p(x)))
-    })
-
-    engine_df <- shiny::reactive({
-      shiny::req(upload_path(), length(errs()) == 0)
-      to_engine_df(parsed(), "binary")
-    })
-    m1 <- shiny::reactive(marginal_df(engine_df(), 1))
-    m2 <- shiny::reactive(marginal_df(engine_df(), 2))
-
-    # Stage 1: two embedded single-chemical fitters, one per marginal series.
-    # The chemical panels are the single source of truth for the curves; the
-    # interaction workspace reads them (curve_params()) and never writes back.
-    fit1 <- curve_fit_server("chem1", fit_df = m1, meta = meta,
-                             chem_field = "chem1")
-    fit2 <- curve_fit_server("chem2", fit_df = m2, meta = meta,
-                             chem_field = "chem2")
-
-    # Frozen curve-parameter vector (shared max = average of the two fits).
-    curve_params <- shiny::reactive({
-      shiny::req(fit1(), fit2())
-      assemble_curve_params(fit1(), fit2())
-    })
-
-    output$reveal_note <- shiny::renderUI({
-      if (is.null(fit1()) || is.null(fit2()))
-        shiny::div(class = "text-muted",
-                   shiny::tags$small(
-                     "Fit both single curves (Autofit or Simulate) to reveal ",
-                     "the interaction workspace."))
-    })
-
-    engine_response <- shiny::reactive(
-      if (input$response == "quantal") "binary" else "continuous")
-
-    # Stages 2-3 (the interaction workspace) are gated on `base`: both single
-    # curves fitted. There is no manual freeze step -- the workspace simply
-    # appears once both fits exist. Extracted into its own module so a later
-    # task can instantiate it once per stressor pair.
-    pair_workspace_server("work",
-                          fit_df    = engine_df,
-                          base      = shiny::reactive(
-                            if (!is.null(fit1()) && !is.null(fit2()))
-                              assemble_curve_params(fit1(), fit2()) else NULL),
-                          reference = shiny::reactive(input$reference),
-                          response  = engine_response)
-  })
-}
-
 #' Pair interaction workspace server (Stage 2 + Stage 3)
 #'
 #' Fits and displays the interaction-model comparison for one stressor pair,
-#' given the frozen single-stressor curves. Extracted from the binary tab's
-#' server so it can be instantiated once per stressor pair; `binary_server`
-#' still owns the upload and the two single-curve fitters and delegates here.
+#' given the frozen single-stressor curves. Extracted from the legacy binary
+#' tab's server so it can be instantiated once per stressor pair; each caller
+#' owns the upload and the two single-curve fitters and delegates here.
 #'
 #' @param id Module id.
 #' @param fit_df Reactive; the pair's engine data frame.

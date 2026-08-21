@@ -86,22 +86,6 @@ test_that("collect_bounds reads a custom parameter set (single tab)", {
   expect_equal(b$lower, c(ec50 = 0.01))
 })
 
-test_that("marginal_df extracts a chemical's single series, renaming its conc to C1", {
-  df <- data.frame(C1 = c(0, 1, 2, 0, 0, 3),
-                   C2 = c(0, 0, 0, 1, 2, 4),
-                   Res = c(100, 60, 40, 70, 50, 10))
-
-  m1 <- marginal_df(df, 1)               # rows where C2 == 0
-  expect_equal(m1$C1, c(0, 1, 2))
-  expect_equal(m1$Res, c(100, 60, 40))
-  expect_false("C2" %in% names(m1))
-
-  m2 <- marginal_df(df, 2)               # rows where C1 == 0; C2 renamed to C1
-  expect_equal(m2$C1, c(0, 1, 2))
-  expect_equal(m2$Res, c(100, 70, 50))
-  expect_false("C2" %in% names(m2))
-})
-
 test_that("assemble_curve_params averages max and keeps per-chemical slope/ec50", {
   f1 <- list(par = c(max = 700, slope = 2, ec50 = 1))
   f2 <- list(par = c(max = 600, slope = 1, ec50 = 5))
@@ -178,21 +162,6 @@ test_that("validate_upload catches a negative C3", {
   bad <- data.frame(C1 = c(0, 1), C2 = c(0, 1), C3 = c(-1, 1), Res = c(100, 20))
   expect_match(paste(validate_upload(bad, "ternary", "continuous"), collapse = " "),
                ">= 0|negative|0")
-})
-
-test_that("marginal_df3 extracts a chemical's single series (other two == 0)", {
-  df <- data.frame(C1 = c(0, 1, 2, 0, 0, 3),
-                   C2 = c(0, 0, 0, 1, 2, 4),
-                   C3 = c(0, 0, 0, 0, 0, 5),
-                   Res = c(100, 60, 40, 70, 50, 10))
-  m1 <- marginal_df3(df, 1)             # rows where C2 == 0 AND C3 == 0
-  expect_equal(m1$C1, c(0, 1, 2))
-  expect_equal(m1$Res, c(100, 60, 40))
-  expect_false(any(c("C2", "C3") %in% names(m1)))
-
-  m3 <- marginal_df3(df, 3)             # rows where C1 == 0 AND C2 == 0; C3 -> C1
-  expect_equal(m3$C1, c(0))             # only the control row qualifies here
-  expect_equal(m3$Res, c(100))
 })
 
 test_that("assemble_curve_params3 averages max and uses underscore ec50 names", {

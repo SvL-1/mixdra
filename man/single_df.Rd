@@ -18,6 +18,6 @@ A data frame with \code{C1} and the response columns.
 Keeps the rows where every OTHER stressor is 0 (so the shared control row is
 included), drops their columns, and renames this stressor's concentration
 column to \code{C1} — the shape a single-stressor fitter expects. Generalises
-\code{\link[=marginal_df]{marginal_df()}} / \code{\link[=marginal_df3]{marginal_df3()}} to 2- or 3-stressor frames.
+the old per-arity marginal-series extraction to 2- or 3-stressor frames.
 }
 \keyword{internal}
