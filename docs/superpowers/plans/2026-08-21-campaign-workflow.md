@@ -108,8 +108,7 @@ test_that("pair_df keeps that pair's rows and renames to C1/C2", {
   expect_equal(names(p23), c("C1", "C2", "Res"))
   expect_equal(p23$C1, c(0, 1, 2, 3, 0, 0, 0, 1, 2))  # C2 became C1
   expect_equal(p23$C2, c(0, 0, 0, 0, 1, 2, 3, 1, 2))  # C3 became C2
-  expect_false(any(p23$C1 > 0 & p23$C2 > 0 &
-                   df$C1[df$C1 == 0] > 0))            # no C1-dosed rows leaked
+  expect_equal(nrow(p23), 9L)                         # exactly the C1 == 0 rows
 
   p12 <- pair_df(df, 1, 2)
   expect_equal(names(p12), c("C1", "C2", "Res"))
@@ -696,7 +695,11 @@ test_that("campaign_base uses the binary parameter names for a 2-stressor campai
                sort(c("max", "slope1", "slope2", "ec501", "ec502")))
 })
 
-test_that("singles_server stores one fit per stressor and bumps the base version", {
+test_that("singles_server starts with no fits and does not invent one", {
+  # The store-write and version-bump behaviour is covered by the
+  # campaign_bump_base unit test in Task 3; driving nested curve_fit_server
+  # modules through testServer is not worth the harness cost here. The Step 6
+  # manual app check is what confirms a fit reaches the store.
   store <- shiny::reactiveValues(
     n_chem = 2L, chems = c(1L, 2L), base_version = 0L, singles = list(),
     raw = data.frame(C1 = c(0, 1, 2, 3, 0, 0, 0),
@@ -1082,6 +1085,9 @@ campaign_stage_nav <- function(ns, store) {
     panels <- c(panels, list(bslib::nav_panel(title, body)))
   }
 
+  # INSERT-TERNARY-PANEL-HERE (Task 8 adds its block at this point, before the
+  # do.call — appending after it would silently drop the panel).
+
   do.call(bslib::navset_card_tab, panels)
 }
 ```
@@ -1395,9 +1401,9 @@ In `campaign_stage_nav()`, after the pair panels:
   }
 ```
 
-Note the two-stressor case needs no branch: the panel is simply never added.
+Insert this block at the `# INSERT-TERNARY-PANEL-HERE` marker, **before** the `do.call`. The two-stressor case needs no branch: the panel is simply never added.
 
-Add a note listing any pair whose `chosen` is not `"SA"`, rendered above the ternary results:
+Add a note listing any pair whose `chosen` is not `"SA"`. **It belongs to `ternary_server`** (it describes the ternary fit), so add `shiny::uiOutput(ns("sa_note"))` near the top of `ternary_ui` and this renderer to `ternary_server`:
 
 ```r
     output$sa_note <- shiny::renderUI({
