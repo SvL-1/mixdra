@@ -134,8 +134,9 @@ campaign_server <- function(id, meta) {
     # created inside renderUI. Unused slots never receive data. The return
     # value (current_fit/last_compare/... reactives) is kept in `pair_workspaces`
     # purely so tests can reach across the module boundary via testServer's
-    # environment access -- production code never reads it back (on_fit is
-    # how a later task will).
+    # environment access -- production code never reads it back. `on_fit`
+    # publishes the pair's S/A value into store$pairs[[k]], which
+    # campaign_pairwise() reads to freeze the ternary stage's A1/A2/A3.
     pair_workspaces <- list()
     for (p in list(c(1, 2), c(1, 3), c(2, 3))) local({
       pp <- p
@@ -152,8 +153,11 @@ campaign_server <- function(id, meta) {
         }),
         reference    = shiny::reactive(store$reference),
         response     = shiny::reactive(store$response),
-        base_version = shiny::reactive(store$base_version))
+        base_version = shiny::reactive(store$base_version),
+        on_fit = function(res) store$pairs[[k]] <- res)
     })
+
+    ternary_server("ternary", store)
 
     invisible(store)
   })
@@ -173,6 +177,23 @@ campaign_pairs <- function(chems) {
 #' @return A character key, e.g. `"23"`.
 #' @keywords internal
 pair_key <- function(i, j) paste0(i, j)
+
+#' The campaign's frozen pairwise interaction terms
+#'
+#' `A1` is the 1-2 pair, `A2` the 1-3 pair, `A3` the 2-3 pair -- the term order
+#' `ca_asa_tri()` uses. Each value is that pair's fitted S/A `a`, which is the
+#' same quantity (see the design doc, section 3). `NULL` until all three pairs
+#' have been fitted.
+#' @param store The campaign store.
+#' @return A named numeric `c(A1, A2, A3)`, or `NULL`.
+#' @keywords internal
+campaign_pairwise <- function(store) {
+  if (length(store$chems) != 3) return(NULL)
+  keys <- c("12", "13", "23")
+  vals <- lapply(keys, function(k) store$pairs[[k]]$a)
+  if (any(vapply(vals, is.null, logical(1)))) return(NULL)
+  stats::setNames(as.numeric(unlist(vals)), c("A1", "A2", "A3"))
+}
 
 #' Does this pair have any mixture rows?
 #'
@@ -215,8 +236,23 @@ campaign_stage_nav <- function(ns, store) {
     panels <- c(panels, list(bslib::nav_panel(title, body)))
   }
 
-  # INSERT-TERNARY-PANEL-HERE (Task 8 adds its block at this point, before the
-  # do.call -- appending after it would silently drop the panel).
+  if (length(store$chems) == 3) {
+    body <- if (!identical(store$reference, "CA")) {
+      shiny::div(class = "p-3 text-muted",
+                 "The ternary stage is not yet supported for Independent ",
+                 "Action. Switch the campaign reference model to Concentration ",
+                 "Addition to use it.")
+    } else if (!identical(store$response, "continuous")) {
+      shiny::div(class = "p-3 text-muted",
+                 "The ternary stage is not yet supported for quantal data.")
+    } else if (is.null(campaign_pairwise(store))) {
+      shiny::div(class = "p-3 text-muted",
+                 "Fit the interaction models on all three pair tabs first.")
+    } else {
+      ternary_ui(ns("ternary"))
+    }
+    panels <- c(panels, list(bslib::nav_panel("Ternary", body)))
+  }
 
   do.call(bslib::navset_card_tab, panels)
 }

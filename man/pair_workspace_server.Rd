@@ -33,7 +33,13 @@ a single-stressor curve has been refitted since (\code{base_version} moved on
 without a re-fit here). \code{NULL} (the default, used outside the campaign
 tab) leaves the banner permanently silent.}
 
-\item{on_fit}{Callback; unused for now (wired in a later task).}
+\item{on_fit}{Callback invoked whenever the staged "Fit interaction models"
+loop finishes, with \code{list(a, chosen, base_version)}: \code{a} is this pair's
+fitted S/A \code{a} (\code{NULL} if the SA model failed to fit), \code{chosen} is the
+comparison's selected model key, \code{base_version} is the campaign's
+base-parameter version stamp at fit time (\code{NULL} when \code{base_version} is
+not supplied). \code{NULL} (the default) leaves the workspace's behaviour
+unchanged outside the campaign tab.}
 }
 \description{
 Fits and displays the interaction-model comparison for one stressor pair,

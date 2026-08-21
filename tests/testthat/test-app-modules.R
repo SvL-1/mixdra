@@ -227,31 +227,41 @@ test_that("intro_server writes chem3 into the shared meta store", {
   })
 })
 
-test_that("ternary_server: three curves -> Fit Advanced S/A -> hub + selection", {
+test_that("ternary_server: consumes the store's frozen base + pairwise -> hub + selection", {
   skip_on_cran()
   ex <- system.file("extdata", "ternary_ca_fbsa_cpf_imi_continuous.csv", package = "mixdra")
   skip_if_not(nzchar(ex) && file.exists(ex), "bundled ternary example not installed")
-  meta <- shiny::reactiveValues(chem1 = "CPF", chem2 = "FBSA", chem3 = "IMI")
-  shiny::testServer(ternary_server, args = list(meta = meta), {
-    session$setInputs(response = "continuous", reference = "CA",
-                      thorough = FALSE, n_starts = 1, time_limit = 30)
-    expect_length(errs(), 0)                  # bundled example is valid
-    expect_gt(nrow(engine_df()), 0)
+  df <- to_engine_df(read_upload(ex), "campaign")
+  base <- campaign_fit_base(df, c(1L, 2L, 3L), "CA", "continuous")
 
-    # Simulate the three single curves (values near the validated fit).
-    session$setInputs(`chem1-val_max` = 872, `chem1-val_slope` = 4.67,
-                      `chem1-val_ec50` = 0.1275, `chem1-simulate` = 1)
-    session$setInputs(`chem2-val_max` = 872, `chem2-val_slope` = 13,
-                      `chem2-val_ec50` = 5.58, `chem2-simulate` = 1)
-    session$setInputs(`chem3-val_max` = 872, `chem3-val_slope` = 3.63,
-                      `chem3-val_ec50` = 0.575, `chem3-simulate` = 1)
-    expect_true(isTRUE(frozen()))
+  # Real per-pair S/A `a` values, fit exactly as pair_workspace_server does
+  # (curves fixed at the pair's slice of `base`) -- this stands in for what
+  # its on_fit callback would have published into store$pairs.
+  pair_a <- function(i, j) {
+    b <- pair_base(base, i, j)
+    fit_model(pair_df(df, i, j), "CA", "SA", "continuous",
+             start = b, fixed = names(b), n_starts = 1, time_limit = 30)$par[["a"]]
+  }
+  a12 <- pair_a(1, 2); a13 <- pair_a(1, 3); a23 <- pair_a(2, 3)
 
-    # Run the staged Advanced-S/A fit.
-    session$setInputs(fit_asa = 1)
+  store <- shiny::reactiveValues(
+    raw = df, chems = c(1L, 2L, 3L), reference = "CA", response = "continuous",
+    base = base,
+    pairs = list(`12` = list(a = a12, chosen = "SA"),
+                `13` = list(a = a13, chosen = "DR"),   # exercises the sa_note
+                `23` = list(a = a23, chosen = "SA")))
+
+  shiny::testServer(ternary_server, args = list(store = store), {
+    session$setInputs(n_starts = 1)
+
     res <- asa_res()
     expect_false(is.null(res))
     expect_setequal(names(res$pairwise), c("A1", "A2", "A3"))
+    # the frozen pairwise values are used AS-IS, not re-derived (A1 = pair
+    # 1-2, A2 = pair 1-3, A3 = pair 2-3 -- ca_asa_tri()'s term order).
+    expect_equal(unname(res$pairwise[["A1"]]), unname(a12), tolerance = 1e-8)
+    expect_equal(unname(res$pairwise[["A2"]]), unname(a13), tolerance = 1e-8)
+    expect_equal(unname(res$pairwise[["A3"]]), unname(a23), tolerance = 1e-8)
     expect_gt(nrow(res$individual), 0)
 
     # Hub: Overall row + one row per ternary ratio; Overall selected by default.
@@ -264,30 +274,45 @@ test_that("ternary_server: three curves -> Fit Advanced S/A -> hub + selection",
     session$setInputs(hub_rows_selected = 2)
     expect_equal(selected_ratio(), h$.key[2])
 
-    # A curve edit clears the staged result (user re-runs Fit Advanced S/A).
-    session$setInputs(`chem1-val_max` = 880, `chem1-simulate` = 2)
-    expect_null(asa_res())
+    # The sa_note flags pair 1-3 (chosen = "DR", not S/A) and only that pair.
+    # renderUI's output slot is list(html, deps); html is what the browser sees.
+    note <- as.character(output$sa_note$html)
+    expect_match(note, "13", fixed = TRUE)
+    expect_false(grepl("12", note, fixed = TRUE))
+    expect_false(grepl("23", note, fixed = TRUE))
   })
 })
 
-test_that("ternary_ui builds the sidebar, three curve panels, and the three stages", {
+test_that("ternary_server: no fit until store$raw/base/pairwise are all present", {
+  store <- shiny::reactiveValues(raw = NULL, chems = NULL, reference = NULL,
+                                 response = NULL, base = NULL, pairs = list())
+  shiny::testServer(ternary_server, args = list(store = store), {
+    # asa_res() is a plain reactive gated by shiny::req(); with nothing in the
+    # store yet it fails req() (a silent-error condition), not a plain NULL.
+    expect_error(asa_res(), class = "shiny.silent.error")
+  })
+})
+
+test_that("ternary_ui has no upload/curve-fit UI of its own and shows the three stages", {
   html <- as.character(ternary_ui("ternary"))
-  # sidebar controls + disabled-radio script
-  expect_match(html, "ternary-response", fixed = TRUE)
-  expect_match(html, "ternary-reference", fixed = TRUE)
-  expect_match(html, "coming soon", fixed = TRUE)
-  expect_match(html, "prop('disabled', true)", fixed = TRUE)
-  # Stage 1: three curve panels
-  expect_match(html, "ternary-chem1-autofit", fixed = TRUE)
-  expect_match(html, "ternary-chem2-autofit", fixed = TRUE)
-  expect_match(html, "ternary-chem3-autofit", fixed = TRUE)
-  # Stage 2: fit button + hub table
-  expect_match(html, "ternary-fit_asa", fixed = TRUE)
+  # the sa_note output belongs to ternary_server, not the pair tab
+  expect_match(html, "ternary-sa_note", fixed = TRUE)
+  # the hub table + inspect plots remain
   expect_match(html, "ternary-hub", fixed = TRUE)
-  # Stage 3: plots + effect readout
   expect_match(html, "ternary-isoplane", fixed = TRUE)
   expect_match(html, "ternary-sigma_tu", fixed = TRUE)
   expect_match(html, "ternary-effect", fixed = TRUE)
+  expect_match(html, "ternary-n_starts", fixed = TRUE)
+  # no local upload, response/reference toggle, or Stage-1 curve panels --
+  # the campaign store provides all of that now
+  expect_false(grepl("ternary-file", html, fixed = TRUE))
+  expect_false(grepl("ternary-template", html, fixed = TRUE))
+  expect_false(grepl("ternary-response", html, fixed = TRUE))
+  expect_false(grepl("ternary-reference", html, fixed = TRUE))
+  expect_false(grepl("ternary-chem1-autofit", html, fixed = TRUE))
+  expect_false(grepl("ternary-chem2-autofit", html, fixed = TRUE))
+  expect_false(grepl("ternary-chem3-autofit", html, fixed = TRUE))
+  expect_false(grepl("ternary-fit_asa", html, fixed = TRUE))
   # no alpha / joint controls (deliberately dropped vs binary)
   expect_false(grepl("ternary-alpha", html, fixed = TRUE))
   expect_false(grepl("ternary-optimize_all", html, fixed = TRUE))
@@ -428,6 +453,22 @@ test_that("campaign_pairs enumerates the pairs in A-B, A-C, B-C order", {
                list(c(1L, 2L), c(1L, 3L), c(2L, 3L)))
   expect_equal(campaign_pairs(c(1L, 2L)), list(c(1L, 2L)))
   expect_equal(pair_key(2, 3), "23")
+})
+
+test_that("campaign_pairwise maps pair S/A values onto A1/A2/A3", {
+  store <- shiny::reactiveValues(
+    chems = c(1L, 2L, 3L),
+    pairs = list(`12` = list(a = 0.5), `13` = list(a = -0.2)))
+  # bare reactiveValues reads error outside a reactive consumer in current
+  # shiny -- isolate() at the test call site (not inside campaign_pairwise
+  # itself, which must stay reactive for asa_res() to invalidate correctly).
+  expect_null(shiny::isolate(campaign_pairwise(store)))
+
+  shiny::isolate(store$pairs$`23` <- list(a = 1.1))
+  pw <- shiny::isolate(campaign_pairwise(store))
+  expect_equal(unname(pw[["A1"]]), 0.5)    # pair 1-2
+  expect_equal(unname(pw[["A2"]]), -0.2)   # pair 1-3
+  expect_equal(unname(pw[["A3"]]), 1.1)    # pair 2-3
 })
 
 test_that("pair_has_rows spots a pair with no mixture rows", {

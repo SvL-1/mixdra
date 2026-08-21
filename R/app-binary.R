@@ -300,7 +300,13 @@ binary_server <- function(id, meta) {
 #'   a single-stressor curve has been refitted since (`base_version` moved on
 #'   without a re-fit here). `NULL` (the default, used outside the campaign
 #'   tab) leaves the banner permanently silent.
-#' @param on_fit Callback; unused for now (wired in a later task).
+#' @param on_fit Callback invoked whenever the staged "Fit interaction models"
+#'   loop finishes, with `list(a, chosen, base_version)`: `a` is this pair's
+#'   fitted S/A `a` (`NULL` if the SA model failed to fit), `chosen` is the
+#'   comparison's selected model key, `base_version` is the campaign's
+#'   base-parameter version stamp at fit time (`NULL` when `base_version` is
+#'   not supplied). `NULL` (the default) leaves the workspace's behaviour
+#'   unchanged outside the campaign tab.
 #' @keywords internal
 pair_workspace_server <- function(id, fit_df, base, reference, response,
                                   base_version = NULL, on_fit = NULL) {
@@ -475,6 +481,15 @@ pair_workspace_server <- function(id, fit_df, base, reference, response,
                         chosen = cmp$chosen, reference = reference(),
                         response = response()))
       sel_row(match(cmp$chosen, results_order()))   # default-select the winner row
+
+      # Publish this pair's S/A value + chosen model for the campaign store
+      # (campaign_pairwise() reads it to freeze the ternary stage's A1/A2/A3).
+      # NULL outside the campaign tab (a bare pair_workspace_server call passes
+      # no on_fit), so this is inert there.
+      if (!is.null(on_fit))
+        on_fit(list(a = if (!is.null(s[["SA"]])) s[["SA"]]$par[["a"]] else NULL,
+                    chosen = cmp$chosen,
+                    base_version = if (!is.null(base_version)) base_version() else NULL))
     })
 
     # Optimize all params (joint): for EVERY staged model, re-fit every parameter
