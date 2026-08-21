@@ -131,17 +131,25 @@ campaign_server <- function(id, meta) {
     singles_server("singles", store)
 
     # All three slots are registered up front -- a module server cannot be
-    # created inside renderUI. Unused slots never receive data.
+    # created inside renderUI. Unused slots never receive data. The return
+    # value (current_fit/last_compare/... reactives) is kept in `pair_workspaces`
+    # purely so tests can reach across the module boundary via testServer's
+    # environment access -- production code never reads it back (on_fit is
+    # how a later task will).
+    pair_workspaces <- list()
     for (p in list(c(1, 2), c(1, 3), c(2, 3))) local({
       pp <- p
       k  <- pair_key(pp[1], pp[2])
-      pair_workspace_server(
+      pair_workspaces[[k]] <<- pair_workspace_server(
         paste0("pair", k),
         fit_df = shiny::reactive({
           shiny::req(store$raw, pair_has_rows(store$raw, pp[1], pp[2]))
           pair_df(store$raw, pp[1], pp[2])
         }),
-        base         = shiny::reactive(campaign_base(store)),
+        base = shiny::reactive({
+          b <- campaign_base(store)
+          if (is.null(b)) NULL else pair_base(b, pp[1], pp[2])
+        }),
         reference    = shiny::reactive(store$reference),
         response     = shiny::reactive(store$response),
         base_version = shiny::reactive(store$base_version))

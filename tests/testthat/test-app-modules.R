@@ -340,6 +340,74 @@ test_that("campaign wiring carries upload, base and settings into a pair workspa
   })
 })
 
+test_that("campaign wiring: each pair workspace fits its OWN pair's data with the correctly-sliced base", {
+  # This is the permanent end-to-end coverage for the campaign_server ->
+  # pair_workspace_server delegation (Task 5's lost glue, restored here per
+  # Task 6). It must fail if EITHER the registration loop wires the wrong
+  # pair's data/settings into a slot (the local()-capture bug), OR the base
+  # reaching a pair is not correctly reduced to that pair's binary parameter
+  # names (the ec50_1..3/ec501-502 naming-mismatch defect found in review:
+  # without pair_base(), every 3-stressor pair's EC50s silently collapsed to
+  # ~0 and the second slot's slope/EC50 came from the wrong stressor).
+  skip_if_not_installed("shiny")
+  skip_on_cran()
+  meta <- shiny::reactiveValues()
+  shiny::testServer(campaign_server, args = list(meta = meta), {
+    session$setInputs(response = "continuous", reference = "CA")
+    expect_equal(store$chems, c(1L, 2L, 3L))   # bundled example: 3 stressors
+
+    # Freeze the singles, as the Singles page would, so the pair tabs unlock.
+    store$base <- campaign_fit_base(store$raw, store$chems, store$reference,
+                                    store$response)
+    session$flushReact()
+
+    # --- Pair 1-3 -------------------------------------------------------
+    b13 <- pair_base(store$base, 1, 3)
+    session$setInputs(`pair13-thorough` = FALSE, `pair13-n_starts` = 1,
+                      `pair13-alpha` = 0.05, `pair13-time_limit` = 30)
+    session$setInputs(`pair13-fit_interactions` = 1)
+
+    # Property 2 (base + settings reach the child): the fitted SA model for
+    # pair 1-3, run through the campaign, holds the curve params fixed at
+    # pair_base(store$base, 1, 3) exactly -- stressor 1's EC50 in slot 1,
+    # stressor 3's in slot 2, NOT zeroed and NOT stressor 2's. This is the
+    # single assertion that would have caught the pre-fix defect.
+    sa13 <- pair_workspaces[["13"]]$last_compare()$fits$SA
+    expect_equal(unname(sa13$par[["ec501"]]), unname(b13[["ec501"]]), tolerance = 1e-6)
+    expect_equal(unname(sa13$par[["ec502"]]), unname(b13[["ec502"]]), tolerance = 1e-6)
+    expect_equal(unname(sa13$par[["ec502"]]), unname(store$base[["ec50_3"]]), tolerance = 1e-6)
+    expect_false(isTRUE(all.equal(unname(sa13$par[["ec502"]]),
+                                  unname(store$base[["ec50_2"]]))))  # not stressor 2's
+
+    # And it matches a fit computed directly on the pair's own slice with the
+    # same base and settings -- reference/response/base all propagate, not
+    # just "some" fit ran.
+    p13 <- pair_df(store$raw, 1, 3)
+    direct13 <- fit_model(p13, "CA", "SA", "continuous",
+                          start = b13, fixed = names(b13),
+                          n_starts = 1, time_limit = 30)
+    expect_equal(unname(sa13$par), unname(direct13$par), tolerance = 1e-4)
+    expect_equal(sa13$objective, direct13$objective, tolerance = 1e-4)
+
+    # --- Pair 1-2 (property 1: its OWN data, not pair 1-3's) ------------
+    b12 <- pair_base(store$base, 1, 2)
+    session$setInputs(`pair12-thorough` = FALSE, `pair12-n_starts` = 1,
+                      `pair12-alpha` = 0.05, `pair12-time_limit` = 30)
+    session$setInputs(`pair12-fit_interactions` = 1)
+    sa12 <- pair_workspaces[["12"]]$last_compare()$fits$SA
+    expect_equal(unname(sa12$par[["ec501"]]), unname(b12[["ec501"]]), tolerance = 1e-6)
+    expect_equal(unname(sa12$par[["ec502"]]), unname(b12[["ec502"]]), tolerance = 1e-6)
+
+    # A closure bug that let every slot capture the last-iterated pair (2-3)
+    # would make pair 1-2's frozen ec502 equal pair 1-3's; they must differ,
+    # since slot 2 is a different stressor (2 vs 3) with a very different EC50.
+    expect_false(isTRUE(all.equal(unname(sa12$par[["ec502"]]),
+                                  unname(sa13$par[["ec502"]]))))
+    expect_equal(unname(sa12$par[["ec502"]]), unname(store$base[["ec50_2"]]),
+                tolerance = 1e-6)
+  })
+})
+
 test_that("campaign_bump_base increments the stamp downstream stages compare against", {
   store <- shiny::reactiveValues(base_version = 0L)
   campaign_bump_base(store)

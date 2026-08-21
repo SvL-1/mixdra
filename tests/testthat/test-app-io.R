@@ -262,6 +262,34 @@ test_that("pair_df rejects a descending pair rather than corrupting the frame", 
   expect_error(pair_df(campaign_fixture(), 2, 1))
 })
 
+test_that("pair_base maps a three-stressor campaign base onto one pair's binary names", {
+  base3 <- c(max = 872.2065, slope1 = 4.6740, slope2 = 11.2592, slope3 = 3.6291,
+            ec50_1 = 0.12747, ec50_2 = 34.6707, ec50_3 = 0.57505)
+
+  p13 <- pair_base(base3, 1, 3)
+  expect_equal(names(p13), c("max", "slope1", "slope2", "ec501", "ec502"))
+  expect_equal(unname(p13[["max"]]),    872.2065)
+  expect_equal(unname(p13[["slope1"]]), 4.6740)
+  # stressor 3's slope/EC50 land in slot 2 -- NOT stressor 2's (11.2592 /
+  # 34.6707), which is the exact mis-mapping the bug produced. Stressor 2's
+  # EC50 (~34.7) and stressor 3's (~0.575) are nearly two orders of magnitude
+  # apart, so a wrong mapping is unmissable.
+  expect_equal(unname(p13[["slope2"]]), 3.6291)
+  expect_equal(unname(p13[["ec501"]]),  0.12747)
+  expect_equal(unname(p13[["ec502"]]),  0.57505)
+
+  p23 <- pair_base(base3, 2, 3)
+  expect_equal(unname(p23[["slope1"]]), 11.2592)
+  expect_equal(unname(p23[["slope2"]]), 3.6291)
+  expect_equal(unname(p23[["ec501"]]),  34.6707)
+  expect_equal(unname(p23[["ec502"]]),  0.57505)
+})
+
+test_that("pair_base passes a two-stressor campaign base through unchanged", {
+  base2 <- c(max = 800, slope1 = 2, slope2 = 3, ec501 = 0.1, ec502 = 0.5)
+  expect_identical(pair_base(base2, 1, 2), base2)
+})
+
 test_that("campaign schema requires C1/C2 and treats C3 as optional", {
   expect_equal(upload_schema("campaign", "continuous"), c("C1", "C2", "Res"))
   expect_equal(upload_schema("campaign", "quantal"),

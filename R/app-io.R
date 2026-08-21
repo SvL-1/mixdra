@@ -318,6 +318,28 @@ pair_df <- function(df, i, j) {
   out
 }
 
+#' Map a campaign base onto one pair's binary parameter names
+#'
+#' A three-stressor campaign base is named for the ternary registry
+#' (`slope1..3`, `ec50_1..3`), but each pair is fitted with the two-chemical
+#' model, whose registry uses `slope1`, `slope2`, `ec501`, `ec502`. This selects
+#' the pair's two stressors and renames them into that binary shape, so the
+#' frozen curves are actually held fixed. A two-stressor campaign base is
+#' already in binary shape and passes through unchanged.
+#' @param base Campaign base parameters, from [campaign_base()].
+#' @param i,j Stressor indices of the pair, `i < j`.
+#' @return A named numeric vector: `max`, `slope1`, `slope2`, `ec501`, `ec502`.
+#' @keywords internal
+pair_base <- function(base, i, j) {
+  stopifnot(i < j)
+  if (all(c("ec501", "ec502") %in% names(base))) return(base)   # already binary
+  c(max    = unname(base[["max"]]),
+    slope1 = unname(base[[paste0("slope", i)]]),
+    slope2 = unname(base[[paste0("slope", j)]]),
+    ec501  = unname(base[[paste0("ec50_", i)]]),
+    ec502  = unname(base[[paste0("ec50_", j)]]))
+}
+
 #' Assemble lower/upper bound vectors from Advanced-panel inputs
 #'
 #' Reads `lo_<param>` / `hi_<param>` values for `params`; blank/NA entries are
