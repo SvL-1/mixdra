@@ -2,16 +2,18 @@
 # are fully unit-testable and run without the UI stack installed.
 
 #' Fixed column schema for a stage and response type
-#' @param stage "single", "binary", or "ternary".
+#' @param stage "single", "binary", "ternary", or "campaign".
 #' @param response "continuous" or "quantal".
 #' @return Character vector of required column names.
 #' @keywords internal
 upload_schema <- function(stage, response) {
-  stage <- match.arg(stage, c("single", "binary", "ternary"))
+  stage <- match.arg(stage, c("single", "binary", "ternary", "campaign"))
   response <- match.arg(response, c("continuous", "quantal"))
   if (stage == "single") {
     if (response == "continuous") c("Conc", "Res") else c("Conc", "Affected", "Exposed")
-  } else if (stage == "binary") {
+  } else if (stage == "binary" || stage == "campaign") {
+    # A campaign REQUIRES C1/C2; C3 is optional and makes it a three-stressor
+    # campaign. Optionality is enforced in validate_upload(), not the schema.
     if (response == "continuous") c("C1", "C2", "Res") else c("C1", "C2", "Affected", "Exposed")
   } else {
     if (response == "continuous") c("C1", "C2", "C3", "Res")
@@ -23,11 +25,14 @@ upload_schema <- function(stage, response) {
 #'
 #' Returns a small, illustrative dataset with exactly the schema columns. The
 #' binary template includes single-chemical rows (one chemical at 0) because
-#' [mixdra::analyse_mixture()] seeds itself from them.
+#' [mixdra::analyse_mixture()] seeds itself from them. The campaign template is
+#' the full ternary template with all four strata.
 #' @inheritParams upload_schema
 #' @return A data frame the user can download, fill in, and re-upload.
 #' @keywords internal
 template_df <- function(stage, response) {
+  # A campaign template IS the ternary template: all four strata in one frame.
+  if (stage == "campaign") stage <- "ternary"
   cols <- upload_schema(stage, response)
   if (stage == "single") {
     conc <- c(0, 0.1, 0.3, 1, 3, 10)
@@ -67,7 +72,8 @@ template_df <- function(stage, response) {
 
 #' Validate an uploaded data frame against the fixed schema
 #'
-#' @inheritParams upload_schema
+#' @param stage "single", "binary", "ternary", or "campaign".
+#' @param response "continuous" or "quantal".
 #' @param df The uploaded data frame.
 #' @return Character vector of human-readable error messages; empty if valid.
 #' @keywords internal
@@ -111,6 +117,27 @@ validate_upload <- function(df, stage, response) {
     if (!any(nz == 3, na.rm = TRUE))
       errs <- c(errs, paste0("No ternary rows (all of C1, C2, C3 > 0); the ",
                              "per-ratio A4 step needs at least one ternary mixture."))
+  }
+
+  if (stage == "campaign") {
+    cols <- intersect(c("C1", "C2", "C3"), present)
+    ok   <- cols[vapply(df[cols], is.numeric, logical(1))]
+    if (length(ok) >= 2) {
+      chems <- campaign_chems(df[ok])
+      if (length(chems) < 2) {
+        errs <- c(errs, paste0(
+          "A campaign needs at least two stressors with a positive ",
+          "concentration; found ", length(chems), "."))
+      } else {
+        for (k in chems) {
+          nd <- length(unique(stats::na.omit(single_df(df, k)$C1)))
+          if (nd < 4)
+            errs <- c(errs, paste0(
+              "Stressor ", k, " has only ", nd, " distinct concentrations in ",
+              "its single-stressor series; at least 4 are needed to fit a curve."))
+        }
+      }
+    }
   }
 
   errs

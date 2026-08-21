@@ -270,3 +270,44 @@ test_that("pair_df on a two-stressor frame is a no-op slice", {
 test_that("pair_df rejects a descending pair rather than corrupting the frame", {
   expect_error(pair_df(campaign_fixture(), 2, 1))
 })
+
+test_that("campaign schema requires C1/C2 and treats C3 as optional", {
+  expect_equal(upload_schema("campaign", "continuous"), c("C1", "C2", "Res"))
+  expect_equal(upload_schema("campaign", "quantal"),
+               c("C1", "C2", "Affected", "Exposed"))
+})
+
+test_that("the campaign template is a full three-stressor campaign", {
+  tpl <- template_df("campaign", "continuous")
+  expect_true(all(c("C1", "C2", "C3", "Res") %in% names(tpl)))
+  cls <- classify_rows(tpl)
+  expect_true(all(c("control", "single", "binary", "ternary") %in%
+                  as.character(cls)))
+})
+
+test_that("a well-formed campaign validates clean", {
+  expect_equal(validate_upload(campaign_fixture(), "campaign", "continuous"),
+               character(0))
+})
+
+test_that("a campaign needs at least two dosed stressors", {
+  df <- campaign_fixture()
+  df$C2 <- 0
+  df$C3 <- 0
+  errs <- validate_upload(df, "campaign", "continuous")
+  expect_true(any(grepl("at least two stressors", errs)))
+})
+
+test_that("each single series needs 4 distinct concentrations", {
+  df <- campaign_fixture()
+  df <- df[!(df$C2 > 0 & df$C1 == 0 & df$C3 == 0 & df$C2 > 2), ]  # thin chem 2
+  errs <- validate_upload(df, "campaign", "continuous")
+  expect_true(any(grepl("Stressor 2", errs)))
+  expect_true(any(grepl("distinct concentrations", errs)))
+})
+
+test_that("a pair with no mixture rows is NOT an error (the sub-tab disables instead)", {
+  df <- campaign_fixture()
+  df <- df[!(df$C2 > 0 & df$C3 > 0), ]     # drop every 2x3 mixture row
+  expect_equal(validate_upload(df, "campaign", "continuous"), character(0))
+})
