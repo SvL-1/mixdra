@@ -26,7 +26,12 @@ until both single-stressor curves are fitted.}
 
 \item{response}{Reactive; the engine response key (\code{"continuous"}/\code{"binary"}).}
 
-\item{base_version}{Reactive; unused for now (wired in a later task).}
+\item{base_version}{Reactive; the campaign's base-parameter version stamp
+(\code{store$base_version}). When supplied, the workspace records the stamp at
+the moment "Fit interaction models" last ran and shows a stale banner if
+a single-stressor curve has been refitted since (\code{base_version} moved on
+without a re-fit here). \code{NULL} (the default, used outside the campaign
+tab) leaves the banner permanently silent.}
 
 \item{on_fit}{Callback; unused for now (wired in a later task).}
 }

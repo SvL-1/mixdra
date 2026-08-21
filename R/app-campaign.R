@@ -130,8 +130,52 @@ campaign_server <- function(id, meta) {
 
     singles_server("singles", store)
 
+    # All three slots are registered up front -- a module server cannot be
+    # created inside renderUI. Unused slots never receive data.
+    for (p in list(c(1, 2), c(1, 3), c(2, 3))) local({
+      pp <- p
+      k  <- pair_key(pp[1], pp[2])
+      pair_workspace_server(
+        paste0("pair", k),
+        fit_df = shiny::reactive({
+          shiny::req(store$raw, pair_has_rows(store$raw, pp[1], pp[2]))
+          pair_df(store$raw, pp[1], pp[2])
+        }),
+        base         = shiny::reactive(campaign_base(store)),
+        reference    = shiny::reactive(store$reference),
+        response     = shiny::reactive(store$response),
+        base_version = shiny::reactive(store$base_version))
+    })
+
     invisible(store)
   })
+}
+
+#' The pairs of a campaign, in A-B, A-C, B-C order
+#' @param chems Integer vector of stressor indices.
+#' @return A list of length-2 integer vectors.
+#' @keywords internal
+campaign_pairs <- function(chems) {
+  if (length(chems) < 2) return(list())
+  utils::combn(sort(chems), 2, simplify = FALSE)
+}
+
+#' Store key for a pair
+#' @param i,j Stressor indices.
+#' @return A character key, e.g. `"23"`.
+#' @keywords internal
+pair_key <- function(i, j) paste0(i, j)
+
+#' Does this pair have any mixture rows?
+#'
+#' A campaign may cover a pair's singles without ever dosing them together; that
+#' pair's sub-tab is disabled rather than treated as an upload error.
+#' @param df Campaign engine frame.
+#' @param i,j Stressor indices.
+#' @return `TRUE` if at least one row has both concentrations positive.
+#' @keywords internal
+pair_has_rows <- function(df, i, j) {
+  any(df[[paste0("C", i)]] > 0 & df[[paste0("C", j)]] > 0, na.rm = TRUE)
 }
 
 #' Sub-navigation for the campaign stages
@@ -143,7 +187,28 @@ campaign_server <- function(id, meta) {
 #' @param store The campaign store.
 #' @keywords internal
 campaign_stage_nav <- function(ns, store) {
-  bslib::navset_card_tab(
-    bslib::nav_panel("Singles", singles_ui(ns("singles")))
-  )
+  panels <- list(bslib::nav_panel("Singles", singles_ui(ns("singles"))))
+
+  ready <- !is.null(campaign_base(store))
+  for (p in campaign_pairs(store$chems)) {
+    k     <- pair_key(p[1], p[2])
+    title <- paste(axis_label(store, paste0("chem", p[1])), "×",
+                   axis_label(store, paste0("chem", p[2])))
+    body <- if (!pair_has_rows(store$raw, p[1], p[2])) {
+      shiny::div(class = "p-3 text-muted",
+                 "This campaign has no mixture rows for this pair.")
+    } else if (!ready) {
+      shiny::div(class = "p-3 text-muted",
+                 sprintf("Fit all %d single-stressor curves first.",
+                         store$n_chem))
+    } else {
+      pair_workspace_ui(ns(paste0("pair", k)))
+    }
+    panels <- c(panels, list(bslib::nav_panel(title, body)))
+  }
+
+  # INSERT-TERNARY-PANEL-HERE (Task 8 adds its block at this point, before the
+  # do.call -- appending after it would silently drop the panel).
+
+  do.call(bslib::navset_card_tab, panels)
 }

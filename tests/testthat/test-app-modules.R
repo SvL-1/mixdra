@@ -316,6 +316,30 @@ test_that("changing the campaign reference invalidates every downstream fit", {
   })
 })
 
+test_that("campaign wiring carries upload, base and settings into a pair workspace", {
+  skip_if_not_installed("shiny")
+  meta <- shiny::reactiveValues()
+  shiny::testServer(campaign_server, args = list(meta = meta), {
+    session$setInputs(response = "continuous", reference = "CA")
+
+    # The upload reaches the store, and the pair slice is derived from it.
+    expect_gt(nrow(store$raw), 0)
+    expect_equal(store$n_chem, 3L)
+    p12 <- pair_df(store$raw, 1, 2)
+    expect_true(all(c("C1", "C2") %in% names(p12)))
+    expect_true(any(p12$C1 > 0 & p12$C2 > 0))
+
+    # Settings propagate as the workspace will read them.
+    expect_equal(store$reference, "CA")
+    expect_equal(store$response, "continuous")
+
+    # Base starts absent, and the pair tabs are gated on it.
+    expect_null(shiny::isolate(campaign_base(store)))
+    store$base <- c(max = 800, slope1 = 2, slope2 = 3, ec501 = 0.1, ec502 = 0.5)
+    expect_false(is.null(shiny::isolate(campaign_base(store))))
+  })
+})
+
 test_that("campaign_bump_base increments the stamp downstream stages compare against", {
   store <- shiny::reactiveValues(base_version = 0L)
   campaign_bump_base(store)
@@ -329,6 +353,21 @@ test_that("campaign_ui builds a Shiny UI fragment", {
   ui <- campaign_ui("camp")
   expect_true(inherits(ui, "shiny.tag") || inherits(ui, "shiny.tag.list") ||
               inherits(ui, "bslib_fragment"))
+})
+
+test_that("campaign_pairs enumerates the pairs in A-B, A-C, B-C order", {
+  expect_equal(campaign_pairs(c(1L, 2L, 3L)),
+               list(c(1L, 2L), c(1L, 3L), c(2L, 3L)))
+  expect_equal(campaign_pairs(c(1L, 2L)), list(c(1L, 2L)))
+  expect_equal(pair_key(2, 3), "23")
+})
+
+test_that("pair_has_rows spots a pair with no mixture rows", {
+  df <- campaign_fixture()
+  expect_true(pair_has_rows(df, 1, 2))
+  expect_true(pair_has_rows(df, 2, 3))
+  df2 <- df[!(df$C2 > 0 & df$C3 > 0), ]
+  expect_false(pair_has_rows(df2, 2, 3))
 })
 
 test_that("campaign_fit_base reproduces the engine's own Stage-1 joint fit", {

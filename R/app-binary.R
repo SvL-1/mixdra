@@ -114,6 +114,7 @@ pair_workspace_ui <- function(id) {
     # "Optimize all params (joint)" appends a joint-refined block of rows.
     bslib::card(
       bslib::card_header("Stage 2 · Interaction models"),
+      shiny::uiOutput(ns("stale")),
       shiny::p("Fit both single-stressor curves in Stage 1, then ",
                shiny::tags$b("Fit interaction models"), " to fill the table ",
                "(reference → S/A → DR/DL, curves held fixed from the singles). ",
@@ -293,7 +294,12 @@ binary_server <- function(id, meta) {
 #'   until both single-stressor curves are fitted.
 #' @param reference Reactive; the reference model key (`"CA"`/`"IA"`).
 #' @param response Reactive; the engine response key (`"continuous"`/`"binary"`).
-#' @param base_version Reactive; unused for now (wired in a later task).
+#' @param base_version Reactive; the campaign's base-parameter version stamp
+#'   (`store$base_version`). When supplied, the workspace records the stamp at
+#'   the moment "Fit interaction models" last ran and shows a stale banner if
+#'   a single-stressor curve has been refitted since (`base_version` moved on
+#'   without a re-fit here). `NULL` (the default, used outside the campaign
+#'   tab) leaves the banner permanently silent.
 #' @param on_fit Callback; unused for now (wired in a later task).
 #' @keywords internal
 pair_workspace_server <- function(id, fit_df, base, reference, response,
@@ -312,6 +318,11 @@ pair_workspace_server <- function(id, fit_df, base, reference, response,
     # change re-runs the loop, rebuilding the store at the new curves.
     fits_store   <- shiny::reactiveVal(list())
     last_compare <- shiny::reactiveVal(NULL)
+
+    # The base_version stamp fits_store() was last filled at, so the UI can
+    # tell the user a single-stressor curve changed since (base_version is
+    # NULL/unused outside the campaign tab -- see the parameter doc).
+    stamped_at <- shiny::reactiveVal(NULL)
 
     # Number of chemicals present (binary tab -> 2; future-proofs the loop order).
     n_chem <- shiny::reactive(
@@ -458,6 +469,7 @@ pair_workspace_server <- function(id, fit_df, base, reference, response,
         }
       })
       fits_store(s)
+      if (!is.null(base_version)) stamped_at(base_version())
       cmp <- compare_fits(s, nrow(fit_df()), response(), input$alpha)
       last_compare(list(fits = s, comparison = cmp$comparison,
                         chosen = cmp$chosen, reference = reference(),
@@ -541,6 +553,19 @@ pair_workspace_server <- function(id, fit_df, base, reference, response,
         shiny::div(class = "text-info", shiny::tags$small(
           "Showing the joint-refined (all-parameters) fit for this model. ",
           "The staged comparison block above is unchanged."))
+    })
+
+    # Warns when a single-stressor curve was refitted after these interaction
+    # models were fitted (only meaningful when base_version is wired -- the
+    # campaign tab; a bare `pair_workspace_server` call with no base_version
+    # never sets stamped_at(), so this stays silent there).
+    output$stale <- shiny::renderUI({
+      shiny::req(length(fits_store()) > 0, stamped_at())
+      if (!identical(stamped_at(), base_version()))
+        shiny::div(class = "alert alert-warning",
+                   "A single-stressor curve changed after these models were ",
+                   "fitted. Re-run ", shiny::tags$b("Fit interaction models"),
+                   " to bring them up to date.")
     })
 
     output$surface <- plotly::renderPlotly({

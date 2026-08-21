@@ -207,15 +207,6 @@ test_that("assemble_curve_params3 averages max and uses underscore ec50 names", 
   expect_equal(unname(p[["ec50_3"]]), 0.57)
 })
 
-campaign_fixture <- function() {
-  data.frame(
-    C1  = c(0, 1, 2, 3, 0, 0, 0, 0, 0, 0, 1, 2, 0, 0, 1),
-    C2  = c(0, 0, 0, 0, 1, 2, 3, 0, 0, 0, 1, 2, 1, 2, 1),
-    C3  = c(0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 0, 0, 1, 2, 1),
-    Res = c(100, 90, 80, 70, 92, 84, 76, 95, 88, 80, 60, 40, 62, 44, 30)
-  )
-}
-
 test_that("campaign_chems reports the stressors that are actually dosed", {
   df <- campaign_fixture()
   expect_equal(campaign_chems(df), c(1L, 2L, 3L))
