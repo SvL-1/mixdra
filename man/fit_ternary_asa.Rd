@@ -9,6 +9,7 @@ fit_ternary_asa(
   reference = "CA",
   response = "continuous",
   base = NULL,
+  pairwise = NULL,
   lower = NULL,
   upper = NULL,
   n_starts = 1,
@@ -25,6 +26,10 @@ fit_ternary_asa(
 \item{base}{Optional named curve params (\verb{max, slope1-3, ec50_1-3}); when
 supplied the Stage-1 singles fit is skipped and these are held fixed.
 Defaults to \code{NULL} (fit from singles).}
+
+\item{pairwise}{Optional named numeric vector (\verb{A1, A2, A3}); when supplied
+the Stage-2 binaries fit is skipped and these are held fixed.
+Defaults to \code{NULL} (fit from binaries).}
 
 \item{lower, upper, n_starts, time_limit}{Forwarded to \code{\link[=fit_model]{fit_model()}}.}
 }
