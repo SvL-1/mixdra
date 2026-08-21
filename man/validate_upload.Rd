@@ -9,7 +9,7 @@ validate_upload(df, stage, response)
 \arguments{
 \item{df}{The uploaded data frame.}
 
-\item{stage}{"single", "binary", or "ternary".}
+\item{stage}{"single", "binary", "ternary", or "campaign".}
 
 \item{response}{"continuous" or "quantal".}
 }

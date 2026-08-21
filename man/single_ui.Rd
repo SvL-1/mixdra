@@ -2,7 +2,7 @@
 % Please edit documentation in R/app-single.R
 \name{single_ui}
 \alias{single_ui}
-\title{Single Chemical stage UI}
+\title{Single Stressor stage UI}
 \usage{
 single_ui(id)
 }
@@ -10,6 +10,6 @@ single_ui(id)
 \item{id}{Module id.}
 }
 \description{
-Single Chemical stage UI
+Single Stressor stage UI
 }
 \keyword{internal}

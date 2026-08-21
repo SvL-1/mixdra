@@ -13,7 +13,7 @@ run_app(...)
 Invisibly; called for the side effect of running the app.
 }
 \description{
-Starts the interactive app (Introduction, Single Chemical, Binary Mixture,
+Starts the interactive app (Introduction, Single Stressor, Binary Mixture,
 Ternary Mixture).
 The UI stack (\code{shiny}, \code{bslib}, \code{plotly}, \code{DT}) is a set of Suggested
 dependencies; this function stops with an install hint if any are missing.

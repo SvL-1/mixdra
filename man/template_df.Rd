@@ -7,7 +7,7 @@
 template_df(stage, response)
 }
 \arguments{
-\item{stage}{"single", "binary", or "ternary".}
+\item{stage}{"single", "binary", "ternary", or "campaign".}
 
 \item{response}{"continuous" or "quantal".}
 }
@@ -17,6 +17,7 @@ A data frame the user can download, fill in, and re-upload.
 \description{
 Returns a small, illustrative dataset with exactly the schema columns. The
 binary template includes single-chemical rows (one chemical at 0) because
-\code{\link[=analyse_mixture]{analyse_mixture()}} seeds itself from them.
+\code{\link[=analyse_mixture]{analyse_mixture()}} seeds itself from them. The campaign template is
+the full ternary template with all four strata.
 }
 \keyword{internal}

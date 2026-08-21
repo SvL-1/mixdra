@@ -7,8 +7,11 @@
 axis_label(meta, chem_field = NULL)
 }
 \description{
-With \code{chem_field} (e.g. "chem1") uses that chemical's name; without it uses a
-generic "Concentration". Appends the unit when present. Used by the single
-stage (generic) and the binary stage (per chemical).
+With \code{chem_field} (e.g. "chem1") uses that stressor's name and its matching
+per-stressor unit (\code{unit1}/\code{unit2}/\code{unit3}). The Single Stressor tab passes
+\code{"chem0"}/\code{"unit0"}, the name and unit entered on that tab. When the name is
+blank (any field) it falls back to a generic "Concentration"; when only the
+unit is set the unit is still appended. Used by the single stage and the
+binary/ternary stages (per stressor).
 }
 \keyword{internal}

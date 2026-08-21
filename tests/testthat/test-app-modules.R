@@ -278,3 +278,41 @@ test_that("ternary_ui builds the sidebar, three curve panels, and the three stag
   expect_false(grepl("ternary-alpha", html, fixed = TRUE))
   expect_false(grepl("ternary-optimize_all", html, fixed = TRUE))
 })
+
+test_that("campaign_server detects stressor count from the upload", {
+  meta <- shiny::reactiveValues()
+  shiny::testServer(campaign_server, args = list(meta = meta), {
+    session$setInputs(response = "continuous", reference = "CA")
+    expect_equal(store$n_chem, 3L)          # bundled example is a 3-stressor campaign
+    expect_equal(store$chems, c(1L, 2L, 3L))
+    expect_equal(store$reference, "CA")
+  })
+})
+
+test_that("changing the campaign reference invalidates every downstream fit", {
+  meta <- shiny::reactiveValues()
+  shiny::testServer(campaign_server, args = list(meta = meta), {
+    session$setInputs(response = "continuous", reference = "CA")
+    v0 <- store$base_version
+    store$singles <- list(`1` = list(par = c(max = 1, slope = 1, ec50 = 1)))
+
+    session$setInputs(reference = "IA")
+    expect_true(store$base_version > v0)
+    expect_equal(length(store$singles), 0)   # fits cleared, not silently reused
+  })
+})
+
+test_that("campaign_bump_base increments the stamp downstream stages compare against", {
+  store <- shiny::reactiveValues(base_version = 0L)
+  campaign_bump_base(store)
+  campaign_bump_base(store)
+  # isolate(): reading a reactiveValues field outside a reactive consumer
+  # errors on current shiny versions.
+  expect_equal(shiny::isolate(store$base_version), 2L)
+})
+
+test_that("campaign_ui builds a Shiny UI fragment", {
+  ui <- campaign_ui("camp")
+  expect_true(inherits(ui, "shiny.tag") || inherits(ui, "shiny.tag.list") ||
+              inherits(ui, "bslib_fragment"))
+})

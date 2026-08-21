@@ -2,7 +2,7 @@
 % Please edit documentation in R/app-single.R
 \name{single_server}
 \alias{single_server}
-\title{Single Chemical stage server}
+\title{Single Stressor stage server}
 \usage{
 single_server(id, meta)
 }
@@ -12,6 +12,6 @@ single_server(id, meta)
 \item{meta}{Shared reactiveValues for experiment metadata.}
 }
 \description{
-Single Chemical stage server
+Single Stressor stage server
 }
 \keyword{internal}
