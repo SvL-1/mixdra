@@ -320,15 +320,20 @@ test_that("campaign_ui builds a Shiny UI fragment", {
 test_that("campaign_base returns NULL until every single is fitted", {
   store <- shiny::reactiveValues(n_chem = 3L, chems = c(1L, 2L, 3L),
                                  singles = list())
-  expect_null(campaign_base(store))
+  # campaign_base() reads store's reactiveValues plainly (no isolate()) so
+  # that shiny::reactive(campaign_base(store)) picks up a dependency on them
+  # and re-evaluates once the last single is fitted; isolate() here at the
+  # test call site is what a bare reactiveValues read outside a reactive
+  # consumer requires, not something campaign_base() itself should do.
+  expect_null(shiny::isolate(campaign_base(store)))
 
   fake <- function(m, s, e) list(par = c(max = m, slope = s, ec50 = e))
   store$singles <- list(`1` = fake(100, 2, 1), `2` = fake(100, 3, 2))
-  expect_null(campaign_base(store))
+  expect_null(shiny::isolate(campaign_base(store)))
 
   store$singles <- list(`1` = fake(100, 2, 1), `2` = fake(100, 3, 2),
                         `3` = fake(100, 4, 4))
-  b <- campaign_base(store)
+  b <- shiny::isolate(campaign_base(store))
   expect_equal(sort(names(b)),
                sort(c("max", "slope1", "slope2", "slope3",
                       "ec50_1", "ec50_2", "ec50_3")))
@@ -341,7 +346,7 @@ test_that("campaign_base uses the binary parameter names for a 2-stressor campai
   store <- shiny::reactiveValues(
     n_chem = 2L, chems = c(1L, 2L),
     singles = list(`1` = fake(100, 2, 1), `2` = fake(100, 3, 2)))
-  expect_equal(sort(names(campaign_base(store))),
+  expect_equal(sort(names(shiny::isolate(campaign_base(store)))),
                sort(c("max", "slope1", "slope2", "ec501", "ec502")))
 })
 

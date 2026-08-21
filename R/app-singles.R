@@ -13,12 +13,9 @@
 #' @return A named numeric vector, or `NULL`.
 #' @keywords internal
 campaign_base <- function(store) {
-  # isolate() the reads: this is called both from reactive contexts and
-  # directly in unit tests, and a bare reactiveValues read outside a reactive
-  # context always errors in shiny (same rationale as campaign_bump_base).
-  chems <- shiny::isolate(store$chems)
+  chems <- store$chems
   if (is.null(chems)) return(NULL)
-  fits <- lapply(as.character(chems), function(k) shiny::isolate(store$singles[[k]]))
+  fits <- lapply(as.character(chems), function(k) store$singles[[k]])
   if (any(vapply(fits, is.null, logical(1)))) return(NULL)
   if (length(fits) == 3)
     assemble_curve_params3(fits[[1]], fits[[2]], fits[[3]])
