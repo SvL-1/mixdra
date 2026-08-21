@@ -152,6 +152,37 @@ test_that("pair_workspace_ui builds a Shiny UI fragment", {
               inherits(ui, "bslib_fragment"))
 })
 
+test_that("pair_workspace_ui: always-visible table + Fit/Optimize buttons, then diagnostics", {
+  html <- as.character(pair_workspace_ui("work"))
+  expect_false(grepl("Freeze curves", html, fixed = TRUE))
+  # Stage 2 + 3 controls, namespaced directly under "work" now that the legacy
+  # binary tab's outer "binary" namespace is gone.
+  expect_match(html, "work-results", fixed = TRUE)
+  expect_match(html, "work-fit_interactions", fixed = TRUE)
+  expect_match(html, "Fit interaction models", fixed = TRUE)
+  expect_match(html, "work-alpha", fixed = TRUE)
+  expect_match(html, "threshold for the model comparison", fixed = TRUE)
+  expect_match(html, "work-optimize_all", fixed = TRUE)
+  expect_match(html, "Optimize all params (joint)", fixed = TRUE)
+  expect_match(html, "work-refine_readout", fixed = TRUE)
+  expect_match(html, "work-refined_badge", fixed = TRUE)
+  expect_match(html, "work-interaction_help", fixed = TRUE)
+  expect_match(html, "work-objective", fixed = TRUE)
+  # Stage 3: diagnostics
+  expect_match(html, "work-surface", fixed = TRUE)
+  expect_match(html, "work-isobole", fixed = TRUE)
+  expect_match(html, "work-op", fixed = TRUE)
+  expect_match(html, "work-cis", fixed = TRUE)
+  expect_match(html, "work-n_starts", fixed = TRUE)
+  # the manual path + compare-all button + model picker are gone
+  expect_false(grepl("work-compare_all", html, fixed = TRUE))
+  expect_false(grepl("work-model", html, fixed = TRUE))
+  expect_false(grepl("work-autofit", html, fixed = TRUE))
+  expect_false(grepl("work-simulate", html, fixed = TRUE))
+  expect_false(grepl("work-val_a", html, fixed = TRUE))
+  expect_false(grepl("work-find_best", html, fixed = TRUE))
+})
+
 test_that("single_ui shows the model equation and Autofit/Simulate buttons", {
   html <- as.character(single_ui("single"))
   expect_match(html, "Y = max / (1 + (C / EC50)", fixed = TRUE)

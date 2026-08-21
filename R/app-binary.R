@@ -8,7 +8,7 @@
 # (joint)" block of rows for inspection -- stored separately, so the staged verdict
 # (p-values + winner) never changes.
 
-#' Per-model explanation of the interaction fit (pure, for the Binary tab)
+#' Per-model explanation of the interaction fit (pure, for the pair workspace)
 #'
 #' Returns the formula and `a`/`b` meaning for one reference x deviation
 #' combination. Plain HTML (no MathJax), matching the offline-safe style of
@@ -81,8 +81,8 @@ interaction_help <- function(reference, deviation) {
 #'
 #' The interaction-model comparison table, plots and the Advanced-fitting
 #' accordion -- everything downstream of two frozen single-stressor curves.
-#' Extracted from the binary tab so it can be instantiated once per stressor
-#' pair.
+#' Extracted from the legacy binary tab so it can be instantiated once per
+#' stressor pair -- the campaign mounts one per pair sub-tab.
 #' @param id Module id.
 #' @keywords internal
 pair_workspace_ui <- function(id) {

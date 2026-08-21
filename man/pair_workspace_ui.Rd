@@ -12,7 +12,7 @@ pair_workspace_ui(id)
 \description{
 The interaction-model comparison table, plots and the Advanced-fitting
 accordion -- everything downstream of two frozen single-stressor curves.
-Extracted from the binary tab so it can be instantiated once per stressor
-pair.
+Extracted from the legacy binary tab so it can be instantiated once per
+stressor pair -- the campaign mounts one per pair sub-tab.
 }
 \keyword{internal}
