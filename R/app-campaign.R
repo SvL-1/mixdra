@@ -4,6 +4,16 @@
 # Sam's requested layout (issue #10). Single-stressor curves are fitted once on
 # the Singles page and held fixed everywhere below it.
 
+#' Default for a NULL value
+#'
+#' Returns `y` when `x` is `NULL`, otherwise `x`. Used to give campaign store
+#' fields a sensible value before the first upload has been read.
+#' @param x Value to test.
+#' @param y Fallback used when `x` is `NULL`.
+#' @return `x`, or `y` when `x` is `NULL`.
+#' @keywords internal
+`%||%` <- function(x, y) if (is.null(x)) y else x
+
 #' Increment the base-parameter version stamp
 #'
 #' Downstream stages record the `base_version` they were fitted at; when the
@@ -15,14 +25,12 @@
 #' @keywords internal
 campaign_bump_base <- function(store) {
   # isolate() the read: this is called both from inside reactive contexts
-  # (campaign_server's observeEvent) and directly in unit tests, and current
-  # shiny versions error on a bare reactiveValues read outside one.
+  # (campaign_server's observeEvent) and directly in unit tests, and a bare
+  # reactiveValues read outside a reactive context always errors in shiny.
   new_version <- (shiny::isolate(store$base_version) %||% 0L) + 1L
   store$base_version <- new_version
   invisible(new_version)
 }
-
-`%||%` <- function(x, y) if (is.null(x)) y else x
 
 #' Campaign stage UI
 #' @param id Module id.

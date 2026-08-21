@@ -13,8 +13,10 @@ run_app(...)
 Invisibly; called for the side effect of running the app.
 }
 \description{
-Starts the interactive app (Introduction, Single Stressor, Binary Mixture,
-Ternary Mixture).
+Starts the interactive app: Introduction, Single Stressor and Campaign are
+the permanent tabs; Binary Mixture and Ternary Mixture are legacy
+per-mixture tabs retained temporarily until a later task retires them in
+favour of the Campaign sub-tabs.
 The UI stack (\code{shiny}, \code{bslib}, \code{plotly}, \code{DT}) is a set of Suggested
 dependencies; this function stops with an install hint if any are missing.
 }

@@ -2,11 +2,13 @@
 % Please edit documentation in R/app-run.R
 \name{app_ui}
 \alias{app_ui}
-\title{Assemble the navbar UI from the three stage modules}
+\title{Assemble the navbar UI from the stage modules}
 \usage{
 app_ui()
 }
 \description{
-Assemble the navbar UI from the three stage modules
+Introduction, Single Stressor and Campaign are the permanent tabs; Binary
+Mixture and Ternary Mixture are legacy per-mixture tabs kept only until a
+later task retires them in favour of the Campaign sub-tabs.
 }
 \keyword{internal}

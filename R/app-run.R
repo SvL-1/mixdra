@@ -1,7 +1,11 @@
 # App assembly + launcher. app_ui()/app_server are internal; run_app() is the
 # single exported entry point and guards the Suggested UI dependencies.
 
-#' Assemble the navbar UI from the three stage modules
+#' Assemble the navbar UI from the stage modules
+#'
+#' Introduction, Single Stressor and Campaign are the permanent tabs; Binary
+#' Mixture and Ternary Mixture are legacy per-mixture tabs kept only until a
+#' later task retires them in favour of the Campaign sub-tabs.
 #' @keywords internal
 app_ui <- function() {
   bslib::page_navbar(
@@ -19,7 +23,7 @@ app_ui <- function() {
   )
 }
 
-#' Wire the three stage module servers around a shared meta store
+#' Wire the stage module servers around a shared meta store
 #' @keywords internal
 app_server <- function(input, output, session) {
   meta <- shiny::reactiveValues()
@@ -32,8 +36,10 @@ app_server <- function(input, output, session) {
 
 #' Launch the mixdra Shiny app
 #'
-#' Starts the interactive app (Introduction, Single Stressor, Binary Mixture,
-#' Ternary Mixture).
+#' Starts the interactive app: Introduction, Single Stressor and Campaign are
+#' the permanent tabs; Binary Mixture and Ternary Mixture are legacy
+#' per-mixture tabs retained temporarily until a later task retires them in
+#' favour of the Campaign sub-tabs.
 #' The UI stack (`shiny`, `bslib`, `plotly`, `DT`) is a set of Suggested
 #' dependencies; this function stops with an install hint if any are missing.
 #' @param ... Passed to [shiny::runApp()] (e.g. `launch.browser`, `port`).
