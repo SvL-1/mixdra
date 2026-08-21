@@ -235,6 +235,27 @@ campaign_chems <- function(df) {
 #' @keywords internal
 campaign_n_chem <- function(df) length(campaign_chems(df))
 
+#' Rows where every stressor outside `keep` is absent
+#'
+#' The shared core of [single_df()] and [pair_df()]: keeps the rows where every
+#' concentration column NOT in `keep` is 0 (so the shared control row always
+#' comes along), then drops those columns. Renaming is left to the caller,
+#' which knows whether it wants `C1` or `C1`/`C2`.
+#' @param df Campaign data frame.
+#' @param keep Character vector of concentration columns to retain.
+#' @return A data frame with the non-kept concentration columns removed.
+#' @keywords internal
+slice_to_chems <- function(df, keep) {
+  cols  <- intersect(c("C1", "C2", "C3"), names(df))
+  other <- setdiff(cols, keep)
+  rows  <- if (length(other))
+    Reduce(`&`, lapply(other, function(k) df[[k]] == 0)) else rep(TRUE, nrow(df))
+  out <- df[rows, , drop = FALSE]
+  out[other] <- NULL
+  rownames(out) <- NULL
+  out
+}
+
 #' One stressor's single-stressor series from a campaign frame
 #'
 #' Keeps the rows where every OTHER stressor is 0 (so the shared control row is
@@ -246,15 +267,9 @@ campaign_n_chem <- function(df) length(campaign_chems(df))
 #' @return A data frame with `C1` and the response columns.
 #' @keywords internal
 single_df <- function(df, chem) {
-  cols  <- intersect(c("C1", "C2", "C3"), names(df))
-  this  <- paste0("C", chem)
-  other <- setdiff(cols, this)
-  keep  <- if (length(other))
-    Reduce(`&`, lapply(other, function(k) df[[k]] == 0)) else rep(TRUE, nrow(df))
-  out <- df[keep, , drop = FALSE]
-  out[other] <- NULL
+  this <- paste0("C", chem)
+  out <- slice_to_chems(df, this)
   names(out)[names(out) == this] <- "C1"
-  rownames(out) <- NULL
   out
 }
 
@@ -268,16 +283,11 @@ single_df <- function(df, chem) {
 #' @return A data frame with `C1`, `C2` and the response columns.
 #' @keywords internal
 pair_df <- function(df, i, j) {
-  cols  <- intersect(c("C1", "C2", "C3"), names(df))
-  this  <- paste0("C", c(i, j))
-  other <- setdiff(cols, this)
-  keep  <- if (length(other))
-    Reduce(`&`, lapply(other, function(k) df[[k]] == 0)) else rep(TRUE, nrow(df))
-  out <- df[keep, , drop = FALSE]
-  out[other] <- NULL
+  stopifnot(i < j)
+  this <- paste0("C", c(i, j))
+  out <- slice_to_chems(df, this)
   names(out)[names(out) == this[1]] <- "C1"
   names(out)[names(out) == this[2]] <- "C2"
-  rownames(out) <- NULL
   out
 }
 

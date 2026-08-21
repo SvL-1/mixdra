@@ -266,3 +266,7 @@ test_that("pair_df on a two-stressor frame is a no-op slice", {
   expect_equal(names(out), c("C1", "C2", "Res"))
   expect_equal(nrow(out), nrow(two))
 })
+
+test_that("pair_df rejects a descending pair rather than corrupting the frame", {
+  expect_error(pair_df(campaign_fixture(), 2, 1))
+})
