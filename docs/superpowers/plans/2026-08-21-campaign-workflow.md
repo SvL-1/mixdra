@@ -112,7 +112,7 @@ test_that("pair_df keeps that pair's rows and renames to C1/C2", {
 
   p12 <- pair_df(df, 1, 2)
   expect_equal(names(p12), c("C1", "C2", "Res"))
-  expect_equal(nrow(p12), 10)             # control + 3 + 3 + 3 mixture rows
+  expect_equal(nrow(p12), 9)              # control + 3 + 3 singles + 2 mixture rows
   expect_true(all(p12$C1 >= 0))
 })
 
