@@ -73,18 +73,21 @@ ternary_ui <- function(id) {
 ternary_server <- function(id, store) {
   shiny::moduleServer(id, function(input, output, session) {
 
-    # Notes which pair(s) are best described by DR/DL rather than S/A -- the
-    # three-way model has no such form, so it always uses that pair's S/A
-    # term (agreed with the scientist). Lives here, not on the pair tab,
-    # because it describes the ternary fit.
+    # Notes which pair(s) did NOT select S/A as their winning model -- that
+    # can be DR, DL, or "reference" (no interaction at all). The three-way
+    # model has no DR/DL form and no no-interaction shortcut, so it always
+    # uses that pair's S/A term regardless (agreed with the scientist). Lives
+    # here, not on the pair tab, because it describes the ternary fit.
     output$sa_note <- shiny::renderUI({
       odd <- names(Filter(function(p) !identical(p$chosen, "SA"), store$pairs))
       if (length(odd))
         shiny::div(class = "alert alert-info",
                    "Pair(s) ", paste(odd, collapse = ", "),
-                   " are best described by a dose-ratio or dose-level model. ",
-                   "The ternary fit uses their S/A term, which is the only form ",
-                   "the three-way model has.")
+                   " were not best described by the Synergism/Antagonism ",
+                   "(S/A) model (a dose-ratio or dose-level model fit better, ",
+                   "or no interaction at all). The ternary fit uses their S/A ",
+                   "term anyway, which is the only interaction form the ",
+                   "three-way model has.")
     })
 
     asa_res <- shiny::reactive({

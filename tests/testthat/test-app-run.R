@@ -21,5 +21,10 @@ test_that("run_app is exported and errors clearly when a dependency is missing",
 })
 
 test_that("app_ui includes the Ternary Mixture panel", {
-  expect_match(as.character(app_ui()), "ternary-fit_asa", fixed = TRUE)
+  # "ternary-fit_asa" was the standalone tab's own "Fit Advanced S/A" button,
+  # removed when the ternary stage became a campaign sub-tab consuming frozen
+  # store values (no local fit button); that legacy nav entry is retired in a
+  # later task, so just assert the panel is still present, not an internal
+  # control id.
+  expect_match(as.character(app_ui()), "Ternary Mixture", fixed = TRUE)
 })

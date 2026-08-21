@@ -471,6 +471,68 @@ test_that("campaign_pairwise maps pair S/A values onto A1/A2/A3", {
   expect_equal(unname(pw[["A3"]]), 1.1)    # pair 2-3
 })
 
+test_that("campaign_pairwise goes stale (NULL) when a pair's base_version no longer matches the campaign's", {
+  # Direct-store unit test: all three pairs present and internally consistent
+  # (same base_version as the campaign) -> non-NULL. Bump ONLY the campaign's
+  # stamp (as a single-stressor refit would, via campaign_bump_base()) without
+  # touching the pairs -- exactly the silent-staleness scenario: the pairs'
+  # `a` values are unchanged but were fitted against a now-superseded base.
+  store <- shiny::reactiveValues(
+    base_version = 2L,
+    chems = c(1L, 2L, 3L),
+    pairs = list(`12` = list(a = 0.5, chosen = "SA", base_version = 2L),
+                `13` = list(a = -0.2, chosen = "SA", base_version = 2L),
+                `23` = list(a = 1.1, chosen = "SA", base_version = 2L)))
+  expect_false(is.null(shiny::isolate(campaign_pairwise(store))))
+
+  campaign_bump_base(store)   # simulates a single-stressor curve being refit
+  expect_equal(shiny::isolate(store$base_version), 3L)
+  expect_null(shiny::isolate(campaign_pairwise(store)))   # stale -- must not mix generations
+})
+
+test_that("campaign_server: refitting the base after all three pairs are fit makes campaign_pairwise NULL again (no silent generation mixing)", {
+  # End-to-end version of the guard above, through the real production wiring:
+  # Singles' "Fit single-stressor curves" button bumps store$base_version but
+  # does NOT clear store$pairs (only a file/response/reference change does) --
+  # so without the base_version guard in campaign_pairwise(), the ternary
+  # stage would silently combine the fresh base with stale pairwise terms.
+  skip_if_not_installed("shiny")
+  skip_on_cran()
+  meta <- shiny::reactiveValues()
+  shiny::testServer(campaign_server, args = list(meta = meta), {
+    session$setInputs(response = "continuous", reference = "CA")
+    expect_equal(store$chems, c(1L, 2L, 3L))
+
+    session$setInputs(`singles-fit_singles` = 1)
+    session$flushReact()
+    expect_false(is.null(campaign_base(store)))
+    v0 <- store$base_version
+
+    # Fit all three pairs for real; each on_fit publishes its S/A `a` AND the
+    # base_version it was fitted against (v0).
+    session$setInputs(`pair12-n_starts` = 1, `pair12-alpha` = 0.05, `pair12-time_limit` = 30,
+                      `pair13-n_starts` = 1, `pair13-alpha` = 0.05, `pair13-time_limit` = 30,
+                      `pair23-n_starts` = 1, `pair23-alpha` = 0.05, `pair23-time_limit` = 30)
+    session$setInputs(`pair12-fit_interactions` = 1)
+    session$setInputs(`pair13-fit_interactions` = 1)
+    session$setInputs(`pair23-fit_interactions` = 1)
+
+    expect_equal(store$pairs[["12"]]$base_version, v0)
+    expect_equal(store$pairs[["13"]]$base_version, v0)
+    expect_equal(store$pairs[["23"]]$base_version, v0)
+    expect_false(is.null(campaign_pairwise(store)))    # all three present + fresh -> usable
+
+    # Re-fit the singles: the base changes and base_version bumps, but
+    # store$pairs is left untouched (still stamped at v0) -- exactly the
+    # scenario the guard exists for.
+    session$setInputs(`singles-fit_singles` = 2)
+    session$flushReact()
+    expect_gt(store$base_version, v0)
+    expect_equal(store$pairs[["12"]]$base_version, v0)   # still the OLD stamp
+    expect_null(campaign_pairwise(store))                # now correctly gated
+  })
+})
+
 test_that("pair_has_rows spots a pair with no mixture rows", {
   df <- campaign_fixture()
   expect_true(pair_has_rows(df, 1, 2))

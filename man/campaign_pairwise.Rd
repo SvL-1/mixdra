@@ -16,6 +16,10 @@ A named numeric \code{c(A1, A2, A3)}, or \code{NULL}.
 \code{A1} is the 1-2 pair, \code{A2} the 1-3 pair, \code{A3} the 2-3 pair -- the term order
 \code{ca_asa_tri()} uses. Each value is that pair's fitted S/A \code{a}, which is the
 same quantity (see the design doc, section 3). \code{NULL} until all three pairs
-have been fitted.
+have been fitted, AND \code{NULL} again if any pair's \code{a} was fitted against a
+since-superseded base (its recorded \code{base_version} no longer matches
+\code{store$base_version}) -- otherwise a refit single-stressor curve would
+silently combine a fresh base with stale pairwise terms, voiding the
+exactness the campaign's staged reuse depends on (design doc, section 6).
 }
 \keyword{internal}

@@ -183,7 +183,11 @@ pair_key <- function(i, j) paste0(i, j)
 #' `A1` is the 1-2 pair, `A2` the 1-3 pair, `A3` the 2-3 pair -- the term order
 #' `ca_asa_tri()` uses. Each value is that pair's fitted S/A `a`, which is the
 #' same quantity (see the design doc, section 3). `NULL` until all three pairs
-#' have been fitted.
+#' have been fitted, AND `NULL` again if any pair's `a` was fitted against a
+#' since-superseded base (its recorded `base_version` no longer matches
+#' `store$base_version`) -- otherwise a refit single-stressor curve would
+#' silently combine a fresh base with stale pairwise terms, voiding the
+#' exactness the campaign's staged reuse depends on (design doc, section 6).
 #' @param store The campaign store.
 #' @return A named numeric `c(A1, A2, A3)`, or `NULL`.
 #' @keywords internal
@@ -192,7 +196,25 @@ campaign_pairwise <- function(store) {
   keys <- c("12", "13", "23")
   vals <- lapply(keys, function(k) store$pairs[[k]]$a)
   if (any(vapply(vals, is.null, logical(1)))) return(NULL)
+  if (any(vapply(keys, function(k)
+        !identical(store$pairs[[k]]$base_version, store$base_version),
+        logical(1)))) return(NULL)
   stats::setNames(as.numeric(unlist(vals)), c("A1", "A2", "A3"))
+}
+
+#' Are all three pairs fitted, even if stale against the current base?
+#'
+#' Used only to word the ternary tab's gating message: "fit the pairs" (none
+#' fitted yet) vs. "re-fit the pairs" (fitted, but a single-stressor curve
+#' changed since). [campaign_pairwise()] alone can't distinguish those --
+#' it returns `NULL` for both.
+#' @param store The campaign store.
+#' @return `TRUE` if all three pairs have a recorded `a`, regardless of version.
+#' @keywords internal
+campaign_pairs_fitted <- function(store) {
+  if (length(store$chems) != 3) return(FALSE)
+  all(vapply(c("12", "13", "23"),
+             function(k) !is.null(store$pairs[[k]]$a), logical(1)))
 }
 
 #' Does this pair have any mixture rows?
@@ -247,7 +269,12 @@ campaign_stage_nav <- function(ns, store) {
                  "The ternary stage is not yet supported for quantal data.")
     } else if (is.null(campaign_pairwise(store))) {
       shiny::div(class = "p-3 text-muted",
-                 "Fit the interaction models on all three pair tabs first.")
+                 if (campaign_pairs_fitted(store))
+                   paste("A single-stressor curve changed since these pairs ",
+                         "were fitted. Re-run \"Fit interaction models\" on ",
+                         "each pair tab to bring them up to date.")
+                 else
+                   "Fit the interaction models on all three pair tabs first.")
     } else {
       ternary_ui(ns("ternary"))
     }
