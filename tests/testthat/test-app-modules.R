@@ -364,6 +364,24 @@ test_that("campaign_fit_base ignores a present-but-never-dosed third column", {
   expect_false(any(grepl("3", names(got))))  # no slope3 / ec50_3 leaked in
 })
 
+test_that("campaign_fit_base handles a non-contiguous stressor set", {
+  df <- to_engine_df(read_upload(system.file(
+    "extdata", "ternary_ca_fbsa_cpf_imi_continuous.csv", package = "mixdra")), "campaign")
+
+  # Stressors 1 and 3 dosed, stressor 2 never dosed but its column remains.
+  d13 <- df[df$C2 == 0, ]
+  expect_equal(campaign_chems(d13), c(1L, 3L))
+
+  got <- campaign_fit_base(d13, c(1L, 3L), "CA", "continuous")
+  expect_equal(sort(names(got)),
+               sort(c("max", "slope1", "slope2", "ec501", "ec502")))
+
+  # Slot 2 must carry stressor 3's curve, not stressor 2's. Stressor 3's own
+  # EC50 from the full campaign is ~0.575; stressor 2's is ~34.7, so a
+  # mis-mapped rename would be off by nearly two orders of magnitude.
+  expect_lt(unname(got[["ec502"]]), 5)
+})
+
 test_that("campaign_base reads the stored joint fit, not the panel fits", {
   store <- shiny::reactiveValues(base = c(max = 1, slope1 = 2, ec501 = 3),
                                  singles = list())

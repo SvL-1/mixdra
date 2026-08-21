@@ -13,9 +13,8 @@ campaign_base(store)
 A named numeric vector, or \code{NULL}.
 }
 \description{
-\code{NULL} until every stressor in the campaign has a fitted curve. Returns the
-binary parameter names (\code{ec501}/\code{ec502}) for a two-stressor campaign and the
-ternary ones (\code{ec50_1}..\code{ec50_3}) for a three-stressor campaign, matching the
-registries the downstream fits use.
+The result of the joint single-stressor fit, stored by \code{\link[=singles_server]{singles_server()}} when
+the user runs it. \code{NULL} until then. Downstream stages read this and never
+re-derive it.
 }
 \keyword{internal}
