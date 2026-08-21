@@ -843,6 +843,194 @@ git commit -m "feat(app): singles stage - fit every stressor curve once per camp
 
 ---
 
+## Task 4b: Joint single-stressor fit with one shared max
+
+**Files:**
+- Modify: `R/app-singles.R` (`campaign_base`, `singles_ui`, `singles_server`)
+- Test: `tests/testthat/test-app-modules.R`
+
+**Why:** measured on the bundled campaign, assembling the base from three independent per-stressor fits diverges from the reference workbook by up to 19.5% on `slope1`, while the engine's own joint Stage-1 fit reproduces it to 4-5 significant figures. See §5a of the spec. A campaign has one control group, so the upper asymptote is one quantity estimated once — not three averaged.
+
+**Interfaces:**
+- Consumes: `classify_rows()`, `seed_from_singles()`, `fit_model()`, `model_spec()`, `campaign_chems()`.
+- Produces:
+  - `campaign_fit_base(df, chems, reference, response) -> named numeric` — the joint fit, a pure function with no Shiny dependency
+  - `campaign_base(store)` — now simply returns `store$base` (or `NULL`), no longer assembling from panel fits
+
+**Two gotchas this code must handle:**
+1. The engine calls quantal data `"binary"`, not `"quantal"` (`R/app-binary.R:341-342`). Map it.
+2. `seed_from_singles()` and `model_spec()` infer the stressor count from the concentration columns **present** in the frame. A two-stressor campaign whose file still carries an all-zero `C3` would be mis-read as three. Restrict the frame to the active columns first.
+
+- [ ] **Step 1: Write the failing tests**
+
+```r
+test_that("campaign_fit_base reproduces the engine's own Stage-1 joint fit", {
+  df <- to_engine_df(read_upload(system.file(
+    "extdata", "ternary_ca_fbsa_cpf_imi_continuous.csv", package = "mixdra")), "campaign")
+
+  got <- campaign_fit_base(df, c(1L, 2L, 3L), "CA", "continuous")
+  ref <- analyse_ternary(df, reference = "CA", response = "continuous",
+                         n_starts = 1)$base
+
+  expect_equal(sort(names(got)), sort(names(ref)))
+  expect_equal(unname(got[names(ref)]), unname(ref), tolerance = 1e-4)
+  expect_equal(unname(got[["max"]]), 872.2, tolerance = 1e-2)   # workbook value
+})
+
+test_that("campaign_fit_base uses binary parameter names for two stressors", {
+  df <- to_engine_df(read_upload(system.file(
+    "extdata", "ternary_ca_fbsa_cpf_imi_continuous.csv", package = "mixdra")), "campaign")
+  two <- df[df$C3 == 0, c("C1", "C2", "Res")]
+
+  got <- campaign_fit_base(two, c(1L, 2L), "CA", "continuous")
+  expect_equal(sort(names(got)),
+               sort(c("max", "slope1", "slope2", "ec501", "ec502")))
+})
+
+test_that("campaign_fit_base ignores a present-but-never-dosed third column", {
+  df <- to_engine_df(read_upload(system.file(
+    "extdata", "ternary_ca_fbsa_cpf_imi_continuous.csv", package = "mixdra")), "campaign")
+  two <- df[df$C3 == 0, ]                    # keeps the all-zero C3 column
+  expect_equal(campaign_chems(two), c(1L, 2L))
+
+  got <- campaign_fit_base(two, campaign_chems(two), "CA", "continuous")
+  expect_false(any(grepl("3", names(got))))  # no slope3 / ec50_3 leaked in
+})
+
+test_that("campaign_base reads the stored joint fit, not the panel fits", {
+  store <- shiny::reactiveValues(base = c(max = 1, slope1 = 2, ec501 = 3),
+                                 singles = list())
+  expect_equal(unname(shiny::isolate(campaign_base(store))[["max"]]), 1)
+
+  store$base <- NULL
+  expect_null(shiny::isolate(campaign_base(store)))
+})
+```
+
+- [ ] **Step 2: Run and verify failure**
+
+```bash
+Rscript -e '.libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths())); devtools::test(filter = "app-modules")'
+```
+
+Expected: FAIL with `could not find function "campaign_fit_base"`.
+
+- [ ] **Step 3: Implement the joint fit**
+
+Replace `campaign_base()` in `R/app-singles.R` and add above it:
+
+```r
+#' Joint single-stressor fit for a campaign
+#'
+#' Fits every single-stressor arm together with ONE shared `max`, exactly as the
+#' engine's own Stage 1 does (`fit_ternary_asa()`), rather than fitting each
+#' stressor separately and averaging their asymptotes. A campaign has one control
+#' group, so the upper asymptote is a single quantity estimated once from all the
+#' single-stressor arms — and this is what the reference workbook does, which
+#' keeps campaign numbers comparable with Excel.
+#' @param df Campaign engine frame (`C1`, `C2`, optionally `C3`, response cols).
+#' @param chems Integer stressor indices, from [campaign_chems()].
+#' @param reference "CA" or "IA".
+#' @param response "continuous" or "quantal" (mapped to the engine's "binary").
+#' @return A named numeric vector of base curve parameters.
+#' @keywords internal
+campaign_fit_base <- function(df, chems, reference, response) {
+  # The engine infers the stressor count from the concentration columns PRESENT,
+  # so drop any column this campaign never doses -- otherwise a leftover all-zero
+  # C3 makes a two-stressor campaign fit as a three-stressor one.
+  keep <- c(paste0("C", chems),
+            intersect(c("Res", "Affected", "Exposed"), names(df)))
+  d <- df[keep]
+  names(d)[seq_along(chems)] <- paste0("C", seq_along(chems))
+
+  resp <- if (identical(response, "quantal")) "binary" else "continuous"
+  cls  <- classify_rows(d)
+  singles <- d[cls %in% c("control", "single"), , drop = FALSE]
+
+  params <- model_spec(reference, "reference", length(chems))$params
+  seed   <- seed_from_singles(d, resp)
+  fit <- fit_model(singles, reference, "reference", resp, start = seed,
+                   n_starts = 1, time_limit = 30)
+  fit$par[params]
+}
+
+#' The campaign's frozen base-parameter vector
+#'
+#' The result of the joint single-stressor fit, stored by [singles_server()] when
+#' the user runs it. `NULL` until then. Downstream stages read this and never
+#' re-derive it.
+#' @param store The campaign store.
+#' @return A named numeric vector, or `NULL`.
+#' @keywords internal
+campaign_base <- function(store) store$base
+```
+
+- [ ] **Step 4: Make the fit an explicit action**
+
+Fitting is expensive, so it must not run on every reactive read. In `singles_ui()`, add above the panels:
+
+```r
+    shiny::actionButton(ns("fit_singles"), "Fit single-stressor curves",
+                        class = "btn-primary"),
+    shiny::helpText(shiny::tags$small(
+      "Fits all single-stressor arms together with one shared upper asymptote ",
+      "(the campaign has one control group). These values are held fixed by ",
+      "every stage below.")),
+    shiny::uiOutput(ns("base_readout")),
+```
+
+and in `singles_server()`:
+
+```r
+    shiny::observeEvent(input$fit_singles, {
+      shiny::req(store$raw, store$chems)
+      b <- tryCatch(
+        campaign_fit_base(store$raw, store$chems, store$reference %||% "CA",
+                          store$response %||% "continuous"),
+        error = function(e) {
+          shiny::showNotification(paste0("Single-stressor fit failed: ",
+                                         conditionMessage(e)), type = "error")
+          NULL
+        })
+      if (!is.null(b)) {
+        store$base <- b
+        campaign_bump_base(store)
+      }
+    })
+
+    output$base_readout <- shiny::renderUI({
+      b <- campaign_base(store)
+      if (is.null(b)) return(shiny::tags$small("Not fitted yet."))
+      shiny::tags$small(shiny::HTML(paste0(
+        "<b>Campaign base (shared max):</b> ",
+        paste(sprintf("%s = %.4g", names(b), b), collapse = " &middot; "))))
+    })
+```
+
+Leave the three `curve_fit` panels exactly as they are. They stay exploratory — a scientist can Autofit or Simulate one to interrogate it, and that never becomes the campaign's number. Keep the existing `observeEvent(fit(), ...)` writes into `store$singles` for display, but they no longer feed `campaign_base()`.
+
+- [ ] **Step 5: Run and verify pass**
+
+```bash
+Rscript -e '.libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths())); devtools::test(filter = "app-modules")'
+```
+
+Expected: PASS. The first test is the one that matters — it pins the campaign base to the engine's own joint fit and to the workbook's `max`.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add R/app-singles.R tests/testthat/test-app-modules.R
+git commit -m "fix(app): campaign base is one joint fit with a shared max
+
+Assembling the base from three independent per-stressor fits diverged
+from the reference workbook by up to 19.5% on slope1. A campaign has one
+control group, so the upper asymptote is estimated once from all
+single-stressor arms - which is what the engine and the workbook do."
+```
+
+---
+
 # Phase 2 — The pair workspace
 
 ## Task 5: Extract the interaction workspace from the binary tab

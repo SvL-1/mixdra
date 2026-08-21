@@ -103,6 +103,44 @@ allows the curve-fit panel to be reused **genuinely unchanged** (§9); `names` a
 `units` in the table above are the campaign-level view of the same values, not a
 replacement for them.
 
+## 5a. How the single-stressor curves are fitted (amended 2026-08-21)
+
+**The campaign's base comes from ONE joint fit over all single-stressor arms
+with a single shared `max`**, not from three independent per-stressor fits whose
+asymptotes are averaged.
+
+This was measured, not assumed. On the bundled campaign, assembling the base
+from three independent fits gives `max` 842.36, `slope1` 5.585, `ec50_1`
+0.13588; the engine's own Stage 1 joint fit gives 872.21, 4.674, 0.12747 — a
+19.5% divergence on `slope1`. The engine's values reproduce the reference
+workbook (max 872.2, ec50_1 0.1275) to 4-5 significant figures; the averaged
+ones do not.
+
+Two reasons the joint fit is right:
+
+1. **A campaign has one control group.** The control response is shared by every
+   single-stressor arm, so the upper asymptote is one quantity to be estimated
+   once from all of them — not three quantities to be averaged after the fact.
+2. **It is what the reference workbook does**, so campaign numbers stay
+   comparable with Excel. This matters directly to the open R-vs-Excel question
+   in issue #8.
+
+Consequences for the Singles page:
+
+- `campaign_base()` derives from `store$raw`, `store$reference` and
+  `store$response` — **not** from the three curve panels. It is the authority.
+- The three `curve_fit` panels remain, showing each stressor's data and curve.
+  They are **exploratory**: a scientist can Autofit or Simulate one to interrogate
+  it, and that never silently becomes the campaign's number.
+- The Singles page shows the frozen campaign base explicitly, labelled as the
+  joint fit with a shared control asymptote, so the authoritative values are
+  visible rather than implied.
+- Because the base no longer depends on panel state, `base_version` changes only
+  when the upload, reference or response changes — which `campaign_server`
+  already handles. The staleness machinery in §6 gets simpler, not more complex.
+
+`curve_fit_server()` is still reused unchanged.
+
 ## 6. Staleness — version stamping
 
 Expensive fits in this app are deliberately imperative: `fits_store` is a
