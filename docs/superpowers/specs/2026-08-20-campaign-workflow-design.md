@@ -148,12 +148,34 @@ Expensive fits in this app are deliberately imperative: `fits_store` is a
 models is slow. That is the right call, but it means a downstream stage can
 silently belong to a superseded curve.
 
-- `base_version` increments whenever any single fit changes.
-- Every pair result records the `base_version` it was fitted at; the ternary
-  result records both `base_version` and the pair versions.
-- When a recorded stamp no longer matches, the stage shows a **stale banner with
-  a refit button and greys its numbers**. It never silently presents stale
-  numbers as current, and it never re-runs an expensive fit unasked.
+- `base_version` increments when the upload, reference or response changes — the
+  things the base is actually derived from. An **exploratory** curve panel fit
+  does not bump it (see §5a): the panels do not feed the base, so treating them
+  as invalidating would lock the ternary and demand needless refits.
+- Every pair result records the `base_version` it was fitted at, and
+  `campaign_pairwise()` refuses to hand the ternary its terms unless every pair's
+  stamp matches the campaign's current one.
+
+### Amended 2026-08-21: invalidation is by clearing, not by banner
+
+The original design said a stage whose stamp no longer matched would show a
+**stale banner with a refit button and greyed numbers**. Implementation showed
+that mechanism to be both unreachable and unnecessary, and it has been removed.
+
+Unreachable, because the pair workspace already clears its fits when the base,
+reference, response or data changes — so by the time a banner could have been
+shown there were no numbers left to grey, and its `req()` failed.
+
+Unnecessary, because clearing is *strictly safer* than a banner. A banner leaves
+stale numbers on screen and relies on the reader noticing a warning; clearing
+removes them. The design goal was never the banner itself, it was that the app
+must never present numbers from one generation as though they belonged to
+another — and clearing achieves that more completely.
+
+What remains, and is load-bearing: the **`campaign_pairwise()` generation
+guard**. The ternary reads `store$pairs` directly and never observes the pair
+workspace's clear, so that guard is the only thing standing between a refit base
+and a ternary result computed from superseded pairwise terms.
 
 A pure reactive chain was rejected: it would refit 3 pairs × 4 models on any
 upstream twitch.
