@@ -58,23 +58,29 @@ test_that("single_ui builds a Shiny UI fragment", {
   expect_true(inherits(single_ui("single"), c("shiny.tag", "shiny.tag.list", "bslib_fragment")))
 })
 
-test_that("binary_server: Fit-interactions fills the staged block, Optimize-all appends an isolated joint block", {
+test_that("pair_workspace_server: Fit-interactions fills the staged block, Optimize-all appends an isolated joint block", {
   skip_on_cran()
-  meta <- shiny::reactiveValues(chem1 = "A", chem2 = "B")
-  shiny::testServer(binary_server, args = list(meta = meta), {
-    csv <- testthat::test_path("fixtures", "binary", "cpf_mps_imi",
-                               "binary_ca_mps_cpf_imi_continuous.csv")
-    skip_if_not(file.exists(csv), "binary fixture missing")
-    session$setInputs(response = "continuous", reference = "CA", thorough = FALSE,
-                      n_starts = 1, alpha = 0.05, time_limit = 30,
-                      file = list(datapath = csv, name = "binary.csv"))
-    # the comparison table renders from the very start, before any curve/interaction
-    # fit (all four rows present, empty) -- it is no longer gated on `frozen`.
+  csv <- testthat::test_path("fixtures", "binary", "cpf_mps_imi",
+                             "binary_ca_mps_cpf_imi_continuous.csv")
+  skip_if_not(file.exists(csv), "binary fixture missing")
+  df <- to_engine_df(read_upload(csv), "binary")
+
+  # `base` mirrors the frozen curve-parameter vector binary_server builds from
+  # the two Stage-1 curve fits (assemble_curve_params(fit1, fit2)); mutating
+  # this reactiveVal mid-test stands in for a Stage-1 curve edit.
+  base_rv <- shiny::reactiveVal(
+    assemble_curve_params(list(par = c(max = 700, slope = 2, ec50 = 1)),
+                          list(par = c(max = 600, slope = 1, ec50 = 5))))
+
+  shiny::testServer(pair_workspace_server, args = list(
+    fit_df    = shiny::reactive(df),
+    base      = shiny::reactive(base_rv()),
+    reference = shiny::reactive("CA"),
+    response  = shiny::reactive("continuous")), {
+    session$setInputs(thorough = FALSE, n_starts = 1, alpha = 0.05, time_limit = 30)
+    # the comparison table renders from the very start, before any interaction
+    # fit (all four rows present, empty) -- it is no longer gated on `base`.
     expect_false(is.null(output$results))
-    session$setInputs(`chem1-val_max` = 700, `chem1-val_slope` = 2,
-                      `chem1-val_ec50` = 1, `chem1-simulate` = 1)
-    session$setInputs(`chem2-val_max` = 600, `chem2-val_slope` = 1,
-                      `chem2-val_ec50` = 5, `chem2-simulate` = 1)
 
     # "Fit interaction models" runs the whole staged chain in one (blocking) go.
     session$setInputs(fit_interactions = 1)
@@ -123,7 +129,9 @@ test_that("binary_server: Fit-interactions fills the staged block, Optimize-all 
 
     # a curve edit clears BOTH the staged and joint fits -- the user re-runs the
     # buttons (curve columns still show the new values, read live in the renderer).
-    session$setInputs(`chem1-val_max` = 720, `chem1-simulate` = 2)
+    base_rv(assemble_curve_params(list(par = c(max = 720, slope = 2, ec50 = 1)),
+                                  list(par = c(max = 600, slope = 1, ec50 = 5))))
+    session$flushReact()
     expect_null(last_compare())
     expect_equal(length(fits_store()), 0)
     expect_equal(length(refined_fits()), 0)
@@ -153,24 +161,24 @@ test_that("binary_server falls back to the bundled example before any upload", {
 test_that("binary_ui: always-visible table + Fit/Optimize buttons, then diagnostics", {
   html <- as.character(binary_ui("binary"))
   expect_false(grepl("Freeze curves", html, fixed = TRUE))
-  # Stage 2: the table + alpha + Fit-interactions + the single Optimize button
-  expect_match(html, "binary-results", fixed = TRUE)
-  expect_match(html, "binary-fit_interactions", fixed = TRUE)
+  # Stage 2 + 3 now live in the pair_workspace_ui module, nested under "work".
+  expect_match(html, "binary-work-results", fixed = TRUE)
+  expect_match(html, "binary-work-fit_interactions", fixed = TRUE)
   expect_match(html, "Fit interaction models", fixed = TRUE)
-  expect_match(html, "binary-alpha", fixed = TRUE)
+  expect_match(html, "binary-work-alpha", fixed = TRUE)
   expect_match(html, "threshold for the model comparison", fixed = TRUE)
-  expect_match(html, "binary-optimize_all", fixed = TRUE)
+  expect_match(html, "binary-work-optimize_all", fixed = TRUE)
   expect_match(html, "Optimize all params (joint)", fixed = TRUE)
-  expect_match(html, "binary-refine_readout", fixed = TRUE)
-  expect_match(html, "binary-refined_badge", fixed = TRUE)
-  expect_match(html, "binary-interaction_help", fixed = TRUE)
-  expect_match(html, "binary-objective", fixed = TRUE)
+  expect_match(html, "binary-work-refine_readout", fixed = TRUE)
+  expect_match(html, "binary-work-refined_badge", fixed = TRUE)
+  expect_match(html, "binary-work-interaction_help", fixed = TRUE)
+  expect_match(html, "binary-work-objective", fixed = TRUE)
   # Stage 3: diagnostics
-  expect_match(html, "binary-surface", fixed = TRUE)
-  expect_match(html, "binary-isobole", fixed = TRUE)
-  expect_match(html, "binary-op", fixed = TRUE)
-  expect_match(html, "binary-cis", fixed = TRUE)
-  expect_match(html, "binary-n_starts", fixed = TRUE)
+  expect_match(html, "binary-work-surface", fixed = TRUE)
+  expect_match(html, "binary-work-isobole", fixed = TRUE)
+  expect_match(html, "binary-work-op", fixed = TRUE)
+  expect_match(html, "binary-work-cis", fixed = TRUE)
+  expect_match(html, "binary-work-n_starts", fixed = TRUE)
   # the manual path + compare-all button + model picker are gone
   expect_false(grepl("binary-compare_all", html, fixed = TRUE))
   expect_false(grepl("binary-model", html, fixed = TRUE))
@@ -178,6 +186,12 @@ test_that("binary_ui: always-visible table + Fit/Optimize buttons, then diagnost
   expect_false(grepl("binary-simulate", html, fixed = TRUE))
   expect_false(grepl("binary-val_a", html, fixed = TRUE))
   expect_false(grepl("binary-find_best", html, fixed = TRUE))
+})
+
+test_that("pair_workspace_ui builds a Shiny UI fragment", {
+  ui <- pair_workspace_ui("work")
+  expect_true(inherits(ui, "shiny.tag") || inherits(ui, "shiny.tag.list") ||
+              inherits(ui, "bslib_fragment"))
 })
 
 test_that("single_ui shows the model equation and Autofit/Simulate buttons", {
@@ -370,4 +384,23 @@ test_that("singles_ui builds a Shiny UI fragment", {
   ui <- singles_ui("s")
   expect_true(inherits(ui, "shiny.tag") || inherits(ui, "shiny.tag.list") ||
               inherits(ui, "bslib_fragment"))
+})
+
+test_that("pair_workspace reproduces the binary tab's staged S/A fit", {
+  skip_if_not_installed("shiny")
+  df <- read.csv(system.file("extdata", "ternary_ca_fbsa_cpf_imi_continuous.csv",
+                             package = "mixdra"))
+  p12 <- pair_df(df, 1, 2)
+
+  f1 <- analyse_single(single_df(df, 1))
+  f2 <- analyse_single(single_df(df, 2))
+  base <- assemble_curve_params(f1, f2)
+
+  fit <- fit_model(p12, "CA", "SA", "continuous",
+                   start = c(base, a = 0), fixed = names(base),
+                   n_starts = 1, time_limit = 30)
+
+  expect_true(is.finite(fit$par[["a"]]))
+  expect_named(fit$par[names(base)], names(base))
+  expect_equal(unname(fit$par[names(base)]), unname(base), tolerance = 1e-8)
 })
