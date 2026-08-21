@@ -99,9 +99,15 @@ singles_server <- function(id, store) {
         }),
         meta = store, chem_field = paste0("chem", kk))
 
+      # DISPLAY STATE ONLY. The panels are exploratory: a scientist may Autofit
+      # or Simulate one to interrogate a stressor, and that must never become
+      # the campaign's number. The campaign base is the joint fit stored by the
+      # "Fit single-stressor curves" button below, so a panel fit deliberately
+      # does NOT touch store$base and does NOT bump base_version -- bumping it
+      # would invalidate every pair and lock the user out of the ternary for an
+      # action the design promises is inert (design doc, section 5a).
       shiny::observeEvent(fit(), {
         store$singles[[as.character(kk)]] <- fit()
-        campaign_bump_base(store)
       }, ignoreNULL = TRUE)
     })
 

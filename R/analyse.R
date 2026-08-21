@@ -77,8 +77,9 @@ fit_curve_from_singles <- function(df, reference, response,
 #' Model order for the interaction-model selection chain
 #'
 #' Binary mixtures walk reference -> SA -> {DR, DL}; ternary mixtures support
-#' only reference -> SA here (Advanced S/A is fitted separately). Used by the
-#' binary tab's live compare-all loop to fit each model in turn.
+#' only reference -> SA here (Advanced S/A is fitted separately). Used by
+#' [analyse_mixture()] and by the campaign's pair workspace to fit each model
+#' in turn.
 #' @keywords internal
 selection_chain_order <- function(n_chem) {
   if (n_chem == 2) c("reference", "SA", "DR", "DL") else c("reference", "SA")

@@ -8,7 +8,8 @@ selection_chain_order(n_chem)
 }
 \description{
 Binary mixtures walk reference -> SA -> {DR, DL}; ternary mixtures support
-only reference -> SA here (Advanced S/A is fitted separately). Used by the
-binary tab's live compare-all loop to fit each model in turn.
+only reference -> SA here (Advanced S/A is fitted separately). Used by
+\code{\link[=analyse_mixture]{analyse_mixture()}} and by the campaign's pair workspace to fit each model
+in turn.
 }
 \keyword{internal}

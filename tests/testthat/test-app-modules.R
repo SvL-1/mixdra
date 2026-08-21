@@ -171,7 +171,9 @@ test_that("pair_workspace_ui: always-visible table + Fit/Optimize buttons, then 
   # Stage 3: diagnostics
   expect_match(html, "work-surface", fixed = TRUE)
   expect_match(html, "work-isobole", fixed = TRUE)
-  expect_match(html, "work-op", fixed = TRUE)
+  # the closing quote matters: a bare "work-op" is also a substring of
+  # "work-optimize_all", so the obs-vs-predicted output would go unguarded.
+  expect_match(html, "work-op\"", fixed = TRUE)
   expect_match(html, "work-cis", fixed = TRUE)
   expect_match(html, "work-n_starts", fixed = TRUE)
   # the manual path + compare-all button + model picker are gone
@@ -181,6 +183,9 @@ test_that("pair_workspace_ui: always-visible table + Fit/Optimize buttons, then 
   expect_false(grepl("work-simulate", html, fixed = TRUE))
   expect_false(grepl("work-val_a", html, fixed = TRUE))
   expect_false(grepl("work-find_best", html, fixed = TRUE))
+  # the stale banner is gone: a base change clears the fits outright, which is
+  # stricter than warning about them, so the banner could never fire.
+  expect_false(grepl("work-stale", html, fixed = TRUE))
 })
 
 test_that("single_ui shows the model equation and Autofit/Simulate buttons", {
@@ -323,10 +328,132 @@ test_that("changing the campaign reference invalidates every downstream fit", {
     session$setInputs(response = "continuous", reference = "CA")
     v0 <- store$base_version
     store$singles <- list(`1` = list(par = c(max = 1, slope = 1, ec50 = 1)))
+    store$base    <- c(max = 800, slope1 = 2, slope2 = 3, ec501 = 0.1, ec502 = 0.5)
+    store$pairs   <- list(`12` = list(a = 0.5, chosen = "SA", base_version = v0))
+    store$ternary <- list(dummy = TRUE)
 
     session$setInputs(reference = "IA")
     expect_true(store$base_version > v0)
     expect_equal(length(store$singles), 0)   # fits cleared, not silently reused
+    # The base is derived from the upload + reference + response, so it must go
+    # too -- a surviving base leaves the pair tabs unlocked and freezes the OLD
+    # reference's EC50s into every downstream fit.
+    expect_null(store$base)
+    expect_null(campaign_base(store))
+    expect_equal(length(store$pairs), 0)
+    expect_null(store$ternary)
+  })
+})
+
+test_that("campaign_server: a new upload clears the campaign base and the pair workspaces' fits", {
+  # C1 + C3, end-to-end through the real wiring. Before the fix, uploading a
+  # second file left store$base holding the FIRST file's curves (so the pair
+  # tabs stayed unlocked and the new data was fitted against the old EC50s),
+  # and left each pair workspace's fitted models on screen, plotted against the
+  # new file's points.
+  skip_if_not_installed("shiny")
+  skip_on_cran()
+  a <- campaign_csv(c(max = 800, slope1 = 2, slope2 = 1.5,
+                      ec501 = 1, ec502 = 5, a = 0.8))
+  b <- campaign_csv(c(max = 500, slope1 = 3, slope2 = 2.5,
+                      ec501 = 20, ec502 = 60, a = -0.5))
+  meta <- shiny::reactiveValues()
+  shiny::testServer(campaign_server, args = list(meta = meta), {
+    session$setInputs(response = "continuous", reference = "CA",
+                      file = list(datapath = a, name = "a.csv"))
+    session$setInputs(`singles-fit_singles` = 1)
+    session$flushReact()
+    expect_equal(unname(store$base[["ec501"]]), 1, tolerance = 1e-3)
+
+    session$setInputs(`pair12-n_starts` = 1, `pair12-alpha` = 0.05,
+                      `pair12-time_limit` = 30)
+    session$setInputs(`pair12-fit_interactions` = 1)
+    expect_false(is.null(pair_workspaces[["12"]]$last_compare()))
+    expect_false(is.null(pair_workspaces[["12"]]$display_fit()))
+
+    # --- a genuinely different file ------------------------------------
+    session$setInputs(file = list(datapath = b, name = "b.csv"))
+    session$flushReact()
+
+    # the new data landed ...
+    expect_gt(max(store$raw$C1), 10)          # file b's ladder reaches ~160
+    # ... and everything derived from file a is gone
+    expect_null(store$base)                                    # C1
+    expect_null(campaign_base(store))
+    expect_equal(length(store$singles), 0)
+    expect_equal(length(store$pairs), 0)
+    expect_null(store$ternary)
+    expect_null(pair_workspaces[["12"]]$last_compare())        # C3
+    expect_null(pair_workspaces[["12"]]$display_fit())
+  })
+})
+
+test_that("a quantal campaign fits its pair interaction models end to end", {
+  # C2. The store keeps the USER's response key ("quantal") because the gating
+  # reads it; the engine's key is "binary", and fit_model() match.arg()s it. The
+  # mapping used to live only in campaign_fit_base(), so the singles fit worked
+  # and EVERY pair fit died with 'arg' should be one of "continuous", "binary".
+  skip_if_not_installed("shiny")
+  skip_on_cran()
+  q <- campaign_csv(c(max = 0.95, slope1 = 2, slope2 = 1.5,
+                      ec501 = 1, ec502 = 5, a = 0.8),
+                    response = "binary")   # group_size = Inf -> exact proportions
+  meta <- shiny::reactiveValues()
+  shiny::testServer(campaign_server, args = list(meta = meta), {
+    session$setInputs(response = "quantal", reference = "CA",
+                      file = list(datapath = q, name = "q.csv"))
+    session$flushReact()
+    expect_length(errs(), 0)
+    expect_equal(store$response, "quantal")   # unchanged: the gating reads it
+    expect_equal(store$chems, c(1L, 2L))
+
+    session$setInputs(`singles-fit_singles` = 1)
+    session$flushReact()
+    expect_false(is.null(store$base))
+    expect_equal(unname(store$base[["ec501"]]), 1, tolerance = 1e-3)
+
+    session$setInputs(`pair12-n_starts` = 1, `pair12-alpha` = 0.05,
+                      `pair12-time_limit` = 30)
+    session$setInputs(`pair12-fit_interactions` = 1)
+
+    lc <- pair_workspaces[["12"]]$last_compare()
+    expect_false(is.null(lc))
+    # all four staged models fitted -- not zero of four
+    expect_setequal(names(lc$fits), c("reference", "SA", "DR", "DL"))
+    expect_equal(lc$response, "binary")
+    expect_true(all(vapply(lc$fits,
+                           function(f) identical(f$response, "binary"),
+                           logical(1))))
+    # the deviance objective is the binary one, and the known `a` is recovered
+    expect_true(is.finite(lc$fits$SA$objective))
+    expect_equal(unname(lc$fits$SA$par[["a"]]), 0.8, tolerance = 1e-2)
+    # and the pair's S/A value reaches the campaign store
+    expect_equal(unname(store$pairs[["12"]]$a), 0.8, tolerance = 1e-2)
+  })
+})
+
+test_that("an exploratory single-stressor panel fit does not invalidate the campaign", {
+  # I1 / spec 5a: the campaign base is the joint fit behind the "Fit
+  # single-stressor curves" button. Autofitting one exploratory panel leaves it
+  # byte-identical, so it must not bump base_version -- doing so made
+  # campaign_pairwise() NULL and locked the user out of the ternary.
+  skip_if_not_installed("shiny")
+  skip_on_cran()
+  meta <- shiny::reactiveValues()
+  shiny::testServer(campaign_server, args = list(meta = meta), {
+    session$setInputs(response = "continuous", reference = "CA")
+    session$setInputs(`singles-fit_singles` = 1)
+    session$flushReact()
+    v0 <- store$base_version
+    b0 <- store$base
+
+    session$setInputs(`singles-chem1-response` = "continuous",
+                      `singles-chem1-autofit` = 1)
+    session$flushReact()
+
+    expect_equal(length(store$singles), 1)    # the panel fit is kept for display
+    expect_equal(store$base_version, v0)      # ... but the campaign is untouched
+    expect_identical(store$base, b0)
   })
 })
 
@@ -528,6 +655,66 @@ test_that("pair_has_rows spots a pair with no mixture rows", {
   expect_true(pair_has_rows(df, 2, 3))
   df2 <- df[!(df$C2 > 0 & df$C3 > 0), ]
   expect_false(pair_has_rows(df2, 2, 3))
+})
+
+test_that("campaign_has_ternary_rows spots a campaign with only pairwise designs", {
+  df <- campaign_fixture()
+  expect_true(campaign_has_ternary_rows(df))
+  expect_false(campaign_has_ternary_rows(df[!(df$C1 > 0 & df$C2 > 0 & df$C3 > 0), ]))
+  expect_false(campaign_has_ternary_rows(df[c("C1", "C2", "Res")]))   # two-stressor
+})
+
+# A ready-to-render three-stressor campaign store: base fitted, all three pairs
+# fitted at the current base_version, so campaign_stage_nav() reaches the
+# ternary panel unless the DATA says otherwise.
+nav_store <- function(df) shiny::reactiveValues(
+  raw = df, chems = c(1L, 2L, 3L), n_chem = 3L,
+  chem1 = "A", chem2 = "B", chem3 = "C",
+  reference = "CA", response = "continuous", base_version = 1L,
+  base = c(max = 100, slope1 = 1, slope2 = 1, slope3 = 1,
+           ec50_1 = 1, ec50_2 = 1, ec50_3 = 1),
+  pairs = list(`12` = list(a = 0.1, chosen = "SA", base_version = 1L),
+               `13` = list(a = 0.1, chosen = "SA", base_version = 1L),
+               `23` = list(a = 0.1, chosen = "SA", base_version = 1L)))
+
+test_that("campaign_stage_nav disables the Ternary sub-tab when there are no ternary rows", {
+  # I4 / spec 7. Without a 1:1:1 arm no row activates the A4 term, so optim
+  # returns its start point and the app would present A4 = 0 as a fitted value.
+  # A campaign covering only the pairwise designs is legitimate, so the tab is
+  # disabled with a reason rather than the upload being rejected.
+  df <- campaign_fixture()
+  with_rows <- shiny::isolate(
+    as.character(campaign_stage_nav(shiny::NS("camp"), nav_store(df))))
+  expect_match(with_rows, "camp-ternary-hub", fixed = TRUE)
+  expect_false(grepl("no ternary rows", with_rows, fixed = TRUE))
+
+  none <- df[!(df$C1 > 0 & df$C2 > 0 & df$C3 > 0), ]
+  expect_length(validate_upload(none, "campaign", "continuous"), 0)  # not an error
+  without <- shiny::isolate(
+    as.character(campaign_stage_nav(shiny::NS("camp"), nav_store(none))))
+  expect_match(without, "no ternary rows", fixed = TRUE)
+  expect_false(grepl("camp-ternary-hub", without, fixed = TRUE))
+  expect_match(without, "data-value=\"Ternary\"", fixed = TRUE)  # listed, not hidden
+})
+
+test_that("campaign_stage_nav keeps the open sub-tab across a rebuild", {
+  # I3: the navset is re-rendered on every store write (a finished pair fit, a
+  # keystroke in the Introduction tab). Without an id/selected pair that snapped
+  # the user back to Singles and reset the workspace's accordion inputs.
+  ns    <- shiny::NS("camp")
+  store <- nav_store(campaign_fixture())
+  active_tab <- function(html)
+    regmatches(html, regexpr("(?s)<li class=\"active\">.*?</li>", html, perl = TRUE))
+
+  html <- shiny::isolate(
+    as.character(campaign_stage_nav(ns, store, selected = "Ternary")))
+  expect_match(html, "id=\"camp-stage\"", fixed = TRUE)
+  expect_match(active_tab(html), "data-value=\"Ternary\"", fixed = TRUE)
+
+  # a title that no longer exists (a stressor was renamed) falls back cleanly
+  html2 <- shiny::isolate(
+    as.character(campaign_stage_nav(ns, store, selected = "Gone")))
+  expect_match(active_tab(html2), "data-value=\"Singles\"", fixed = TRUE)
 })
 
 test_that("campaign_fit_base reproduces the engine's own Stage-1 joint fit", {

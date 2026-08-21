@@ -4,12 +4,17 @@
 \alias{campaign_stage_nav}
 \title{Sub-navigation for the campaign stages}
 \usage{
-campaign_stage_nav(ns, store)
+campaign_stage_nav(ns, store, selected = NULL)
 }
 \arguments{
 \item{ns}{The module's namespace function.}
 
 \item{store}{The campaign store.}
+
+\item{selected}{Title of the sub-tab to open, or \code{NULL} for the first one.
+The caller passes the currently open tab so that rebuilding the navset
+(which happens on any store change) does not reset the user's position;
+a title that no longer exists is ignored.}
 }
 \description{
 Built server-side because which sub-tabs exist depends on the data: the

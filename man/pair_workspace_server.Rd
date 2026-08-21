@@ -27,11 +27,11 @@ until both single-stressor curves are fitted.}
 \item{response}{Reactive; the engine response key (\code{"continuous"}/\code{"binary"}).}
 
 \item{base_version}{Reactive; the campaign's base-parameter version stamp
-(\code{store$base_version}). When supplied, the workspace records the stamp at
-the moment "Fit interaction models" last ran and shows a stale banner if
-a single-stressor curve has been refitted since (\code{base_version} moved on
-without a re-fit here). \code{NULL} (the default, used outside the campaign
-tab) leaves the banner permanently silent.}
+(\code{store$base_version}), passed on to \code{on_fit} so the campaign can tell
+which generation of the base a pair's published \code{a} belongs to. The
+workspace itself needs no staleness banner: a change to \code{base()} clears
+its fits outright (see the invalidation observer below), which is stricter.
+\code{NULL} (the default, used outside the campaign tab).}
 
 \item{on_fit}{Callback invoked whenever the staged "Fit interaction models"
 loop finishes, with \code{list(a, chosen, base_version)}: \code{a} is this pair's

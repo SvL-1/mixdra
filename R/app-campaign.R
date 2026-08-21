@@ -109,13 +109,22 @@ campaign_server <- function(id, meta) {
       store$reference <- input$reference
     })
 
-    # A new file or a changed response/reference invalidates every fit below.
+    # A new file or a changed response/reference invalidates EVERY fit below,
+    # `store$base` included: the campaign base is derived from the upload, so a
+    # base that outlives the file it was fitted on would silently freeze the old
+    # file's EC50s into the new file's pair and ternary fits.
+    #
+    # `priority` puts this ahead of the observer above that writes the new
+    # `store$raw`/`chems`/`response`/`reference`, so no downstream stage can
+    # observe the new data next to the old base: the whole derived state is
+    # gone before a single new value lands.
     shiny::observeEvent(list(input$file, input$response, input$reference), {
+      store$base    <- NULL
       store$singles <- list()
       store$pairs   <- list()
       store$ternary <- NULL
       campaign_bump_base(store)
-    }, ignoreInit = TRUE)
+    }, ignoreInit = TRUE, priority = 1000)
 
     output$summary <- shiny::renderUI({
       shiny::req(store$raw)
@@ -126,7 +135,13 @@ campaign_server <- function(id, meta) {
         sum(cls == "binary"), " pair, ", sum(cls == "ternary"), " ternary rows.")))
     })
 
-    output$stages <- shiny::renderUI(campaign_stage_nav(session$ns, store))
+    # The sub-navigation is data-dependent, so it is rebuilt whenever the store
+    # changes (a finished pair fit, a stressor renamed in the Introduction tab).
+    # Re-read the currently open sub-tab with isolate() and hand it back as
+    # `selected` so a rebuild does not snap the user back to Singles: isolate,
+    # because a plain read would make every tab click rebuild the whole navset.
+    output$stages <- shiny::renderUI(
+      campaign_stage_nav(session$ns, store, selected = shiny::isolate(input$stage)))
 
     singles_server("singles", store)
 
@@ -152,7 +167,13 @@ campaign_server <- function(id, meta) {
           if (is.null(b)) NULL else pair_base(b, pp[1], pp[2])
         }),
         reference    = shiny::reactive(store$reference),
-        response     = shiny::reactive(store$response),
+        # The store holds the USER-facing response key ("continuous"/"quantal")
+        # because the gating and the template download read it; the engine's key
+        # is "continuous"/"binary". Map here, at the wiring, exactly as
+        # campaign_fit_base() does for the singles fit -- fit_model() match.arg()s
+        # its `response` and errors on "quantal".
+        response     = shiny::reactive(
+          if (identical(store$response, "quantal")) "binary" else "continuous"),
         base_version = shiny::reactive(store$base_version),
         on_fit = function(res) store$pairs[[k]] <- res)
     })
@@ -229,6 +250,24 @@ pair_has_rows <- function(df, i, j) {
   any(df[[paste0("C", i)]] > 0 & df[[paste0("C", j)]] > 0, na.rm = TRUE)
 }
 
+#' Does this campaign have any three-stressor mixture rows?
+#'
+#' The ternary stage's per-ratio `A4` step needs at least one row with all three
+#' concentrations positive. Without one no row activates the `A4` term, so
+#' `optim` returns its start point and the app would present `A4 = 0` as a
+#' fitted result. A campaign covering only the pairwise designs is a legitimate
+#' dataset, so this disables the Ternary sub-tab rather than rejecting the
+#' upload (the standalone ternary stage's hard error, kept in
+#' [validate_upload()], applies to a ternary-only upload).
+#' @param df Campaign engine frame.
+#' @return `TRUE` if at least one row has `C1`, `C2` and `C3` all positive.
+#' @keywords internal
+campaign_has_ternary_rows <- function(df) {
+  cols <- c("C1", "C2", "C3")
+  if (!all(cols %in% names(df))) return(FALSE)
+  any(rowSums(as.matrix(df[cols]) > 0) == 3, na.rm = TRUE)
+}
+
 #' Sub-navigation for the campaign stages
 #'
 #' Built server-side because which sub-tabs exist depends on the data: the
@@ -236,8 +275,12 @@ pair_has_rows <- function(df, i, j) {
 #' mixture rows are disabled.
 #' @param ns The module's namespace function.
 #' @param store The campaign store.
+#' @param selected Title of the sub-tab to open, or `NULL` for the first one.
+#'   The caller passes the currently open tab so that rebuilding the navset
+#'   (which happens on any store change) does not reset the user's position;
+#'   a title that no longer exists is ignored.
 #' @keywords internal
-campaign_stage_nav <- function(ns, store) {
+campaign_stage_nav <- function(ns, store, selected = NULL) {
   panels <- list(bslib::nav_panel("Singles", singles_ui(ns("singles"))))
 
   ready <- !is.null(campaign_base(store))
@@ -259,7 +302,11 @@ campaign_stage_nav <- function(ns, store) {
   }
 
   if (length(store$chems) == 3) {
-    body <- if (!identical(store$reference, "CA")) {
+    body <- if (!campaign_has_ternary_rows(store$raw)) {
+      shiny::div(class = "p-3 text-muted",
+                 "This campaign has no ternary rows (all three stressors ",
+                 "dosed together), so the per-ratio A4 step has nothing to fit.")
+    } else if (!identical(store$reference, "CA")) {
       shiny::div(class = "p-3 text-muted",
                  "The ternary stage is not yet supported for Independent ",
                  "Action. Switch the campaign reference model to Concentration ",
@@ -281,5 +328,11 @@ campaign_stage_nav <- function(ns, store) {
     panels <- c(panels, list(bslib::nav_panel("Ternary", body)))
   }
 
-  do.call(bslib::navset_card_tab, panels)
+  # `selected` is only honoured while the tab it names still exists (stressor
+  # renames change the pair titles); otherwise fall back to the first panel.
+  titles <- vapply(panels, function(p) as.character(p$attribs$title %||% ""),
+                   character(1))
+  sel <- if (!is.null(selected) && selected %in% titles) selected else NULL
+  do.call(bslib::navset_card_tab,
+          c(panels, list(id = ns("stage"), selected = sel)))
 }

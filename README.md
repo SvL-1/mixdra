@@ -112,8 +112,9 @@ Its sub-tabs run the study in order:
    the pairwise terms already fitted above. Present only for a three-stressor
    campaign, and currently CA + continuous only.
 
-The Single Stressor tab is an independent scratchpad: it does not read from or
-write to the campaign.
+The Single Stressor tab is an independent scratchpad: it shares only the
+experiment-metadata fields (the stressor name and unit it puts on its own axes);
+it neither reads nor writes any campaign analysis state.
 
 ### Scripted analysis
 
