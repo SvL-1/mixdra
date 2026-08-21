@@ -1317,6 +1317,36 @@ In `campaign_server`, after `singles_server("singles", store)`:
 
 Add `shiny::uiOutput(ns("stale"))` at the top of the Stage 2 card in `pair_workspace_ui`.
 
+- [ ] **Step 5b: Restore the end-to-end wiring coverage lost in Task 5**
+
+Task 5 re-pointed an integration test from `binary_server` at the inner `pair_workspace_server`, which left the **delegation glue** untested — that a real upload reaches the workspace as `fit_df`, that fitted singles assemble into `base` and flow down, and that `reference`/`response` propagate inward. That glue lives in `binary_server` today and is deleted in Task 9, so the coverage belongs here, on the permanent campaign equivalent. Add:
+
+```r
+test_that("campaign wiring carries upload, base and settings into a pair workspace", {
+  skip_if_not_installed("shiny")
+  meta <- shiny::reactiveValues()
+  shiny::testServer(campaign_server, args = list(meta = meta), {
+    session$setInputs(response = "continuous", reference = "CA")
+
+    # The upload reaches the store, and the pair slice is derived from it.
+    expect_gt(nrow(store$raw), 0)
+    expect_equal(store$n_chem, 3L)
+    p12 <- pair_df(store$raw, 1, 2)
+    expect_true(all(c("C1", "C2") %in% names(p12)))
+    expect_true(any(p12$C1 > 0 & p12$C2 > 0))
+
+    # Settings propagate as the workspace will read them.
+    expect_equal(store$reference, "CA")
+    expect_equal(store$response, "continuous")
+
+    # Base starts absent, and the pair tabs are gated on it.
+    expect_null(shiny::isolate(campaign_base(store)))
+    store$base <- c(max = 800, slope1 = 2, slope2 = 3, ec501 = 0.1, ec502 = 0.5)
+    expect_false(is.null(shiny::isolate(campaign_base(store))))
+  })
+})
+```
+
 - [ ] **Step 6: Run and verify pass**
 
 ```bash
