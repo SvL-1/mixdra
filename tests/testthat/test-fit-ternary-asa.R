@@ -139,3 +139,10 @@ test_that("analyse_ternary returns overall + per-ratio structure", {
                     "pred_ASA", "a4_effect") %in% names(eff)))
   expect_equal(eff$a4_effect, eff$pred_ASA - eff$pred_SA, tolerance = 1e-8)
 })
+
+test_that("classify_rows handles a two-stressor frame: no ternary class", {
+  two <- data.frame(C1 = c(0, 1, 0, 1), C2 = c(0, 0, 1, 1), Res = c(100, 80, 85, 60))
+  cls <- classify_rows(two)
+  expect_equal(as.character(cls), c("control", "single", "single", "binary"))
+  expect_false("ternary" %in% as.character(cls))
+})

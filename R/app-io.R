@@ -215,6 +215,72 @@ assemble_curve_params3 <- function(fit1, fit2, fit3) {
     ec50_3 = fit3$par[["ec50"]])
 }
 
+#' Which stressors a campaign frame actually doses
+#'
+#' A concentration column that is present but never positive (e.g. a `C3` of
+#' zeros pasted in by mistake) does not count — the campaign is then a
+#' two-stressor one.
+#' @param df Campaign data frame with `C1`, `C2` and optionally `C3`.
+#' @return Integer vector of stressor indices, e.g. `c(1L, 2L)`.
+#' @keywords internal
+campaign_chems <- function(df) {
+  cols <- intersect(c("C1", "C2", "C3"), names(df))
+  act  <- cols[vapply(df[cols], function(x) any(x > 0, na.rm = TRUE), logical(1))]
+  as.integer(sub("^C", "", act))
+}
+
+#' Number of stressors in a campaign frame
+#' @inheritParams campaign_chems
+#' @return 2 or 3 (or fewer, which [validate_upload()] rejects).
+#' @keywords internal
+campaign_n_chem <- function(df) length(campaign_chems(df))
+
+#' One stressor's single-stressor series from a campaign frame
+#'
+#' Keeps the rows where every OTHER stressor is 0 (so the shared control row is
+#' included), drops their columns, and renames this stressor's concentration
+#' column to `C1` — the shape a single-stressor fitter expects. Generalises
+#' [marginal_df()] / [marginal_df3()] to 2- or 3-stressor frames.
+#' @inheritParams campaign_chems
+#' @param chem 1, 2 or 3 — which stressor's series to extract.
+#' @return A data frame with `C1` and the response columns.
+#' @keywords internal
+single_df <- function(df, chem) {
+  cols  <- intersect(c("C1", "C2", "C3"), names(df))
+  this  <- paste0("C", chem)
+  other <- setdiff(cols, this)
+  keep  <- if (length(other))
+    Reduce(`&`, lapply(other, function(k) df[[k]] == 0)) else rep(TRUE, nrow(df))
+  out <- df[keep, , drop = FALSE]
+  out[other] <- NULL
+  names(out)[names(out) == this] <- "C1"
+  rownames(out) <- NULL
+  out
+}
+
+#' One pair's rows from a campaign frame
+#'
+#' Keeps the rows where the third stressor is 0 (so the singles and the shared
+#' control come along, exactly as the binary fitter expects), drops its column,
+#' and renames the pair's concentration columns to `C1`/`C2`.
+#' @inheritParams campaign_chems
+#' @param i,j Stressor indices of the pair, `i < j`.
+#' @return A data frame with `C1`, `C2` and the response columns.
+#' @keywords internal
+pair_df <- function(df, i, j) {
+  cols  <- intersect(c("C1", "C2", "C3"), names(df))
+  this  <- paste0("C", c(i, j))
+  other <- setdiff(cols, this)
+  keep  <- if (length(other))
+    Reduce(`&`, lapply(other, function(k) df[[k]] == 0)) else rep(TRUE, nrow(df))
+  out <- df[keep, , drop = FALSE]
+  out[other] <- NULL
+  names(out)[names(out) == this[1]] <- "C1"
+  names(out)[names(out) == this[2]] <- "C2"
+  rownames(out) <- NULL
+  out
+}
+
 #' Assemble lower/upper bound vectors from Advanced-panel inputs
 #'
 #' Reads `lo_<param>` / `hi_<param>` values for `params`; blank/NA entries are

@@ -206,3 +206,63 @@ test_that("assemble_curve_params3 averages max and uses underscore ec50 names", 
   expect_equal(unname(p[["slope2"]]), 13)
   expect_equal(unname(p[["ec50_3"]]), 0.57)
 })
+
+campaign_fixture <- function() {
+  data.frame(
+    C1  = c(0, 1, 2, 3, 0, 0, 0, 0, 0, 0, 1, 2, 0, 0, 1),
+    C2  = c(0, 0, 0, 0, 1, 2, 3, 0, 0, 0, 1, 2, 1, 2, 1),
+    C3  = c(0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 0, 0, 1, 2, 1),
+    Res = c(100, 90, 80, 70, 92, 84, 76, 95, 88, 80, 60, 40, 62, 44, 30)
+  )
+}
+
+test_that("campaign_chems reports the stressors that are actually dosed", {
+  df <- campaign_fixture()
+  expect_equal(campaign_chems(df), c(1L, 2L, 3L))
+  expect_equal(campaign_n_chem(df), 3L)
+
+  df$C3 <- 0                              # column present but never dosed
+  expect_equal(campaign_chems(df), c(1L, 2L))
+  expect_equal(campaign_n_chem(df), 2L)
+
+  two <- df[c("C1", "C2", "Res")]         # column absent entirely
+  expect_equal(campaign_n_chem(two), 2L)
+})
+
+test_that("single_df keeps the control row and renames the concentration to C1", {
+  df <- campaign_fixture()
+
+  s2 <- single_df(df, 2)
+  expect_equal(names(s2), c("C1", "Res"))
+  expect_equal(s2$C1, c(0, 1, 2, 3))      # shared control + chem-2 series
+  expect_equal(s2$Res, c(100, 92, 84, 76))
+
+  s1 <- single_df(df, 1)                  # chem 1 needs no rename
+  expect_equal(s1$C1, c(0, 1, 2, 3))
+
+  two <- df[df$C3 == 0, c("C1", "C2", "Res")]
+  expect_equal(single_df(two, 2)$C1, c(0, 1, 2, 3))   # works with only C1/C2
+})
+
+test_that("pair_df keeps that pair's rows and renames to C1/C2", {
+  df <- campaign_fixture()
+
+  p23 <- pair_df(df, 2, 3)
+  expect_equal(names(p23), c("C1", "C2", "Res"))
+  expect_equal(p23$C1, c(0, 1, 2, 3, 0, 0, 0, 1, 2))  # C2 became C1
+  expect_equal(p23$C2, c(0, 0, 0, 0, 1, 2, 3, 1, 2))  # C3 became C2
+  expect_equal(nrow(p23), 9L)                         # exactly the C1 == 0 rows
+
+  p12 <- pair_df(df, 1, 2)
+  expect_equal(names(p12), c("C1", "C2", "Res"))
+  expect_equal(nrow(p12), 9)              # control + 3 C1 singles + 3 C2 singles + 2 mixture rows
+  expect_true(all(p12$C1 >= 0))
+})
+
+test_that("pair_df on a two-stressor frame is a no-op slice", {
+  two <- campaign_fixture()[c("C1", "C2", "Res")]
+  two <- two[two$C1 > 0 | two$C2 > 0 | seq_len(nrow(two)) == 1, ]
+  out <- pair_df(two, 1, 2)
+  expect_equal(names(out), c("C1", "C2", "Res"))
+  expect_equal(nrow(out), nrow(two))
+})
