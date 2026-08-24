@@ -2,11 +2,15 @@
 % Please edit documentation in R/app-run.R
 \name{app_ui}
 \alias{app_ui}
-\title{Assemble the navbar UI from the three stage modules}
+\title{Assemble the navbar UI from the stage modules}
 \usage{
 app_ui()
 }
 \description{
-Assemble the navbar UI from the three stage modules
+Introduction, Single Stressor and Campaign are the app's three tabs. The
+legacy standalone Binary Mixture and Ternary Mixture tabs were retired in
+favour of the Campaign's per-pair sub-tabs and ternary sub-tab, which reuse
+the same \code{\link[=pair_workspace_ui]{pair_workspace_ui()}}/\code{\link[=pair_workspace_server]{pair_workspace_server()}} and
+\code{\link[=ternary_ui]{ternary_ui()}}/\code{\link[=ternary_server]{ternary_server()}} modules.
 }
 \keyword{internal}

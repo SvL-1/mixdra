@@ -4,14 +4,21 @@
 \alias{ternary_server}
 \title{Ternary Mixture stage server}
 \usage{
-ternary_server(id, meta)
+ternary_server(id, store)
 }
 \arguments{
 \item{id}{Module id.}
 
-\item{meta}{Shared reactiveValues for experiment metadata.}
+\item{store}{The campaign store.}
 }
 \description{
-Ternary Mixture stage server
+Consumes the campaign store: \code{\link[=campaign_base]{campaign_base()}} for the frozen
+single-stressor curves and \code{\link[=campaign_pairwise]{campaign_pairwise()}} for the frozen per-pair
+S/A terms. Fits automatically once both are available -- there is no
+local upload or curve/pairwise fitting to trigger first; Singles and the
+pair tabs already did that. \code{store$raw}/\code{store$reference}/\code{store$response}
+re-gate the fit to CA + continuous even though \code{campaign_stage_nav()}
+already shows an explanatory panel instead of this UI otherwise, so a
+stale mounted panel never silently fits.
 }
 \keyword{internal}

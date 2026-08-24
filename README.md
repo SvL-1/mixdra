@@ -94,9 +94,27 @@ install.packages(c("shiny", "bslib", "plotly", "DT"))
 mixdra::run_app()
 ```
 
-Opens a `bslib` dashboard with **Single Chemical**, **Binary Mixture**, and **Ternary Mixture**
-workflows: upload your data (or use the built-in example), fit the curves, and step through
-fit-and-compare with live plots and an editable data table.
+Opens a `bslib` dashboard with three tabs: **Introduction** for experiment
+metadata, **Single Stressor** for a standalone one-stressor experiment, and
+**Campaign** for a full mixture study.
+
+A campaign is one uploaded file covering two or three stressors — single-stressor
+rows carry zeros in the other concentrations, pair rows carry zero in the third.
+Its sub-tabs run the study in order:
+
+1. **Singles** — every stressor's dose-response curve, fitted once. These curves
+   are the campaign's single source of truth.
+2. **One sub-tab per pair** — the interaction model comparison
+   (reference → S/A → DR/DL) for each pair, with the single-stressor curves held
+   fixed so interaction shows up as `a`/`b` rather than being absorbed by
+   refitted curves.
+3. **Ternary** — the staged Advanced-S/A fit, reusing both the frozen curves and
+   the pairwise terms already fitted above. Present only for a three-stressor
+   campaign, and currently CA + continuous only.
+
+The Single Stressor tab is an independent scratchpad: it shares only the
+experiment-metadata fields (the stressor name and unit it puts on its own axes);
+it neither reads nor writes any campaign analysis state.
 
 ### Scripted analysis
 

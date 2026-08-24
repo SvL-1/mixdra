@@ -2,11 +2,11 @@
 % Please edit documentation in R/app-run.R
 \name{app_server}
 \alias{app_server}
-\title{Wire the three stage module servers around a shared meta store}
+\title{Wire the stage module servers around a shared meta store}
 \usage{
 app_server(input, output, session)
 }
 \description{
-Wire the three stage module servers around a shared meta store
+Wire the stage module servers around a shared meta store
 }
 \keyword{internal}

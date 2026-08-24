@@ -139,3 +139,53 @@ test_that("analyse_ternary returns overall + per-ratio structure", {
                     "pred_ASA", "a4_effect") %in% names(eff)))
   expect_equal(eff$a4_effect, eff$pred_ASA - eff$pred_SA, tolerance = 1e-8)
 })
+
+test_that("classify_rows handles a two-stressor frame: no ternary class", {
+  two <- data.frame(C1 = c(0, 1, 0, 1), C2 = c(0, 0, 1, 1), Res = c(100, 80, 85, 60))
+  cls <- classify_rows(two)
+  expect_equal(as.character(cls), c("control", "single", "single", "binary"))
+  expect_false("ternary" %in% as.character(cls))
+})
+
+test_that("supplying pairwise skips Stage 2 and holds A1/A2/A3 fixed", {
+  df <- read.csv(system.file("extdata", "ternary_ca_fbsa_cpf_imi_continuous.csv",
+                             package = "mixdra"))
+  auto <- fit_ternary_asa(df, n_starts = 1)
+  pw   <- auto$pairwise
+
+  frozen <- fit_ternary_asa(df, base = auto$base, pairwise = pw, n_starts = 1)
+  expect_equal(unname(frozen$pairwise), unname(pw), tolerance = 1e-10)
+  expect_null(frozen$fits$pairwise)          # Stage 2 was not run
+  expect_true(is.finite(frozen$A4_overall))
+})
+
+test_that("pairwise validates its names", {
+  df <- read.csv(system.file("extdata", "ternary_ca_fbsa_cpf_imi_continuous.csv",
+                             package = "mixdra"))
+  expect_error(fit_ternary_asa(df, pairwise = c(A1 = 0, A2 = 0)),
+               "missing param")
+  expect_error(fit_ternary_asa(df, pairwise = list(A1 = 0, A2 = 0, A3 = 0)),
+               "named numeric")
+})
+
+test_that("LINCHPIN: each pair's S/A a IS its ternary A-term at the same base", {
+  # Spec section 3. If this fails, reusing the fitted binaries in the ternary
+  # stage is no longer exact and the campaign design needs revisiting.
+  df <- read.csv(system.file("extdata", "ternary_ca_fbsa_cpf_imi_continuous.csv",
+                             package = "mixdra"))
+  auto <- fit_ternary_asa(df, n_starts = 1)
+  base <- auto$base
+
+  # The binary base uses ec501/ec502; map the ternary base onto each pair
+  # using the shipped production helper (not a private copy).
+  a_of <- function(i, j) {
+    b <- pair_base(base, i, j)
+    fit_model(pair_df(df, i, j), "CA", "SA", "continuous",
+              start = c(b, a = 0), fixed = names(b),
+              n_starts = 1, time_limit = 60)$par[["a"]]
+  }
+
+  expect_equal(a_of(1, 2), unname(auto$pairwise[["A1"]]), tolerance = 1e-3)
+  expect_equal(a_of(1, 3), unname(auto$pairwise[["A2"]]), tolerance = 1e-3)
+  expect_equal(a_of(2, 3), unname(auto$pairwise[["A3"]]), tolerance = 1e-3)
+})

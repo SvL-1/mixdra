@@ -40,12 +40,15 @@ ternary_ratio_key <- function(df, sig = 6) {
 #' @param base Optional named curve params (`max, slope1-3, ec50_1-3`); when
 #'   supplied the Stage-1 singles fit is skipped and these are held fixed.
 #'   Defaults to `NULL` (fit from singles).
+#' @param pairwise Optional named numeric vector (`A1, A2, A3`); when supplied
+#'   the Stage-2 binaries fit is skipped and these are held fixed.
+#'   Defaults to `NULL` (fit from binaries).
 #' @param lower,upper,n_starts,time_limit Forwarded to [fit_model()].
 #' @return See [analyse_ternary()].
 #' @keywords internal
 fit_ternary_asa <- function(df, reference = "CA", response = "continuous",
-                            base = NULL, lower = NULL, upper = NULL,
-                            n_starts = 1, time_limit = 30) {
+                            base = NULL, pairwise = NULL, lower = NULL,
+                            upper = NULL, n_starts = 1, time_limit = 30) {
   if (reference != "CA")
     stop("fit_ternary_asa: only reference = 'CA' is implemented")
   cls <- classify_rows(df)
@@ -73,12 +76,26 @@ fit_ternary_asa <- function(df, reference = "CA", response = "continuous",
   }
 
   # Stage 2 - A1/A2/A3 from binaries; base + A4 held fixed; start all A at 0.
-  binaries <- df[cls == "binary", , drop = FALSE]
-  f2 <- fit_model(binaries, reference, "ASA", response,
-                  start = c(base_par, A1 = 0, A2 = 0, A3 = 0, A4 = 0),
-                  fixed = c(base_params, "A4"),
-                  n_starts = n_starts, time_limit = time_limit)
-  a123 <- f2$par[c("A1", "A2", "A3")]
+  # A supplied `pairwise` (the campaign's per-pair S/A values) skips this fit and
+  # holds those values fixed downstream -- exact, because each binary row
+  # activates exactly one A term (see the design doc, section 3).
+  if (is.null(pairwise)) {
+    binaries <- df[cls == "binary", , drop = FALSE]
+    f2 <- fit_model(binaries, reference, "ASA", response,
+                    start = c(base_par, A1 = 0, A2 = 0, A3 = 0, A4 = 0),
+                    fixed = c(base_params, "A4"),
+                    n_starts = n_starts, time_limit = time_limit)
+    a123 <- f2$par[c("A1", "A2", "A3")]
+  } else {
+    if (!is.numeric(pairwise))
+      stop("fit_ternary_asa: `pairwise` must be a named numeric vector")
+    miss <- setdiff(c("A1", "A2", "A3"), names(pairwise))
+    if (length(miss))
+      stop("fit_ternary_asa: `pairwise` is missing param(s): ",
+           paste(miss, collapse = ", "))
+    a123 <- pairwise[c("A1", "A2", "A3")]
+    f2 <- NULL
+  }
 
   # Stage 3a - overall A4 from ALL residuals; everything else fixed.
   start3 <- c(base_par, a123, A4 = 0)
@@ -133,6 +150,9 @@ fit_ternary_asa <- function(df, reference = "CA", response = "continuous",
 #' @param base Optional named curve params (`max, slope1-3, ec50_1-3`); when
 #'   supplied the Stage-1 singles fit is skipped and these are held fixed.
 #'   Defaults to `NULL` (fit from singles).
+#' @param pairwise Optional named numeric vector (`A1, A2, A3`); when supplied
+#'   the Stage-2 binaries fit is skipped and these are held fixed.
+#'   Defaults to `NULL` (fit from binaries).
 #' @param lower,upper,n_starts,time_limit Forwarded to [fit_model()].
 #' @return A list: `reference`, `response`, `base` (named curve params),
 #'   `pairwise` (A1,A2,A3), `A4_overall`, `individual` (data frame: ratio,
@@ -141,14 +161,14 @@ fit_ternary_asa <- function(df, reference = "CA", response = "continuous",
 #' @export
 analyse_ternary <- function(df, reference = "CA",
                             response = c("continuous", "binary"),
-                            base = NULL, lower = NULL, upper = NULL,
-                            n_starts = 1, time_limit = 30) {
+                            base = NULL, pairwise = NULL, lower = NULL,
+                            upper = NULL, n_starts = 1, time_limit = 30) {
   response <- match.arg(response)
   if (!all(c("C1", "C2", "C3") %in% names(df)))
     stop("analyse_ternary requires C1, C2 and C3 columns")
   fit_ternary_asa(df, reference = reference, response = response, base = base,
-                  lower = lower, upper = upper, n_starts = n_starts,
-                  time_limit = time_limit)
+                  pairwise = pairwise, lower = lower, upper = upper,
+                  n_starts = n_starts, time_limit = time_limit)
 }
 
 #' Per-ratio A4 effect-size readout

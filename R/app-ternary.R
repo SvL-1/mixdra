@@ -1,86 +1,38 @@
-# Ternary Mixture stage. Reuses the binary tab's UX skeleton: a sidebar, three
-# single-curve panels (Stage 1), a per-ratio A4 "hub" table (Stage 2), and an
-# inspect stage (Stage 3 -- isoplane + Sigma-TU + the selected ratio's effect).
-# The science differs from binary: there is no SA/DR/DL model selection. The
-# staged Advanced-S/A fit (analyse_ternary) is the method; its punchline is the
-# overall-A4 vs per-ratio-A4 contrast (averaging-out). CA + continuous only.
-
-#' Client-side JS to disable one option of a Shiny radio group
-#'
-#' Shiny renders radio options as `<input name=... value=...>`; jQuery (bundled
-#' with Shiny) flips the unsupported one to disabled on load. Used to show the
-#' Quantal / IA options greyed-out without adding a JS dependency.
-#' @param input_name The namespaced input id (e.g. `ns("response")`).
-#' @param value The option value to disable (e.g. `"quantal"`).
-#' @keywords internal
-disable_radio_js <- function(input_name, value) {
-  shiny::tags$script(shiny::HTML(sprintf(
-    "$(function(){$('input[name=\"%s\"][value=\"%s\"]').prop('disabled', true);});",
-    input_name, value)))
-}
+# Ternary Mixture stage: a sub-tab of the Campaign, appearing once all three
+# pair tabs have been fitted. It owns NO upload, curve fitting, or pairwise
+# fitting of its own -- those are the Singles page and the three pair tabs.
+# Instead it consumes the campaign's frozen single-stressor curves
+# (campaign_base()) and each pair's frozen S/A interaction term
+# (campaign_pairwise()), and runs the two remaining stages of the staged
+# Advanced-S/A fit: an overall three-way A4 from all the data, and an
+# individual A4 per ternary mixture ratio. This reuse was requested by the
+# project's scientist and proven exact: each pair's fitted `a` equals the
+# ternary model's corresponding A-term to 5-6 significant figures on real
+# data (see the design doc, section 3). CA + continuous only --
+# campaign_stage_nav() shows an explanatory panel instead of this UI for
+# IA / quantal / a not-yet-fully-fitted campaign.
 
 #' Ternary Mixture stage UI
 #' @param id Module id.
 #' @keywords internal
 ternary_ui <- function(id) {
   ns <- shiny::NS(id)
-  bslib::layout_sidebar(
-    sidebar = bslib::sidebar(
-      width = 380,
-      shiny::radioButtons(ns("response"), "Response type",
-                          c("Continuous" = "continuous",
-                            "Quantal (coming soon)" = "quantal"),
-                          selected = "continuous"),
-      disable_radio_js(ns("response"), "quantal"),
-      shiny::radioButtons(ns("reference"), "Reference model",
-                          c("Concentration addition (CA)" = "CA",
-                            "Independent action (IA) (coming soon)" = "IA"),
-                          selected = "CA"),
-      disable_radio_js(ns("reference"), "IA"),
-      shiny::downloadButton(ns("template"), "Download template"),
-      shiny::fileInput(ns("file"), "Upload CSV", accept = ".csv"),
-      shiny::helpText(shiny::tags$small(
-        "An example dataset (FBSA + CPF + IMI, continuous) is loaded until you upload your own.")),
-      shiny::uiOutput(ns("errors")),
+  shiny::tagList(
+    shiny::uiOutput(ns("sa_note")),
+
+    bslib::card(
+      bslib::card_header("Advanced S/A (frozen base + pairwise)"),
+      shiny::p("Uses the campaign's frozen single-stressor curves and each ",
+               "pair's frozen S/A interaction term (A1 = pair 1-2, A2 = pair ",
+               "1-3, A3 = pair 2-3) to fit the overall three-way A4 and an ",
+               "individual A4 per ternary mixture ratio."),
       bslib::accordion(
         open = FALSE,
         bslib::accordion_panel(
           "Advanced fitting options",
-          shiny::helpText("Apply to the staged Advanced-S/A fit."),
-          shiny::numericInput(ns("n_starts"), "n_starts", value = 1, min = 1),
-          shiny::numericInput(ns("time_limit"), "time_limit (s/stage)", value = 30, min = 1),
-          shiny::checkboxInput(ns("thorough"), "Thorough fit (multi-start, slower)", FALSE),
-          shiny::uiOutput(ns("thorough_note"))
+          shiny::numericInput(ns("n_starts"), "n_starts", value = 1, min = 1)
         )
-      )
-    ),
-
-    # Stage 1 -- three single-chemical curve panels.
-    bslib::card(
-      bslib::card_header("Stage 1 · Single curves"),
-      shiny::p("Fit each stressor's dose-response curve (Autofit or Simulate). ",
-               "These curves are held fixed as the base for the staged ",
-               "Advanced-S/A fit below, which appears once all three are fitted."),
-      shiny::div(shiny::h5(shiny::textOutput(ns("chem1_title"))),
-                 curve_fit_ui(ns("chem1"))),
-      shiny::div(class = "mt-4",
-                 shiny::h5(shiny::textOutput(ns("chem2_title"))),
-                 curve_fit_ui(ns("chem2"))),
-      shiny::div(class = "mt-4",
-                 shiny::h5(shiny::textOutput(ns("chem3_title"))),
-                 curve_fit_ui(ns("chem3"))),
-      shiny::uiOutput(ns("reveal_note"))
-    ),
-
-    # Stage 2 -- staged Advanced-S/A fit + the per-ratio A4 hub table.
-    bslib::card(
-      bslib::card_header("Stage 2 · Advanced S/A"),
-      shiny::p("Fit all three single curves in Stage 1, then ",
-               shiny::tags$b("Fit Advanced S/A"), " to run the staged fit ",
-               "(base → pairwise A1/A2/A3 from the binaries → overall A4 ",
-               "→ an individual A4 per ternary ratio)."),
-      shiny::div(shiny::actionButton(ns("fit_asa"), "Fit Advanced S/A",
-                                     class = "btn-primary")),
+      ),
       shiny::uiOutput(ns("base_pairwise")),
       shiny::helpText(
         "Each row is one ternary ratio; the ", shiny::tags$b("Overall"),
@@ -91,9 +43,8 @@ ternary_ui <- function(id) {
       DT::DTOutput(ns("hub"))
     ),
 
-    # Stage 3 -- inspect.
     bslib::card(
-      bslib::card_header("Stage 3 · Inspect"),
+      bslib::card_header("Inspect"),
       bslib::layout_columns(
         bslib::card(bslib::card_header("EC50 isoplane (simplex)"),
                     plotly::plotlyOutput(ns("isoplane"), height = "520px")),
@@ -107,110 +58,57 @@ ternary_ui <- function(id) {
 }
 
 #' Ternary Mixture stage server
+#'
+#' Consumes the campaign store: [campaign_base()] for the frozen
+#' single-stressor curves and [campaign_pairwise()] for the frozen per-pair
+#' S/A terms. Fits automatically once both are available -- there is no
+#' local upload or curve/pairwise fitting to trigger first; Singles and the
+#' pair tabs already did that. `store$raw`/`store$reference`/`store$response`
+#' re-gate the fit to CA + continuous even though `campaign_stage_nav()`
+#' already shows an explanatory panel instead of this UI otherwise, so a
+#' stale mounted panel never silently fits.
 #' @param id Module id.
-#' @param meta Shared reactiveValues for experiment metadata.
+#' @param store The campaign store.
 #' @keywords internal
-ternary_server <- function(id, meta) {
+ternary_server <- function(id, store) {
   shiny::moduleServer(id, function(input, output, session) {
 
-    output$template <- shiny::downloadHandler(
-      filename = function() "ternary_continuous_template.csv",
-      content  = function(file)
-        utils::write.csv(template_df("ternary", "continuous"), file, row.names = FALSE)
-    )
-
-    output$thorough_note <- shiny::renderUI({
-      if (isTRUE(input$thorough))
-        shiny::div(class = "text-warning",
-                   shiny::tags$small("Multi-start fitting may take several minutes."))
+    # Notes which pair(s) did NOT select S/A as their winning model -- that
+    # can be DR, DL, or "reference" (no interaction at all). The three-way
+    # model has no DR/DL form and no no-interaction shortcut, so it always
+    # uses that pair's S/A term regardless (agreed with the scientist). Lives
+    # here, not on the pair tab, because it describes the ternary fit.
+    output$sa_note <- shiny::renderUI({
+      odd <- names(Filter(function(p) !identical(p$chosen, "SA"), store$pairs))
+      if (length(odd))
+        shiny::div(class = "alert alert-info",
+                   "Pair(s) ", paste(odd, collapse = ", "),
+                   " were not best described by the Synergism/Antagonism ",
+                   "(S/A) model (a dose-ratio or dose-level model fit better, ",
+                   "or no interaction at all). The ternary fit uses their S/A ",
+                   "term anyway, which is the only interaction form the ",
+                   "three-way model has.")
     })
 
-    chem_title <- function(field, n) shiny::renderText({
-      nm <- meta[[field]]; if (!is.null(nm) && nzchar(nm)) nm else paste("Stressor", n)
-    })
-    output$chem1_title <- chem_title("chem1", 1)
-    output$chem2_title <- chem_title("chem2", 2)
-    output$chem3_title <- chem_title("chem3", 3)
-
-    # Data source: upload, else the bundled FBSA/CPF/IMI example.
-    upload_path <- shiny::reactive({
-      if (!is.null(input$file)) return(input$file$datapath)
-      ex <- system.file("extdata", "ternary_ca_fbsa_cpf_imi_continuous.csv", package = "mixdra")
-      if (nzchar(ex)) ex else NULL
-    })
-    parsed <- shiny::reactive({ shiny::req(upload_path()); read_upload(upload_path()) })
-    errs <- shiny::reactive({
-      shiny::req(upload_path()); validate_upload(parsed(), "ternary", "continuous")
-    })
-    output$errors <- shiny::renderUI({
-      e <- errs()
-      if (length(e)) shiny::div(class = "text-danger",
-                                lapply(e, function(x) shiny::tags$p(x)))
+    asa_res <- shiny::reactive({
+      shiny::req(store$raw, store$reference == "CA",
+                 store$response == "continuous")
+      base <- campaign_base(store); shiny::req(base)
+      pw   <- campaign_pairwise(store); shiny::req(pw)
+      analyse_ternary(store$raw, reference = "CA", response = "continuous",
+                      base = base, pairwise = pw,
+                      n_starts = input$n_starts %||% 1)
     })
 
-    engine_df <- shiny::reactive({
-      shiny::req(upload_path(), length(errs()) == 0)
-      to_engine_df(parsed(), "ternary")
-    })
-    m1 <- shiny::reactive(marginal_df3(engine_df(), 1))
-    m2 <- shiny::reactive(marginal_df3(engine_df(), 2))
-    m3 <- shiny::reactive(marginal_df3(engine_df(), 3))
-
-    fit1 <- curve_fit_server("chem1", fit_df = m1, meta = meta, chem_field = "chem1")
-    fit2 <- curve_fit_server("chem2", fit_df = m2, meta = meta, chem_field = "chem2")
-    fit3 <- curve_fit_server("chem3", fit_df = m3, meta = meta, chem_field = "chem3")
-
-    frozen <- shiny::reactive(!is.null(fit1()) && !is.null(fit2()) && !is.null(fit3()))
-    curve_params <- shiny::reactive({
-      shiny::req(fit1(), fit2(), fit3())
-      assemble_curve_params3(fit1(), fit2(), fit3())
-    })
-
-    n_starts_eff <- shiny::reactive(
-      if (isTRUE(input$thorough)) max(input$n_starts, 20) else input$n_starts)
-
-    output$reveal_note <- shiny::renderUI({
-      if (!isTRUE(frozen()))
-        shiny::div(class = "text-muted",
-                   shiny::tags$small("Fit all three single curves (Autofit or ",
-                                     "Simulate) to enable the Advanced-S/A fit."))
-    })
-
-    # The staged result; cleared when the curves / reference / response change.
-    asa_res <- shiny::reactiveVal(NULL)
     sel_row <- shiny::reactiveVal(integer(0))
-    shiny::observeEvent(list(curve_params(), input$reference, input$response), {
-      asa_res(NULL); sel_row(integer(0))
-    }, ignoreInit = TRUE)
-
-    shiny::observeEvent(input$fit_asa, {
-      if (!isTRUE(frozen())) {
-        shiny::showNotification(
-          "Fit all three single curves first (Autofit / Simulate in Stage 1).",
-          type = "warning")
-        return()
-      }
-      res <- shiny::withProgress(message = "Fitting Advanced S/A", value = 0.5, {
-        tryCatch(
-          analyse_ternary(engine_df(), reference = "CA", response = "continuous",
-                          base = curve_params(), n_starts = n_starts_eff(),
-                          time_limit = input$time_limit),
-          error = function(e) {
-            shiny::showNotification(paste("Fit failed:", conditionMessage(e)), type = "error")
-            NULL
-          })
-      })
-      asa_res(res)
-      sel_row(1L)                       # default-select the Overall row
-    })
-
+    shiny::observeEvent(asa_res(), sel_row(1L), ignoreNULL = TRUE)  # default: Overall
     shiny::observeEvent(input$hub_rows_selected, {
       sel_row(input$hub_rows_selected)
     }, ignoreNULL = FALSE, ignoreInit = TRUE)
 
     effect_tbl <- shiny::reactive({
       res <- asa_res(); shiny::req(res)
-      ternary_effect_table(res, engine_df())
+      ternary_effect_table(res, store$raw)
     })
 
     # Hub: Overall row + one row per ternary ratio (joined with the effect table).
@@ -272,7 +170,7 @@ ternary_server <- function(id, meta) {
     })
 
     output$isoplane <- plotly::renderPlotly({
-      res <- asa_res(); shiny::req(res); plot_isoplane(res, engine_df())
+      res <- asa_res(); shiny::req(res); plot_isoplane(res, store$raw)
     })
     output$sigma_tu <- plotly::renderPlotly({
       res <- asa_res(); shiny::req(res); plot_sigma_tu(res)
@@ -295,6 +193,6 @@ ternary_server <- function(id, meta) {
     })
 
     list(asa_res = asa_res, hub_df = hub_df, effect_tbl = effect_tbl,
-         selected_ratio = selected_ratio, frozen = frozen)  # for testability
+         selected_ratio = selected_ratio)  # for testability
   })
 }

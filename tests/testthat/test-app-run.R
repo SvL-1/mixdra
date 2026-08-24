@@ -20,6 +20,12 @@ test_that("run_app is exported and errors clearly when a dependency is missing",
   expect_match(body_txt, "shiny")
 })
 
-test_that("app_ui includes the Ternary Mixture panel", {
-  expect_match(as.character(app_ui()), "ternary-fit_asa", fixed = TRUE)
+test_that("app_ui exposes Introduction, Single Stressor and Campaign", {
+  ui <- app_ui()
+  txt <- paste(as.character(ui), collapse = " ")
+  expect_true(grepl("Introduction", txt))
+  expect_true(grepl("Single Stressor", txt))
+  expect_true(grepl("Campaign", txt))
+  expect_false(grepl("Binary Mixture", txt))
+  expect_false(grepl("Ternary Mixture", txt))
 })

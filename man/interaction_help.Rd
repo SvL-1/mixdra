@@ -2,7 +2,7 @@
 % Please edit documentation in R/app-binary.R
 \name{interaction_help}
 \alias{interaction_help}
-\title{Per-model explanation of the interaction fit (pure, for the Binary tab)}
+\title{Per-model explanation of the interaction fit (pure, for the pair workspace)}
 \usage{
 interaction_help(reference, deviation)
 }

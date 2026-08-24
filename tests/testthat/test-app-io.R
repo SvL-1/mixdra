@@ -86,22 +86,6 @@ test_that("collect_bounds reads a custom parameter set (single tab)", {
   expect_equal(b$lower, c(ec50 = 0.01))
 })
 
-test_that("marginal_df extracts a chemical's single series, renaming its conc to C1", {
-  df <- data.frame(C1 = c(0, 1, 2, 0, 0, 3),
-                   C2 = c(0, 0, 0, 1, 2, 4),
-                   Res = c(100, 60, 40, 70, 50, 10))
-
-  m1 <- marginal_df(df, 1)               # rows where C2 == 0
-  expect_equal(m1$C1, c(0, 1, 2))
-  expect_equal(m1$Res, c(100, 60, 40))
-  expect_false("C2" %in% names(m1))
-
-  m2 <- marginal_df(df, 2)               # rows where C1 == 0; C2 renamed to C1
-  expect_equal(m2$C1, c(0, 1, 2))
-  expect_equal(m2$Res, c(100, 70, 50))
-  expect_false("C2" %in% names(m2))
-})
-
 test_that("assemble_curve_params averages max and keeps per-chemical slope/ec50", {
   f1 <- list(par = c(max = 700, slope = 2, ec50 = 1))
   f2 <- list(par = c(max = 600, slope = 1, ec50 = 5))
@@ -180,21 +164,6 @@ test_that("validate_upload catches a negative C3", {
                ">= 0|negative|0")
 })
 
-test_that("marginal_df3 extracts a chemical's single series (other two == 0)", {
-  df <- data.frame(C1 = c(0, 1, 2, 0, 0, 3),
-                   C2 = c(0, 0, 0, 1, 2, 4),
-                   C3 = c(0, 0, 0, 0, 0, 5),
-                   Res = c(100, 60, 40, 70, 50, 10))
-  m1 <- marginal_df3(df, 1)             # rows where C2 == 0 AND C3 == 0
-  expect_equal(m1$C1, c(0, 1, 2))
-  expect_equal(m1$Res, c(100, 60, 40))
-  expect_false(any(c("C2", "C3") %in% names(m1)))
-
-  m3 <- marginal_df3(df, 3)             # rows where C1 == 0 AND C2 == 0; C3 -> C1
-  expect_equal(m3$C1, c(0))             # only the control row qualifies here
-  expect_equal(m3$Res, c(100))
-})
-
 test_that("assemble_curve_params3 averages max and uses underscore ec50 names", {
   f1 <- list(par = c(max = 870, slope = 4.7, ec50 = 0.13))
   f2 <- list(par = c(max = 872, slope = 13,  ec50 = 5.58))
@@ -205,4 +174,128 @@ test_that("assemble_curve_params3 averages max and uses underscore ec50 names", 
   expect_equal(unname(p[["max"]]), 872)         # mean(870, 872, 874)
   expect_equal(unname(p[["slope2"]]), 13)
   expect_equal(unname(p[["ec50_3"]]), 0.57)
+})
+
+test_that("campaign_chems reports the stressors that are actually dosed", {
+  df <- campaign_fixture()
+  expect_equal(campaign_chems(df), c(1L, 2L, 3L))
+  expect_equal(campaign_n_chem(df), 3L)
+
+  df$C3 <- 0                              # column present but never dosed
+  expect_equal(campaign_chems(df), c(1L, 2L))
+  expect_equal(campaign_n_chem(df), 2L)
+
+  two <- df[c("C1", "C2", "Res")]         # column absent entirely
+  expect_equal(campaign_n_chem(two), 2L)
+})
+
+test_that("single_df keeps the control row and renames the concentration to C1", {
+  df <- campaign_fixture()
+
+  s2 <- single_df(df, 2)
+  expect_equal(names(s2), c("C1", "Res"))
+  expect_equal(s2$C1, c(0, 1, 2, 3))      # shared control + chem-2 series
+  expect_equal(s2$Res, c(100, 92, 84, 76))
+
+  s1 <- single_df(df, 1)                  # chem 1 needs no rename
+  expect_equal(s1$C1, c(0, 1, 2, 3))
+
+  two <- df[df$C3 == 0, c("C1", "C2", "Res")]
+  expect_equal(single_df(two, 2)$C1, c(0, 1, 2, 3))   # works with only C1/C2
+})
+
+test_that("pair_df keeps that pair's rows and renames to C1/C2", {
+  df <- campaign_fixture()
+
+  p23 <- pair_df(df, 2, 3)
+  expect_equal(names(p23), c("C1", "C2", "Res"))
+  expect_equal(p23$C1, c(0, 1, 2, 3, 0, 0, 0, 1, 2))  # C2 became C1
+  expect_equal(p23$C2, c(0, 0, 0, 0, 1, 2, 3, 1, 2))  # C3 became C2
+  expect_equal(nrow(p23), 9L)                         # exactly the C1 == 0 rows
+
+  p12 <- pair_df(df, 1, 2)
+  expect_equal(names(p12), c("C1", "C2", "Res"))
+  expect_equal(nrow(p12), 9)              # control + 3 C1 singles + 3 C2 singles + 2 mixture rows
+  expect_true(all(p12$C1 >= 0))
+})
+
+test_that("pair_df on a two-stressor frame is a no-op slice", {
+  two <- campaign_fixture()[c("C1", "C2", "Res")]
+  two <- two[two$C1 > 0 | two$C2 > 0 | seq_len(nrow(two)) == 1, ]
+  out <- pair_df(two, 1, 2)
+  expect_equal(names(out), c("C1", "C2", "Res"))
+  expect_equal(nrow(out), nrow(two))
+})
+
+test_that("pair_df rejects a descending pair rather than corrupting the frame", {
+  expect_error(pair_df(campaign_fixture(), 2, 1))
+})
+
+test_that("pair_base maps a three-stressor campaign base onto one pair's binary names", {
+  base3 <- c(max = 872.2065, slope1 = 4.6740, slope2 = 11.2592, slope3 = 3.6291,
+            ec50_1 = 0.12747, ec50_2 = 34.6707, ec50_3 = 0.57505)
+
+  p13 <- pair_base(base3, 1, 3)
+  expect_equal(names(p13), c("max", "slope1", "slope2", "ec501", "ec502"))
+  expect_equal(unname(p13[["max"]]),    872.2065)
+  expect_equal(unname(p13[["slope1"]]), 4.6740)
+  # stressor 3's slope/EC50 land in slot 2 -- NOT stressor 2's (11.2592 /
+  # 34.6707), which is the exact mis-mapping the bug produced. Stressor 2's
+  # EC50 (~34.7) and stressor 3's (~0.575) are nearly two orders of magnitude
+  # apart, so a wrong mapping is unmissable.
+  expect_equal(unname(p13[["slope2"]]), 3.6291)
+  expect_equal(unname(p13[["ec501"]]),  0.12747)
+  expect_equal(unname(p13[["ec502"]]),  0.57505)
+
+  p23 <- pair_base(base3, 2, 3)
+  expect_equal(unname(p23[["slope1"]]), 11.2592)
+  expect_equal(unname(p23[["slope2"]]), 3.6291)
+  expect_equal(unname(p23[["ec501"]]),  34.6707)
+  expect_equal(unname(p23[["ec502"]]),  0.57505)
+})
+
+test_that("pair_base passes a two-stressor campaign base through unchanged", {
+  base2 <- c(max = 800, slope1 = 2, slope2 = 3, ec501 = 0.1, ec502 = 0.5)
+  expect_identical(pair_base(base2, 1, 2), base2)
+})
+
+test_that("campaign schema requires C1/C2 and treats C3 as optional", {
+  expect_equal(upload_schema("campaign", "continuous"), c("C1", "C2", "Res"))
+  expect_equal(upload_schema("campaign", "quantal"),
+               c("C1", "C2", "Affected", "Exposed"))
+})
+
+test_that("the campaign template is a full three-stressor campaign", {
+  tpl <- template_df("campaign", "continuous")
+  expect_true(all(c("C1", "C2", "C3", "Res") %in% names(tpl)))
+  cls <- classify_rows(tpl)
+  expect_true(all(c("control", "single", "binary", "ternary") %in%
+                  as.character(cls)))
+})
+
+test_that("a well-formed campaign validates clean", {
+  expect_equal(validate_upload(campaign_fixture(), "campaign", "continuous"),
+               character(0))
+})
+
+test_that("a campaign needs at least two dosed stressors", {
+  df <- campaign_fixture()
+  df$C2 <- 0
+  df$C3 <- 0
+  errs <- validate_upload(df, "campaign", "continuous")
+  expect_true(any(grepl("at least two stressors", errs)))
+})
+
+test_that("each single series needs 4 distinct concentrations", {
+  df <- campaign_fixture()
+  df <- df[!(df$C2 > 0 & df$C1 == 0 & df$C3 == 0 & df$C2 > 2), ]  # thin chem 2
+  errs <- validate_upload(df, "campaign", "continuous")
+  expect_true(any(grepl("Stressor 2", errs)))
+  expect_true(any(grepl("distinct concentrations", errs)))
+})
+
+test_that("a pair with no mixture rows is NOT an error (the sub-tab disables instead)", {
+  df <- campaign_fixture()
+  df <- df[!(df$C2 > 0 & df$C3 > 0), ]     # drop every 2x3 mixture row
+  expect_equal(validate_upload(df, "campaign", "continuous"), character(0))
 })

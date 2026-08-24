@@ -2,16 +2,18 @@
 # are fully unit-testable and run without the UI stack installed.
 
 #' Fixed column schema for a stage and response type
-#' @param stage "single", "binary", or "ternary".
+#' @param stage "single", "binary", "ternary", or "campaign".
 #' @param response "continuous" or "quantal".
 #' @return Character vector of required column names.
 #' @keywords internal
 upload_schema <- function(stage, response) {
-  stage <- match.arg(stage, c("single", "binary", "ternary"))
+  stage <- match.arg(stage, c("single", "binary", "ternary", "campaign"))
   response <- match.arg(response, c("continuous", "quantal"))
   if (stage == "single") {
     if (response == "continuous") c("Conc", "Res") else c("Conc", "Affected", "Exposed")
-  } else if (stage == "binary") {
+  } else if (stage == "binary" || stage == "campaign") {
+    # A campaign REQUIRES C1/C2; C3 is optional and makes it a three-stressor
+    # campaign. Optionality is enforced in validate_upload(), not the schema.
     if (response == "continuous") c("C1", "C2", "Res") else c("C1", "C2", "Affected", "Exposed")
   } else {
     if (response == "continuous") c("C1", "C2", "C3", "Res")
@@ -23,11 +25,14 @@ upload_schema <- function(stage, response) {
 #'
 #' Returns a small, illustrative dataset with exactly the schema columns. The
 #' binary template includes single-chemical rows (one chemical at 0) because
-#' [mixdra::analyse_mixture()] seeds itself from them.
+#' [mixdra::analyse_mixture()] seeds itself from them. The campaign template is
+#' the full ternary template with all four strata.
 #' @inheritParams upload_schema
 #' @return A data frame the user can download, fill in, and re-upload.
 #' @keywords internal
 template_df <- function(stage, response) {
+  # A campaign template IS the ternary template: all four strata in one frame.
+  if (stage == "campaign") stage <- "ternary"
   cols <- upload_schema(stage, response)
   if (stage == "single") {
     conc <- c(0, 0.1, 0.3, 1, 3, 10)
@@ -67,7 +72,8 @@ template_df <- function(stage, response) {
 
 #' Validate an uploaded data frame against the fixed schema
 #'
-#' @inheritParams upload_schema
+#' @param stage "single", "binary", "ternary", or "campaign".
+#' @param response "continuous" or "quantal".
 #' @param df The uploaded data frame.
 #' @return Character vector of human-readable error messages; empty if valid.
 #' @keywords internal
@@ -113,6 +119,27 @@ validate_upload <- function(df, stage, response) {
                              "per-ratio A4 step needs at least one ternary mixture."))
   }
 
+  if (stage == "campaign") {
+    cols <- intersect(c("C1", "C2", "C3"), present)
+    ok   <- cols[vapply(df[cols], is.numeric, logical(1))]
+    if (length(ok) >= 2) {
+      chems <- campaign_chems(df[ok])
+      if (length(chems) < 2) {
+        errs <- c(errs, paste0(
+          "A campaign needs at least two stressors with a positive ",
+          "concentration; found ", length(chems), "."))
+      } else {
+        for (k in chems) {
+          nd <- length(unique(stats::na.omit(single_df(df, k)$C1)))
+          if (nd < 4)
+            errs <- c(errs, paste0(
+              "Stressor ", k, " has only ", nd, " distinct concentrations in ",
+              "its single-stressor series; at least 4 are needed to fit a curve."))
+        }
+      }
+    }
+  }
+
   errs
 }
 
@@ -136,26 +163,6 @@ to_engine_df <- function(df, stage) {
   df
 }
 
-#' One chemical's single-compound series from a binary frame
-#'
-#' Keeps the rows where the *other* chemical's concentration is 0 (so the shared
-#' control row is included), drops the other concentration column, and renames
-#' this chemical's concentration column to `C1`. The result has the shape a
-#' single-chemical fitter expects (`C1` + response columns).
-#' @param df Binary engine data frame (`C1`, `C2`, response columns).
-#' @param chem 1 or 2 — which chemical's marginal series to extract.
-#' @return A data frame with `C1` and the response columns.
-#' @keywords internal
-marginal_df <- function(df, chem) {
-  this  <- paste0("C", chem)
-  other <- paste0("C", if (chem == 1) 2 else 1)
-  out <- df[df[[other]] == 0, , drop = FALSE]
-  out[[other]] <- NULL
-  names(out)[names(out) == this] <- "C1"
-  rownames(out) <- NULL
-  out
-}
-
 #' Frozen curve-parameter vector from two single-chemical fits
 #'
 #' Builds the named vector `analyse_mixture(start = …)` holds fixed: a shared
@@ -171,28 +178,6 @@ assemble_curve_params <- function(fit1, fit2) {
     slope2 = fit2$par[["slope"]],
     ec501  = fit1$par[["ec50"]],
     ec502  = fit2$par[["ec50"]])
-}
-
-#' One chemical's single-compound series from a ternary frame
-#'
-#' Keeps rows where the OTHER TWO chemicals are 0 (so the shared control row is
-#' included), drops their columns, and renames this chemical's concentration
-#' column to `C1` — the shape a single-chemical fitter expects. The ternary
-#' analogue of [marginal_df()].
-#' @param df Ternary engine data frame (`C1`, `C2`, `C3`, response columns).
-#' @param chem 1, 2 or 3 — which chemical's marginal series to extract.
-#' @return A data frame with `C1` and the response columns.
-#' @keywords internal
-marginal_df3 <- function(df, chem) {
-  cols  <- paste0("C", 1:3)
-  this  <- paste0("C", chem)
-  other <- setdiff(cols, this)
-  keep  <- df[[other[1]]] == 0 & df[[other[2]]] == 0
-  out   <- df[keep, , drop = FALSE]
-  out[other] <- NULL
-  names(out)[names(out) == this] <- "C1"
-  rownames(out) <- NULL
-  out
 }
 
 #' Frozen ternary base-parameter vector from three single-chemical fits
@@ -213,6 +198,104 @@ assemble_curve_params3 <- function(fit1, fit2, fit3) {
     ec50_1 = fit1$par[["ec50"]],
     ec50_2 = fit2$par[["ec50"]],
     ec50_3 = fit3$par[["ec50"]])
+}
+
+#' Which stressors a campaign frame actually doses
+#'
+#' A concentration column that is present but never positive (e.g. a `C3` of
+#' zeros pasted in by mistake) does not count — the campaign is then a
+#' two-stressor one.
+#' @param df Campaign data frame with `C1`, `C2` and optionally `C3`.
+#' @return Integer vector of stressor indices, e.g. `c(1L, 2L)`.
+#' @keywords internal
+campaign_chems <- function(df) {
+  cols <- intersect(c("C1", "C2", "C3"), names(df))
+  act  <- cols[vapply(df[cols], function(x) any(x > 0, na.rm = TRUE), logical(1))]
+  as.integer(sub("^C", "", act))
+}
+
+#' Number of stressors in a campaign frame
+#' @inheritParams campaign_chems
+#' @return 2 or 3 (or fewer, which [validate_upload()] rejects).
+#' @keywords internal
+campaign_n_chem <- function(df) length(campaign_chems(df))
+
+#' Rows where every stressor outside `keep` is absent
+#'
+#' The shared core of [single_df()] and [pair_df()]: keeps the rows where every
+#' concentration column NOT in `keep` is 0 (so the shared control row always
+#' comes along), then drops those columns. Renaming is left to the caller,
+#' which knows whether it wants `C1` or `C1`/`C2`.
+#' @param df Campaign data frame.
+#' @param keep Character vector of concentration columns to retain.
+#' @return A data frame with the non-kept concentration columns removed.
+#' @keywords internal
+slice_to_chems <- function(df, keep) {
+  cols  <- intersect(c("C1", "C2", "C3"), names(df))
+  other <- setdiff(cols, keep)
+  rows  <- if (length(other))
+    Reduce(`&`, lapply(other, function(k) df[[k]] == 0)) else rep(TRUE, nrow(df))
+  out <- df[rows, , drop = FALSE]
+  out[other] <- NULL
+  rownames(out) <- NULL
+  out
+}
+
+#' One stressor's single-stressor series from a campaign frame
+#'
+#' Keeps the rows where every OTHER stressor is 0 (so the shared control row is
+#' included), drops their columns, and renames this stressor's concentration
+#' column to `C1` — the shape a single-stressor fitter expects. Generalises
+#' the old per-arity marginal-series extraction to 2- or 3-stressor frames.
+#' @inheritParams campaign_chems
+#' @param chem 1, 2 or 3 — which stressor's series to extract.
+#' @return A data frame with `C1` and the response columns.
+#' @keywords internal
+single_df <- function(df, chem) {
+  this <- paste0("C", chem)
+  out <- slice_to_chems(df, this)
+  names(out)[names(out) == this] <- "C1"
+  out
+}
+
+#' One pair's rows from a campaign frame
+#'
+#' Keeps the rows where the third stressor is 0 (so the singles and the shared
+#' control come along, exactly as the binary fitter expects), drops its column,
+#' and renames the pair's concentration columns to `C1`/`C2`.
+#' @inheritParams campaign_chems
+#' @param i,j Stressor indices of the pair, `i < j`.
+#' @return A data frame with `C1`, `C2` and the response columns.
+#' @keywords internal
+pair_df <- function(df, i, j) {
+  stopifnot(i < j)
+  this <- paste0("C", c(i, j))
+  out <- slice_to_chems(df, this)
+  names(out)[names(out) == this[1]] <- "C1"
+  names(out)[names(out) == this[2]] <- "C2"
+  out
+}
+
+#' Map a campaign base onto one pair's binary parameter names
+#'
+#' A three-stressor campaign base is named for the ternary registry
+#' (`slope1..3`, `ec50_1..3`), but each pair is fitted with the two-chemical
+#' model, whose registry uses `slope1`, `slope2`, `ec501`, `ec502`. This selects
+#' the pair's two stressors and renames them into that binary shape, so the
+#' frozen curves are actually held fixed. A two-stressor campaign base is
+#' already in binary shape and passes through unchanged.
+#' @param base Campaign base parameters, from [campaign_base()].
+#' @param i,j Stressor indices of the pair, `i < j`.
+#' @return A named numeric vector: `max`, `slope1`, `slope2`, `ec501`, `ec502`.
+#' @keywords internal
+pair_base <- function(base, i, j) {
+  stopifnot(i < j)
+  if (all(c("ec501", "ec502") %in% names(base))) return(base)   # already binary
+  c(max    = unname(base[["max"]]),
+    slope1 = unname(base[[paste0("slope", i)]]),
+    slope2 = unname(base[[paste0("slope", j)]]),
+    ec501  = unname(base[[paste0("ec50_", i)]]),
+    ec502  = unname(base[[paste0("ec50_", j)]]))
 }
 
 #' Assemble lower/upper bound vectors from Advanced-panel inputs
