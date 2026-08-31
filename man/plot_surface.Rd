@@ -4,7 +4,7 @@
 \alias{plot_surface}
 \title{Plot the fitted 3-D response surface of a binary mixture}
 \usage{
-plot_surface(fit, df, n = 100)
+plot_surface(fit, df, n = 100, labels = NULL)
 }
 \arguments{
 \item{fit}{An enriched binary fit from \code{\link[=fit_model]{fit_model()}}.}
@@ -12,6 +12,9 @@ plot_surface(fit, df, n = 100)
 \item{df}{The data frame the fit was built from.}
 
 \item{n}{Grid resolution per axis (default 100).}
+
+\item{labels}{Optional named list of axis titles (\code{x}, \code{y}, \code{z}) overriding
+the concentration column names.}
 }
 \value{
 A plotly object.

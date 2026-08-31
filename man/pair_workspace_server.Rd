@@ -11,7 +11,8 @@ pair_workspace_server(
   reference,
   response,
   base_version = NULL,
-  on_fit = NULL
+  on_fit = NULL,
+  labels = NULL
 )
 }
 \arguments{

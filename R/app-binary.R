@@ -190,8 +190,13 @@ pair_workspace_ui <- function(id) {
 #'   unchanged outside the campaign tab.
 #' @keywords internal
 pair_workspace_server <- function(id, fit_df, base, reference, response,
-                                  base_version = NULL, on_fit = NULL) {
+                                  base_version = NULL, on_fit = NULL,
+                                  labels = NULL) {
   shiny::moduleServer(id, function(input, output, session) {
+
+    # Axis titles for this pair's plots: the stressor names/units from the
+    # Introduction tab, falling back to the C1/C2 column names.
+    axis_labs <- function() if (is.null(labels)) NULL else labels()
 
     output$thorough_note <- shiny::renderUI({
       if (isTRUE(input$thorough))
@@ -459,12 +464,13 @@ pair_workspace_server <- function(id, fit_df, base, reference, response,
       # that model's surface (display_fit()).
       f <- display_fit()
       if (is.null(f) && isTRUE(!is.null(base()))) f <- reference_fit_live()
-      plot_surface(f, fit_df())
+      plot_surface(f, fit_df(), labels = axis_labs())
     })
     output$isobole <- plotly::renderPlotly({
       shiny::req(!is.null(base()), display_fit())
       ref <- if (!is.null(last_compare())) last_compare()$fits$reference else NULL
-      plot_isobole(display_fit(), fit_df(), reference_fit = ref)
+      plot_isobole(display_fit(), fit_df(), reference_fit = ref,
+                   labels = axis_labs())
     })
     output$op <- plotly::renderPlotly({
       shiny::req(!is.null(base()), display_fit()); plot_obs_pred(display_fit(), fit_df())

@@ -87,6 +87,22 @@ plot_obs_pred <- function(fit, df) {
                  yaxis = list(title = "predicted (ŷ)"))
 }
 
+#' Resolve axis titles from an optional override
+#'
+#' Plot axes default to the concentration column names (`C1`, `C2`, ...). The
+#' app overrides them with the stressor names and units entered on the
+#' Introduction tab, so a plot reads "CPF (mg/kg dry soil)" rather than "C1".
+#' @param labels Optional named list of overrides, e.g. `list(x = "CPF")`.
+#' @param defaults Named list of fallback titles.
+#' @return `defaults`, with any name present in `labels` replaced.
+#' @keywords internal
+axis_titles <- function(labels, defaults) {
+  if (is.null(labels)) return(defaults)
+  for (k in names(defaults))
+    if (!is.null(labels[[k]]) && nzchar(labels[[k]])) defaults[[k]] <- labels[[k]]
+  defaults
+}
+
 #' Plot the fitted 3-D response surface of a binary mixture
 #'
 #' Observed points (`scatter3d`) overlaid on the fitted response surface, as an
@@ -94,14 +110,17 @@ plot_obs_pred <- function(fit, df) {
 #' @param fit An enriched binary fit from [fit_model()].
 #' @param df The data frame the fit was built from.
 #' @param n Grid resolution per axis (default 100).
+#' @param labels Optional named list of axis titles (`x`, `y`, `z`) overriding
+#'   the concentration column names.
 #' @return A plotly object.
 #' @export
-plot_surface <- function(fit, df, n = 100) {
+plot_surface <- function(fit, df, n = 100, labels = NULL) {
   require_plotly()
   # With fit = NULL, show only the observed point cloud (raw data, before any
   # fit) -- mirrors plot_dose_response(NULL, ...). The fitted surface is added
   # once a model exists.
   if (is.null(fit)) {
+    ax <- axis_titles(labels, list(x = "C1", y = "C2", z = "response"))
     obs <- data.frame(x = df$C1, y = df$C2, z = obs_response(df))
     p <- plotly::plot_ly()
     p <- plotly::add_trace(p, x = obs$x, y = obs$y, z = obs$z,
@@ -111,8 +130,8 @@ plot_surface <- function(fit, df, n = 100) {
       margin = list(l = 0, r = 0, b = 0, t = 0),
       scene = list(
         domain = list(x = c(0, 1), y = c(0, 1)),
-        xaxis = list(title = "C1"), yaxis = list(title = "C2"),
-        zaxis = list(title = "response"))))
+        xaxis = list(title = ax$x), yaxis = list(title = ax$y),
+        zaxis = list(title = ax$z))))
   }
   g <- surface_grid_data(fit, df, n = n)
   p <- plotly::plot_ly()
@@ -122,13 +141,15 @@ plot_surface <- function(fit, df, n = 100) {
   p <- plotly::add_surface(p, x = g$x_vals, y = g$y_vals, z = g$z,
                            opacity = 0.8, showscale = FALSE)
   # Trim the surrounding white space and let the 3-D scene fill the card.
+  ax <- axis_titles(labels,
+                    list(x = g$labels$x, y = g$labels$y, z = "response"))
   plotly::layout(p,
     margin = list(l = 0, r = 0, b = 0, t = 0),
     scene = list(
       domain = list(x = c(0, 1), y = c(0, 1)),
-      xaxis = list(title = g$labels$x),
-      yaxis = list(title = g$labels$y),
-      zaxis = list(title = "response")))
+      xaxis = list(title = ax$x),
+      yaxis = list(title = ax$y),
+      zaxis = list(title = ax$z)))
 }
 
 #' Plot 2-D isoboles (equal-response contours) of a binary mixture
@@ -143,10 +164,12 @@ plot_surface <- function(fit, df, n = 100) {
 #'   `c(0.1, 0.25, 0.5, 0.75, 0.9)`).
 #' @param reference_fit Optional enriched reference fit to overlay (dashed).
 #' @param n Grid resolution per axis.
+#' @param labels Optional named list of axis titles (`x`, `y`) overriding the
+#'   concentration column names.
 #' @return A plotly object.
 #' @export
 plot_isobole <- function(fit, df, levels = c(0.1, 0.25, 0.5, 0.75, 0.9),
-                         reference_fit = NULL, n = 100) {
+                         reference_fit = NULL, n = 100, labels = NULL) {
   require_plotly()
   d <- isobole_data(fit, df, levels = levels, reference_fit = reference_fit, n = n)
   labs <- attr(d, "labels")
@@ -159,7 +182,8 @@ plot_isobole <- function(fit, df, levels = c(0.1, 0.25, 0.5, 0.75, 0.9),
                            line = list(color = if (is_ref) "red" else "black",
                                        dash  = if (is_ref) "dash" else "solid"))
   }
-  plotly::layout(p, xaxis = list(title = labs$x), yaxis = list(title = labs$y))
+  ax <- axis_titles(labels, list(x = labs$x, y = labs$y))
+  plotly::layout(p, xaxis = list(title = ax$x), yaxis = list(title = ax$y))
 }
 
 #' Plot the EC50 isoplane of a ternary mixture
@@ -170,9 +194,11 @@ plot_isobole <- function(fit, df, levels = c(0.1, 0.25, 0.5, 0.75, 0.9),
 #' @param res An [analyse_ternary()] result.
 #' @param df The data frame the fit was built from (passed to [ec50_markers()]).
 #' @param n Isoplane grid resolution per simplex edge (default 30).
+#' @param labels Optional named list of axis titles (`x`, `y`, `z`) overriding
+#'   the concentration column names.
 #' @return A plotly object.
 #' @export
-plot_isoplane <- function(res, df = NULL, n = 30) {
+plot_isoplane <- function(res, df = NULL, n = 30, labels = NULL) {
   require_plotly()
   d <- isoplane_plot_data(res, df, n = n)
   cols <- c("CA+S/A" = "orange", "CA+S/A+S/A" = "blue", "EC50" = "red")
@@ -185,9 +211,10 @@ plot_isoplane <- function(res, df = NULL, n = 30) {
                            type = "scatter3d", mode = "markers", name = s,
                            marker = list(size = sizes[[s]], color = cols[[s]]))
   }
-  plotly::layout(p, scene = list(xaxis = list(title = "C1"),
-                                 yaxis = list(title = "C2"),
-                                 zaxis = list(title = "C3")))
+  ax <- axis_titles(labels, list(x = "C1", y = "C2", z = "C3"))
+  plotly::layout(p, scene = list(xaxis = list(title = ax$x),
+                                 yaxis = list(title = ax$y),
+                                 zaxis = list(title = ax$z)))
 }
 
 #' Plot Sigma-TU vs z for a ternary mixture

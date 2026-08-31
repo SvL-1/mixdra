@@ -170,7 +170,11 @@ ternary_server <- function(id, store) {
     })
 
     output$isoplane <- plotly::renderPlotly({
-      res <- asa_res(); shiny::req(res); plot_isoplane(res, store$raw)
+      res <- asa_res(); shiny::req(res)
+      plot_isoplane(res, store$raw, labels = list(
+        x = axis_label(store, "chem1"),
+        y = axis_label(store, "chem2"),
+        z = axis_label(store, "chem3")))
     })
     output$sigma_tu <- plotly::renderPlotly({
       res <- asa_res(); shiny::req(res); plot_sigma_tu(res)

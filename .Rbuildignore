@@ -13,3 +13,6 @@
 ^MixTox.*\.xls.*$
 ^vignettes/methodology\.Rmd\.orig$
 ^vignettes/precompute\.R$
+^LICENSE\.md$
+^CITATION\.cff$
+^\.github$

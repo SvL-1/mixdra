@@ -1,0 +1,78 @@
+cff-version: 1.2.0
+title: "mixdra: Mixture Dose-Response Analysis"
+message: "If you use this software, please cite both the software and the paper it implements."
+type: software
+authors:
+  - given-names: Sam
+    family-names: van Loon
+    affiliation: "Amsterdam Institute for Life and Environment (A-LIFE), Vrije Universiteit Amsterdam"
+  - given-names: Jelle
+    family-names: Kalsbeek
+  - given-names: Ge
+    family-names: Xie
+    affiliation: "Institute for Biodiversity and Ecosystem Dynamics, University of Amsterdam"
+repository-code: "https://github.com/SvL-1/mixdra"
+abstract: >-
+  An R package implementing the Jonker et al. (2005) mixture dose-response
+  methodology. Fits single-chemical and binary/ternary mixture models using the
+  concentration addition and independent action reference models, quantifies
+  synergistic/antagonistic, dose-ratio-dependent and dose-level-dependent
+  deviations from additivity, and selects the supported interaction pattern by
+  likelihood-ratio testing. Ships with a Shiny dashboard for non-programmers.
+keywords:
+  - mixture toxicity
+  - dose-response
+  - ecotoxicology
+  - concentration addition
+  - independent action
+  - R
+license: GPL-3.0-or-later
+references:
+  - type: article
+    title: "Microplastics and PFAS as ubiquitous pollutants affect potencies of highly toxic chemicals in mixtures"
+    doi: 10.1016/j.jhazmat.2025.140493
+    year: 2025
+    journal: "Journal of Hazardous Materials"
+    volume: 500
+    start: 140493
+    authors:
+      - given-names: Sam
+        family-names: van Loon
+      - given-names: Ge
+        family-names: Xie
+      - given-names: Claus
+        family-names: Svendsen
+      - given-names: Michiel H. S.
+        family-names: Kraak
+      - given-names: Lotte
+        family-names: de Jeu
+      - given-names: Nienke C.
+        family-names: Schut
+      - given-names: Eva
+        family-names: Sprokkereef
+      - given-names: Rachel
+        family-names: Hurley
+      - given-names: Annemarie P.
+        family-names: van Wezel
+      - given-names: Cornelis A. M.
+        family-names: van Gestel
+  - type: article
+    title: "Significance testing of synergistic/antagonistic, dose level-dependent, or dose ratio-dependent effects in mixture dose-response analysis"
+    doi: 10.1897/04-431R.1
+    year: 2005
+    journal: "Environmental Toxicology and Chemistry"
+    volume: 24
+    issue: 10
+    start: 2701
+    end: 2713
+    authors:
+      - given-names: Martijs J.
+        family-names: Jonker
+      - given-names: Claus
+        family-names: Svendsen
+      - given-names: Jacques J. M.
+        family-names: Bedaux
+      - given-names: Marinus
+        family-names: Bongers
+      - given-names: Jan E.
+        family-names: Kammenga

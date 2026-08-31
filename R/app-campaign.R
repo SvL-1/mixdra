@@ -175,7 +175,14 @@ campaign_server <- function(id, meta) {
         response     = shiny::reactive(
           if (identical(store$response, "quantal")) "binary" else "continuous"),
         base_version = shiny::reactive(store$base_version),
-        on_fit = function(res) store$pairs[[k]] <- res)
+        on_fit = function(res) store$pairs[[k]] <- res,
+        # Label the pair's plots with the stressor names/units and the endpoint
+        # from the Introduction tab, as that tab promises.
+        labels = shiny::reactive(list(
+          x = axis_label(store, paste0("chem", pp[1])),
+          y = axis_label(store, paste0("chem", pp[2])),
+          z = if (!is.null(store$endpoint) && nzchar(store$endpoint))
+                store$endpoint else "response")))
     })
 
     ternary_server("ternary", store)

@@ -3,7 +3,16 @@ test_that("model_spec handles ternary CA selections", {
   expect_equal(ref$params,
                c("max", "slope1", "slope2", "slope3",
                  "ec50_1", "ec50_2", "ec50_3"))
-  expect_identical(ref$fn, ca_tri_vec)
+  # Since the model-unification migration `$fn` is the adapter closure, not the
+  # legacy predictor, so identity no longer holds. What must hold is that it
+  # reproduces the legacy oracle's numbers (cf. test-adapter.R).
+  g <- expand.grid(c1 = c(0, 0.04, 0.16), c2 = c(0, 0.5, 2), c3 = c(0, 2, 8))
+  expect_equal(
+    unname(ref$fn(c1 = g$c1, c2 = g$c2, c3 = g$c3, max = 800,
+                  slope1 = 4, slope2 = 1.5, slope3 = 1,
+                  ec50_1 = 0.08, ec50_2 = 1, ec50_3 = 5)),
+    unname(ca_tri_vec(g$c1, g$c2, g$c3, 800, 4, 1.5, 1, 0.08, 1, 5)),
+    tolerance = 1e-4)
   expect_equal(model_spec("CA", "SA", 3)$extra, "a")
 })
 

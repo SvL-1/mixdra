@@ -9,11 +9,17 @@
 Fits single-chemical and binary/ternary mixture dose-response models using the concentration addition and independent action reference models with synergism/antagonism, dose-ratio-dependent, and dose-level-dependent deviation patterns, following Jonker et al. (2005) \doi{10.1897/04-431R.1}. Supports continuous and binary (quantal) responses and likelihood-ratio model comparison.
 }
 \author{
-\strong{Maintainer}: Mixdra Authors \email{pieter.vklaveren@gmail.com}
+\strong{Maintainer}: Sam van Loon \email{samvanloon94@hotmail.com}
 
 Authors:
 \itemize{
-  \item Mixdra Authors \email{pieter.vklaveren@gmail.com}
+  \item Sam van Loon \email{samvanloon94@hotmail.com}
+  \item Jelle Kalsbeek
+}
+
+Other contributors:
+\itemize{
+  \item Ge Xie (reference implementation for the plotting layer) [contributor]
 }
 
 }

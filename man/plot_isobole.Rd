@@ -9,7 +9,8 @@ plot_isobole(
   df,
   levels = c(0.1, 0.25, 0.5, 0.75, 0.9),
   reference_fit = NULL,
-  n = 100
+  n = 100,
+  labels = NULL
 )
 }
 \arguments{
@@ -23,6 +24,9 @@ plot_isobole(
 \item{reference_fit}{Optional enriched reference fit to overlay (dashed).}
 
 \item{n}{Grid resolution per axis.}
+
+\item{labels}{Optional named list of axis titles (\code{x}, \code{y}) overriding the
+concentration column names.}
 }
 \value{
 A plotly object.

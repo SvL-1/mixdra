@@ -4,7 +4,7 @@
 \alias{plot_isoplane}
 \title{Plot the EC50 isoplane of a ternary mixture}
 \usage{
-plot_isoplane(res, df = NULL, n = 30)
+plot_isoplane(res, df = NULL, n = 30, labels = NULL)
 }
 \arguments{
 \item{res}{An \code{\link[=analyse_ternary]{analyse_ternary()}} result.}
@@ -12,6 +12,9 @@ plot_isoplane(res, df = NULL, n = 30)
 \item{df}{The data frame the fit was built from (passed to \code{\link[=ec50_markers]{ec50_markers()}}).}
 
 \item{n}{Isoplane grid resolution per simplex edge (default 30).}
+
+\item{labels}{Optional named list of axis titles (\code{x}, \code{y}, \code{z}) overriding
+the concentration column names.}
 }
 \value{
 A plotly object.
