@@ -70,15 +70,22 @@ For **1, 2, or 3 chemicals**, `mixdra`:
 
 ## What it looks like
 
-A campaign is one uploaded file covering two or three stressors. `mixdra` fits each
-stressor's curve once, holds those curves fixed, and then fits the interaction terms
-for every pair — so an interaction shows up as `a`/`b`, rather than being quietly
-absorbed by refitted curves.
+**Start with one chemical.** Everything in `mixdra` is built on the three-parameter
+log-logistic curve, so that is where the app starts too: upload concentrations and
+responses, and read off the upper asymptote, the slope and the EC50 with the fitted
+curve beside them. Here, chlorpyrifos against the reproduction of *Folsomia candida*:
+
+![Single Stressor tab: fitted parameters beside the dose-response curve](man/figures/single-stressor-curve.png)
+
+**Then the mixture.** A campaign is one uploaded file covering two or three stressors.
+`mixdra` fits each stressor's curve once, holds those curves fixed, and then fits the
+interaction terms for every pair — so an interaction shows up as `a`/`b`, rather than
+being quietly absorbed by refitted curves.
 
 **The model comparison.** Each pair's reference, S/A, DR and DL models side by side,
 with the likelihood-ratio test against the parent model and the selected (most
 parsimonious) model highlighted. Here the dose-level-dependent model wins for
-chlorpyrifos × FBSA (*p* = 0.033) on the reproduction of *Folsomia candida*:
+chlorpyrifos × FBSA (*p* = 0.033):
 
 ![Campaign pair tab: the interaction model comparison table, with the DL model selected](man/figures/campaign-model-comparison.png)
 
