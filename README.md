@@ -2,6 +2,16 @@
 
 **Mixture dose–response analysis in R — the Jonker et al. (2005) method, made reproducible.**
 
+[![R-CMD-check](https://github.com/SvL-1/mixdra/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/SvL-1/mixdra/actions/workflows/R-CMD-check.yaml)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
+
+> **Pre-release.** `mixdra` is under active development and validation. The
+> science is settled — the engine reproduces the published Excel/VBA results and
+> recovers known parameters from synthetic data — but the API may still change,
+> and a few rough edges are tracked in the issues. Please get in touch before
+> using it for published work, so we can tell you what is and isn't nailed down.
+
 `mixdra` fits single-chemical and **binary/ternary mixture** dose–response models, detects and
 quantifies how mixtures *deviate* from additivity (synergism, antagonism, dose-ratio- and
 dose-level-dependent interactions), and tells you **which interaction pattern the data actually
@@ -35,6 +45,12 @@ makes it a proper instrument: a pure computational engine (no spreadsheet, no GU
 regression test suite pinned against the original Excel results, wrapped in a modern Shiny
 dashboard.
 
+**Why trust that it is the same method.** Claus Svendsen is a co-author of *both* papers —
+the 2005 paper that defines the methodology and the 2025 study that applies it here. This
+implementation is not a third party's reading of a twenty-year-old method; it runs the line
+straight from the people who defined it, and every model is checked against the original
+workbooks that produced the published results.
+
 ## What it does
 
 For **1, 2, or 3 chemicals**, `mixdra`:
@@ -51,6 +67,26 @@ For **1, 2, or 3 chemicals**, `mixdra`:
   model** — the simplest description the data don't reject;
 - handles both **continuous** responses (sum-of-squares objective) and **binary / quantal**
   responses (binomial likelihood, *exposed* / *affected* counts).
+
+## What it looks like
+
+A campaign is one uploaded file covering two or three stressors. `mixdra` fits each
+stressor's curve once, holds those curves fixed, and then fits the interaction terms
+for every pair — so an interaction shows up as `a`/`b`, rather than being quietly
+absorbed by refitted curves.
+
+**The model comparison.** Each pair's reference, S/A, DR and DL models side by side,
+with the likelihood-ratio test against the parent model and the selected (most
+parsimonious) model highlighted. Here the dose-level-dependent model wins for
+chlorpyrifos × FBSA (*p* = 0.033) on the reproduction of *Folsomia candida*:
+
+![Campaign pair tab: the interaction model comparison table, with the DL model selected](man/figures/campaign-model-comparison.jpg)
+
+**The diagnostics.** The selected model's fitted response surface and its isoboles
+against the additivity reference (dashed, red), so departures from additivity are
+visible rather than inferred from a number:
+
+![Stage 3 diagnostics: 3-D response surface and 2-D isoboles versus the reference](man/figures/campaign-diagnostics.jpg)
 
 ## Features
 
@@ -185,8 +221,9 @@ devtools::test(filter = "recovery")
 **In scope (v1):** single + binary + ternary mixtures; CA and IA references; S/A, DR, DL, and
 Advanced S/A deviations; continuous and quantal responses; run-locally Shiny app.
 
-**Out of scope (for now):** hosted/click-a-link web deployment; more than 3 chemicals;
-non-monotonic (J-shaped / hormesis) curves.
+**Out of scope (for now):** more than 3 chemicals; non-monotonic (J-shaped / hormesis)
+curves. There is deliberately no hosted web version: the app runs locally, so your data
+never leaves your machine.
 
 ## Citation
 
@@ -204,8 +241,22 @@ and is based on the underlying methodology of:
 > mixture dose–response analysis. *Environmental Toxicology and Chemistry*, 24(10), 2701–2713.
 > https://doi.org/10.1897/04-431R.1
 
-Please cite both if you use this package in published work.
+Please cite both if you use this package in published work. A machine-readable
+[`CITATION.cff`](CITATION.cff) is included, so GitHub's "Cite this repository" button
+gives you the entry directly.
+
+The raw survival and reproduction data behind the 2025 study are openly archived on
+Zenodo: [doi:10.5281/zenodo.14961673](https://doi.org/10.5281/zenodo.14961673). Paper,
+data, and code are therefore all citable and linked.
+
+## Funding
+
+The research this package implements was funded by the **PAPILLIONS** and **PARC**
+projects under the European Union's Research and Innovation Framework Programmes
+(Horizon 2020 grant agreement No 101000210 and Horizon Europe agreement No 101057014),
+and by the Open Technology Programme of the Netherlands Organisation for Scientific
+Research (NWO), domain Applied and Engineering Sciences (TTW), project number 18725.
 
 ## License
 
-GPL-3.
+GPL (>= 3). See [`LICENSE.md`](LICENSE.md).

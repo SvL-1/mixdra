@@ -1,6 +1,6 @@
 Package: mixdra
 Title: Mixture Dose-Response Analysis (Jonker et al. 2005 Methodology)
-Version: 0.0.0.9000
+Version: 0.1.0
 Authors@R: c(
     person("Sam", "van Loon", email = "samvanloon94@hotmail.com",
            role = c("aut", "cre")),

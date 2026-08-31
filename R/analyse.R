@@ -76,7 +76,7 @@ fit_curve_from_singles <- function(df, reference, response,
 
 #' Model order for the interaction-model selection chain
 #'
-#' Binary mixtures walk reference -> SA -> {DR, DL}; ternary mixtures support
+#' Binary mixtures walk reference -> SA -> DR and DL; ternary mixtures support
 #' only reference -> SA here (Advanced S/A is fitted separately). Used by
 #' [analyse_mixture()] and by the campaign's pair workspace to fit each model
 #' in turn.

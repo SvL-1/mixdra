@@ -82,9 +82,9 @@ plot_obs_pred <- function(fit, df) {
                          line = list(color = "grey", dash = "dash"))
   # Axis labels echo the SSR readout's notation (SSR = sum (y - yhat)^2,
   # yhat = model prediction) so the plot maps directly onto the fitted
-  # objective. "ŷ" is y-hat.
+  # objective. "yhat" is y-hat.
   plotly::layout(p, xaxis = list(title = "observed (y)"),
-                 yaxis = list(title = "predicted (ŷ)"))
+                 yaxis = list(title = "predicted (\u0177)"))
 }
 
 #' Resolve axis titles from an optional override
@@ -219,8 +219,8 @@ plot_isoplane <- function(res, df = NULL, n = 30, labels = NULL) {
 
 #' Plot Sigma-TU vs z for a ternary mixture
 #'
-#' Per-chemical ΣTU-vs-z curves under CA+S/A (solid) and CA+S/A+S/A (dashed),
-#' with the additivity reference line at ΣTU = 1, as an interactive plotly
+#' Per-chemical sigma-TU-vs-z curves under CA+S/A (solid) and CA+S/A+S/A (dashed),
+#' with the additivity reference line at sigma-TU = 1, as an interactive plotly
 #' object. Deviation from 1 is the interaction (< 1 synergy, > 1 antagonism).
 #' @param res An [analyse_ternary()] result.
 #' @param n Number of z points per chemical (default 21).
@@ -240,8 +240,8 @@ plot_sigma_tu <- function(res, n = 21) {
                                          dash = if (s == "CA+S/A") "solid" else "dash"))
     }
   }
-  p <- plotly::add_lines(p, x = c(0, 1), y = c(1, 1), name = "ΣTU = 1",
+  p <- plotly::add_lines(p, x = c(0, 1), y = c(1, 1), name = "\u03a3TU = 1",
                          line = list(color = "black", width = 1))
   plotly::layout(p, xaxis = list(title = "z (chemical TU fraction)"),
-                 yaxis = list(title = "ΣTU"))
+                 yaxis = list(title = "\u03a3TU"))
 }

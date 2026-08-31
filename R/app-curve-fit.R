@@ -37,7 +37,7 @@ param_row <- function(ns, param, label, meaning, hi_default = NA) {
 #'
 #' Same five-column layout as [param_row()] for visual consistency with the
 #' curve grid, but `a`/`b` are unconstrained by the engine, so the Lower/Upper
-#' columns are inert "—" placeholders and only the Value input is editable.
+#' columns are inert "--" placeholders and only the Value input is editable.
 #' @param ns Module namespace function.
 #' @param param Parameter key (`a`/`b`); drives the `val_<param>` input id.
 #' @param label Display label.
@@ -47,8 +47,8 @@ interaction_param_row <- function(ns, param, label, meaning) {
   shiny::fluidRow(
     shiny::column(2, shiny::tags$b(label)),
     shiny::column(3, shiny::tags$small(meaning)),
-    shiny::column(2, shiny::tags$small("—")),
-    shiny::column(2, shiny::tags$small("—")),
+    shiny::column(2, shiny::tags$small("\u2014")),
+    shiny::column(2, shiny::tags$small("\u2014")),
     shiny::column(3, shiny::numericInput(ns(paste0("val_", param)), NULL, value = NA))
   )
 }

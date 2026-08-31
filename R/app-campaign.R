@@ -11,7 +11,7 @@
 #' @param x Value to test.
 #' @param y Fallback used when `x` is `NULL`.
 #' @return `x`, or `y` when `x` is `NULL`.
-#' @keywords internal
+#' @noRd
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
 #' Increment the base-parameter version stamp
@@ -293,7 +293,7 @@ campaign_stage_nav <- function(ns, store, selected = NULL) {
   ready <- !is.null(campaign_base(store))
   for (p in campaign_pairs(store$chems)) {
     k     <- pair_key(p[1], p[2])
-    title <- paste(axis_label(store, paste0("chem", p[1])), "×",
+    title <- paste(axis_label(store, paste0("chem", p[1])), "\u00d7",
                    axis_label(store, paste0("chem", p[2])))
     body <- if (!pair_has_rows(store$raw, p[1], p[2])) {
       shiny::div(class = "p-3 text-muted",

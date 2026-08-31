@@ -16,3 +16,7 @@
 ^LICENSE\.md$
 ^CITATION\.cff$
 ^\.github$
+^\.superpowers$
+^recieved$
+^MixTox_shiny_v2$
+^diag_.*

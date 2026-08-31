@@ -38,7 +38,7 @@ ternary_ui <- function(id) {
         "Each row is one ternary ratio; the ", shiny::tags$b("Overall"),
         " row is the single pooled A4. When per-ratio A4 values differ in sign ",
         "but the overall A4 is near zero, real interaction is being averaged ",
-        "away — that contrast is the point of the ternary analysis. ",
+        "away \u2014 that contrast is the point of the ternary analysis. ",
         "Click a ratio row to inspect it below."),
       DT::DTOutput(ns("hub"))
     ),
@@ -48,10 +48,10 @@ ternary_ui <- function(id) {
       bslib::layout_columns(
         bslib::card(bslib::card_header("EC50 isoplane (simplex)"),
                     plotly::plotlyOutput(ns("isoplane"), height = "520px")),
-        bslib::card(bslib::card_header("ΣTU vs z"),
+        bslib::card(bslib::card_header("\u03a3TU vs z"),
                     plotly::plotlyOutput(ns("sigma_tu"), height = "520px"))
       ),
-      bslib::card(bslib::card_header("Selected ratio — effect size"),
+      bslib::card(bslib::card_header("Selected ratio \u2014 effect size"),
                   shiny::uiOutput(ns("effect")))
     )
   )
@@ -192,7 +192,7 @@ ternary_server <- function(id, store) {
       shiny::tags$p(
         shiny::tags$b("At the near-EC50 point "),
         sprintf("(C1=%.3g, C2=%.3g, C3=%.3g): ", row$C1, row$C2, row$C3),
-        sprintf("CA %.1f → CA+S/A %.1f → CA+S/A+S/A %.1f  |  A4 effect %.1f",
+        sprintf("CA %.1f \u2192 CA+S/A %.1f \u2192 CA+S/A+S/A %.1f  |  A4 effect %.1f",
                 row$pred_CA, row$pred_SA, row$pred_ASA, row$a4_effect))
     })
 

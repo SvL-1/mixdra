@@ -19,7 +19,7 @@ lr_test <- function(obj_parent, obj_child, df_parent, df_child, n, response) {
 
 #' Select the most parsimonious model from a set of nested fits
 #'
-#' Walks reference -> SA -> {DR, DL}; a more complex model is accepted only if
+#' Walks reference -> SA -> DR and DL; a more complex model is accepted only if
 #' it significantly improves on its parent (LR test p < alpha).
 #' @param fits Named list of fits (`reference`, `SA`, `DR`, `DL`), each with
 #'   `objective` and `df`.

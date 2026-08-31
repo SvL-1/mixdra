@@ -32,8 +32,8 @@ interaction_help <- function(reference, deviation) {
 
   sign_note <- shiny::tags$p(shiny::tags$small(
     shiny::tags$b("Sign of a: "),
-    "a > 0 → antagonism (mixture less toxic than the reference predicts); ",
-    "a < 0 → synergism (more toxic)."))
+    "a > 0 \u2192 antagonism (mixture less toxic than the reference predicts); ",
+    "a < 0 \u2192 synergism (more toxic)."))
 
   body <- switch(
     deviation,
@@ -62,7 +62,7 @@ interaction_help <- function(reference, deviation) {
       dl_b <- if (ref == "IA")
         "how it shifts with the dose level (P = the IA-predicted effect at the mixture point)."
       else
-        "how it shifts with the dose level (ΣTU = the summed toxic units at the mixture point)."
+        "how it shifts with the dose level (\u03a3TU = the summed toxic units at the mixture point)."
       shiny::tagList(
         shiny::tags$p(shiny::tags$b("Dose-level dependent (DL): "),
                       shiny::tags$code(shiny::HTML(dl_form))),
@@ -96,10 +96,10 @@ pair_workspace_ui <- function(id) {
       bslib::accordion_panel(
         "Advanced fitting options",
         shiny::helpText("Apply to the staged comparison loop and Optimize all params (joint)."),
-        shiny::numericInput(ns("alpha"), "alpha (α)", value = 0.05,
+        shiny::numericInput(ns("alpha"), "alpha (\u03b1)", value = 0.05,
                             min = 0, max = 1, step = 0.01),
         shiny::helpText("Significance threshold for the model comparison: a more ",
-                        "complex model is kept only if it improves the fit at p < α."),
+                        "complex model is kept only if it improves the fit at p < \u03b1."),
         shiny::numericInput(ns("n_starts"), "n_starts", value = 1, min = 1),
         shiny::numericInput(ns("time_limit"), "time_limit (s/model)", value = 30, min = 1),
         shiny::checkboxInput(ns("thorough"), "Thorough fit (multi-start, slower)", FALSE),
@@ -113,21 +113,21 @@ pair_workspace_ui <- function(id) {
     # fills the a/b/objective/df/p columns. Click a row to inspect it (Stage 3);
     # "Optimize all params (joint)" appends a joint-refined block of rows.
     bslib::card(
-      bslib::card_header("Stage 2 · Interaction models"),
+      bslib::card_header("Stage 2 \u00b7 Interaction models"),
       shiny::p("With the single-stressor curves fitted on the Singles page, run ",
                shiny::tags$b("Fit interaction models"), " to fill the table ",
-               "(reference → S/A → DR/DL, curves held fixed from the singles). ",
+               "(reference \u2192 S/A \u2192 DR/DL, curves held fixed from the singles). ",
                "Click a row to inspect that model; the best is highlighted. ",
                "The table's interaction columns are empty whenever the models ",
-               "have not been run — or were cleared because the data or the ",
-               "curves changed — so run it again to bring them up to date."),
+               "have not been run \u2014 or were cleared because the data or the ",
+               "curves changed \u2014 so run it again to bring them up to date."),
       shiny::div(
         shiny::actionButton(ns("fit_interactions"), "Fit interaction models",
                             class = "btn-primary")),
       shiny::helpText(
         "The highlighted row is the selected (best) model. ",
-        "The \"… (joint)\" column is filled by Optimize all params and is ",
-        "display-only — it never changes which model is selected."),
+        "The \"\u2026 (joint)\" column is filled by Optimize all params and is ",
+        "display-only \u2014 it never changes which model is selected."),
       DT::DTOutput(ns("results")),
       shiny::uiOutput(ns("interaction_help")),
       shiny::uiOutput(ns("refined_badge")),
@@ -135,7 +135,7 @@ pair_workspace_ui <- function(id) {
       shiny::div(class = "mt-2",
         shiny::actionButton(ns("optimize_all"), "Optimize all params (joint)")),
       shiny::helpText("Re-fits every parameter (curves + interaction) of each ",
-                      "model at once, seeded from its staged fit — the Excel-style ",
+                      "model at once, seeded from its staged fit \u2014 the Excel-style ",
                       "joint fit. The results are appended as a second \"Optimized ",
                       "(joint)\" block of rows; click one to inspect its surface. ",
                       "The staged block above (p-values / winner) is unchanged."),
@@ -147,7 +147,7 @@ pair_workspace_ui <- function(id) {
     # surface once a model is selected. The isobole / obs-pred / CI panels are
     # model-based, so they fill in once a model is fitted.
     bslib::card(
-      bslib::card_header("Stage 3 · Inspect the selected model"),
+      bslib::card_header("Stage 3 \u00b7 Inspect the selected model"),
       bslib::layout_columns(
         bslib::card(bslib::card_header("3-D response surface"),
                     plotly::plotlyOutput(ns("surface"), height = "520px")),
@@ -445,7 +445,7 @@ pair_workspace_server <- function(id, fit_df, base, reference, response,
       shiny::tags$p(
         shiny::tags$b(paste0(e$model, " joint refine ", lab, " (vs staged): ")),
         round(staged$objective, 2), shiny::HTML(" &rarr; "), round(joint$objective, 2),
-        if (improved) shiny::tags$span(style = "color:green", " ✓"))
+        if (improved) shiny::tags$span(style = "color:green", " \u2713"))
     })
 
     # Badge: the diagnostics are showing a joint-refined (Optimized) row.
@@ -522,7 +522,7 @@ pair_workspace_server <- function(id, fit_df, base, reference, response,
       ref_label <- if (identical(reference(), "IA")) "Independent action"
                    else "Concentration addition"
       vlabel <- function(e) {
-        if (isTRUE(e$separator)) return("─ Optimized (joint) ─")
+        if (isTRUE(e$separator)) return("\u2500 Optimized (joint) \u2500")
         if (identical(e$model, "reference")) return(ref_label)
         e$model
       }

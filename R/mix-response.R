@@ -106,7 +106,7 @@ mix_response <- function(concs, max, slopes, ec50s,
 #' @param reference "CA" or "IA".
 #' @param deviation "reference", "SA", "DR", or "DL".
 #' @param n_chem 2 or 3.
-#' @return A function accepting named concentration vectors (`c1`, `c2`[, `c3`])
+#' @return A function accepting named concentration vectors `c1` and `c2` (and `c3` for ternary)
 #'   and named scalar parameters (`max`, `slope1..`, `ec50..`, `a`, `b`/`b1..b3`),
 #'   returning one prediction per row.
 #' @keywords internal

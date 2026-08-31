@@ -20,6 +20,6 @@ select_parsimonious(fits, n, response, alpha = 0.05)
 The name of the selected model.
 }
 \description{
-Walks reference -> SA -> {DR, DL}; a more complex model is accepted only if
+Walks reference -> SA -> DR and DL; a more complex model is accepted only if
 it significantly improves on its parent (LR test p < alpha).
 }

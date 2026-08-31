@@ -14,7 +14,7 @@ make_adapter(reference, deviation, n_chem)
 \item{n_chem}{2 or 3.}
 }
 \value{
-A function accepting named concentration vectors (\code{c1}, \code{c2}\link[=, `c3`]{, \code{c3}})
+A function accepting named concentration vectors \code{c1} and \code{c2} (and \code{c3} for ternary)
 and named scalar parameters (\code{max}, \code{slope1..}, \code{ec50..}, \code{a}, \code{b}/\code{b1..b3}),
 returning one prediction per row.
 }

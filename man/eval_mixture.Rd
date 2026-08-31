@@ -14,7 +14,7 @@ eval_mixture(
 )
 }
 \arguments{
-\item{df}{Mixture data frame (\code{C1}/\code{C2}\link[=/`C3`]{/\code{C3}} + response columns).}
+\item{df}{Mixture data frame: \code{C1} and \code{C2} (and \code{C3} for ternary), plus response columns.}
 
 \item{reference}{"CA" or "IA".}
 

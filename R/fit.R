@@ -239,7 +239,7 @@ fit_model <- function(df, reference, deviation = "reference",
 #' [fit_model()] (so the plotting layer consumes it unchanged) with an added
 #' `simulated = TRUE` flag. Delegates to [fit_model()]'s all-fixed path.
 #'
-#' @param df Mixture data frame (`C1`/`C2`[/`C3`] + response columns).
+#' @param df Mixture data frame: `C1` and `C2` (and `C3` for ternary), plus response columns.
 #' @param reference "CA" or "IA".
 #' @param deviation "reference", "SA", "DR", or "DL".
 #' @param response "continuous" or "binary".

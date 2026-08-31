@@ -15,7 +15,7 @@ plot_sigma_tu(res, n = 21)
 A plotly object.
 }
 \description{
-Per-chemical ΣTU-vs-z curves under CA+S/A (solid) and CA+S/A+S/A (dashed),
-with the additivity reference line at ΣTU = 1, as an interactive plotly
+Per-chemical sigma-TU-vs-z curves under CA+S/A (solid) and CA+S/A+S/A (dashed),
+with the additivity reference line at sigma-TU = 1, as an interactive plotly
 object. Deviation from 1 is the interaction (< 1 synergy, > 1 antagonism).
 }
