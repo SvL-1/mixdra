@@ -1,7 +1,7 @@
 # Acceptance/smoke check: joint refinement on the real binary CPF/IMI(MPs) data
 # must run, never worsen the staged objective, and land at finite, plausible
 # params. NOT a bit-exact Excel match (different optimizer; CA bisection is
-# non-smooth). Spec: docs/superpowers/specs/2026-06-02-binary-joint-fit-design.md
+# non-smooth). Spec: docs/design/specs/2026-06-02-binary-joint-fit-design.md
 
 test_that("joint fit on real binary data runs and never worsens the staged fit", {
   skip_on_cran()

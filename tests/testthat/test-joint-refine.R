@@ -1,5 +1,5 @@
 # Tests for the final joint "Optimize all params" engine wrapper.
-# Spec: docs/superpowers/specs/2026-06-02-binary-joint-fit-design.md
+# Spec: docs/design/specs/2026-06-02-binary-joint-fit-design.md
 
 test_that("joint refine recovers known params from noise-free data", {
   par <- c(max = 800, slope1 = 4, slope2 = 1.5, ec501 = 0.08, ec502 = 1, a = 1.5)

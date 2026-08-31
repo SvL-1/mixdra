@@ -1,5 +1,5 @@
 # Tests for explicit per-parameter bounds in fit_model().
-# Spec: docs/superpowers/specs/2026-05-30-parameter-constraints-design.md
+# Spec: docs/design/specs/2026-05-30-parameter-constraints-design.md
 
 bounds_cont_df <- function() {
   g <- expand.grid(C1 = c(0, 0.05, 0.2), C2 = c(0, 0.5, 5))
