@@ -80,13 +80,13 @@ with the likelihood-ratio test against the parent model and the selected (most
 parsimonious) model highlighted. Here the dose-level-dependent model wins for
 chlorpyrifos × FBSA (*p* = 0.033) on the reproduction of *Folsomia candida*:
 
-![Campaign pair tab: the interaction model comparison table, with the DL model selected](man/figures/campaign-model-comparison.jpg)
+![Campaign pair tab: the interaction model comparison table, with the DL model selected](man/figures/campaign-model-comparison.png)
 
 **The diagnostics.** The selected model's fitted response surface and its isoboles
 against the additivity reference (dashed, red), so departures from additivity are
 visible rather than inferred from a number:
 
-![Stage 3 diagnostics: 3-D response surface and 2-D isoboles versus the reference](man/figures/campaign-diagnostics.jpg)
+![Stage 3 diagnostics: 3-D response surface and 2-D isoboles versus the reference](man/figures/campaign-diagnostics.png)
 
 ## Features
 
