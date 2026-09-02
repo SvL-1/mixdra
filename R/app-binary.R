@@ -181,6 +181,11 @@ pair_workspace_ui <- function(id) {
 #'   workspace itself needs no staleness banner: a change to `base()` clears
 #'   its fits outright (see the invalidation observer below), which is stricter.
 #'   `NULL` (the default, used outside the campaign tab).
+#' @param bounds Reactive returning a list with `lower`/`upper` named numeric
+#'   vectors over this pair's binary parameter names (from [pair_bounds()]), or
+#'   `NULL` (the default) for no constraints. Only "Optimize all params (joint)"
+#'   uses them: the staged fits already hold every curve parameter fixed, so a
+#'   constraint there would be inert.
 #' @param on_fit Callback invoked whenever the staged "Fit interaction models"
 #'   loop finishes, with `list(a, chosen, base_version)`: `a` is this pair's
 #'   fitted S/A `a` (`NULL` if the SA model failed to fit), `chosen` is the
@@ -191,7 +196,7 @@ pair_workspace_ui <- function(id) {
 #' @keywords internal
 pair_workspace_server <- function(id, fit_df, base, reference, response,
                                   base_version = NULL, on_fit = NULL,
-                                  labels = NULL) {
+                                  labels = NULL, bounds = NULL) {
   shiny::moduleServer(id, function(input, output, session) {
 
     # Axis titles for this pair's plots: the stressor names/units from the
@@ -336,7 +341,7 @@ pair_workspace_server <- function(id, fit_df, base, reference, response,
     shiny::observeEvent(input$fit_interactions, {
       if (!isTRUE(!is.null(base()))) {
         shiny::showNotification(
-          paste("Fit the single-stressor curves first, on the campaign's",
+          paste("Fit the single-stressor curves first, on the experiment's",
                 "Singles page."),
           type = "warning")
         return()
@@ -394,6 +399,7 @@ pair_workspace_server <- function(id, fit_df, base, reference, response,
         return()
       }
       models <- intersect(results_order(), names(s))
+      bnds <- if (is.null(bounds)) list(lower = NULL, upper = NULL) else bounds()
       r <- list()
       shiny::withProgress(message = "Optimizing all parameters (joint)", value = 0, {
         for (i in seq_along(models)) {
@@ -401,7 +407,7 @@ pair_workspace_server <- function(id, fit_df, base, reference, response,
           shiny::incProgress(0, detail = paste0("model ", m, " (", i, "/",
                                                 length(models), ")"))
           newfit <- tryCatch(
-            refine_joint(s[[m]], fit_df(),
+            refine_joint(s[[m]], fit_df(), lower = bnds$lower, upper = bnds$upper,
                          n_starts = n_starts_eff(), time_limit = input$time_limit),
             error = function(e) {
               shiny::showNotification(

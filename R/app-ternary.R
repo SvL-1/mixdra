@@ -22,7 +22,7 @@ ternary_ui <- function(id) {
 
     bslib::card(
       bslib::card_header("Advanced S/A (frozen base + pairwise)"),
-      shiny::p("Uses the campaign's frozen single-stressor curves and each ",
+      shiny::p("Uses the experiment's frozen single-stressor curves and each ",
                "pair's frozen S/A interaction term (A1 = pair 1-2, A2 = pair ",
                "1-3, A3 = pair 2-3) to fit the overall three-way A4 and an ",
                "individual A4 per ternary mixture ratio."),
@@ -40,7 +40,15 @@ ternary_ui <- function(id) {
         "but the overall A4 is near zero, real interaction is being averaged ",
         "away \u2014 that contrast is the point of the ternary analysis. ",
         "Click a ratio row to inspect it below."),
-      DT::DTOutput(ns("hub"))
+      shiny::helpText(shiny::tags$small(
+        shiny::tags$b("Ratio"), " is the concentration ratio as dosed; ",
+        shiny::tags$b("TU ratio"), " is the same mixture in toxic units ",
+        "(TU = C / EC50 from the singles), i.e. each stressor's share of the ",
+        "mixture's toxicity rather than of its mass. The two differ whenever ",
+        "the stressors differ in potency; the models are fitted on the TU ",
+        "shares.")),
+      DT::DTOutput(ns("hub")),
+      shiny::uiOutput(ns("ec50_note"))
     ),
 
     bslib::card(
@@ -118,8 +126,14 @@ ternary_server <- function(id, store) {
       eff <- effect_tbl()
       m <- merge(ind, eff[, c("ratio", "pred_CA", "pred_SA", "pred_ASA", "a4_effect")],
                  by = "ratio", all.x = TRUE, sort = FALSE)
+      ec <- c(res$base[["ec50_1"]], res$base[["ec50_2"]], res$base[["ec50_3"]])
+      tu <- vapply(seq_len(nrow(m)),
+                   function(i) ratio_label(
+                     tu_shares(c(m$C1[i], m$C2[i], m$C3[i]), ec)),
+                   character(1))
       per <- data.frame(
         Ratio    = sprintf("%.2f:%.2f:%.2f", m$C1, m$C2, m$C3),
+        `TU ratio` = tu,
         n        = m$n,
         A4       = round(m$A4, 4),
         pred_CA  = round(m$pred_CA, 1),
@@ -128,7 +142,8 @@ ternary_server <- function(id, store) {
         a4_effect = round(m$a4_effect, 1),
         .key = m$ratio, stringsAsFactors = FALSE, check.names = FALSE)
       overall <- data.frame(
-        Ratio = "Overall", n = sum(m$n), A4 = round(res$A4_overall, 4),
+        Ratio = "Overall", `TU ratio` = "\u2014",
+        n = sum(m$n), A4 = round(res$A4_overall, 4),
         pred_CA = NA_real_, pred_SA = NA_real_, pred_ASA = NA_real_,
         a4_effect = NA_real_, .key = NA_character_,
         stringsAsFactors = FALSE, check.names = FALSE)
@@ -153,6 +168,25 @@ ternary_server <- function(id, store) {
         shiny::tags$br(),
         shiny::tags$b("Pairwise: "),
         sprintf("A1 %.3f | A2 %.3f | A3 %.3f", p[["A1"]], p[["A2"]], p[["A3"]]))
+    })
+
+    # A TU share is only as good as the EC50 in its denominator: when a fitted
+    # EC50 sits above every dose actually tested for that stressor it is an
+    # extrapolation, and so is its contribution to the TU ratio.
+    output$ec50_note <- shiny::renderUI({
+      res <- asa_res(); shiny::req(res, store$raw)
+      ec  <- c(res$base[["ec50_1"]], res$base[["ec50_2"]], res$base[["ec50_3"]])
+      bad <- which(ec50_out_of_range(store$raw, ec, 1:3))
+      if (!length(bad)) return(NULL)
+      shiny::div(
+        class = "alert alert-warning mt-2",
+        shiny::tags$small(
+          "Extrapolated EC50 for ",
+          paste(vapply(bad, function(k) axis_label(store, paste0("chem", k)),
+                       character(1)), collapse = ", "),
+          ": the fitted EC50 lies above every dose tested for that stressor, ",
+          "so its share of the TU ratio is a model extrapolation rather than a ",
+          "measured quantity."))
     })
 
     output$hub <- DT::renderDT({

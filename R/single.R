@@ -21,10 +21,15 @@ ll3_predict <- function(conc, max, slope, ec50) {
 #' @param resp Numeric vector of responses (same length as `conc`).
 #' @param lower,upper,start Optional named numeric vectors (`max`/`slope`/`ec50`)
 #'   overriding the corresponding defaults.
+#' @param fixed Character vector of parameter names to hold FIXED at their
+#'   `start` value. Pinning has to go through here rather than through equal
+#'   lower/upper bounds: L-BFGS-B cannot take a finite difference inside a
+#'   zero-width box and fails with "non-finite finite-difference value".
 #' @return A list with `par` (named: max, slope, ec50), `ssr`, `convergence`, and
 #'   `kind = "single"`.
 #' @export
-fit_single <- function(conc, resp, lower = NULL, upper = NULL, start = NULL) {
+fit_single <- function(conc, resp, lower = NULL, upper = NULL, start = NULL,
+                       fixed = character(0)) {
   stopifnot(length(conc) == length(resp), length(conc) > 3)
   pos <- conc[conc > 0]
   def_start <- c(max = max(resp, na.rm = TRUE), slope = 1, ec50 = stats::median(pos))
@@ -36,18 +41,24 @@ fit_single <- function(conc, resp, lower = NULL, upper = NULL, start = NULL) {
   st <- def_start; if (!is.null(start)) st[names(start)] <- start
   st <- pmin(pmax(st, lo), hi)   # keep the seed inside the box
 
-  obj <- function(p) {
-    pred <- ll3_predict(conc, p[["max"]], p[["slope"]], p[["ec50"]])
-    sum((resp - pred)^2)
-  }
+  ssr_of <- function(p)
+    sum((resp - ll3_predict(conc, p[["max"]], p[["slope"]], p[["ec50"]]))^2)
+
+  free <- setdiff(names(st), intersect(fixed, names(st)))
+  # Every parameter pinned: nothing to optimise, just evaluate the curve.
+  if (!length(free))
+    return(list(par = st, ssr = ssr_of(st), convergence = 0L, kind = "single"))
+
+  obj <- function(p) { full <- st; full[free] <- p; ssr_of(full) }
   # parscale normalises the three very differently-scaled parameters (max ~ 1e2,
   # slope ~ 1, ec50 ~ 1e-1) so L-BFGS-B's relative tolerance bites uniformly;
   # without it the optimiser stops well short of the true minimum.
-  res <- stats::optim(st, obj, method = "L-BFGS-B",
-                      lower = lo, upper = hi,
-                      control = list(parscale = pmax(abs(st), 1e-8),
+  res <- stats::optim(st[free], obj, method = "L-BFGS-B",
+                      lower = lo[free], upper = hi[free],
+                      control = list(parscale = pmax(abs(st[free]), 1e-8),
                                      factr = 1e-9, maxit = 1000))
-  list(par = res$par, ssr = res$value, convergence = res$convergence,
+  par <- st; par[free] <- res$par
+  list(par = par, ssr = res$value, convergence = res$convergence,
        kind = "single")
 }
 

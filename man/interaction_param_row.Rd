@@ -16,7 +16,7 @@ interaction_param_row(ns, param, label, meaning)
 \item{meaning}{One-line explanation.}
 }
 \description{
-Same five-column layout as \code{\link[=param_row]{param_row()}} for visual consistency with the
+Same six-column layout as \code{\link[=param_row]{param_row()}} for visual consistency with the
 curve grid, but \code{a}/\code{b} are unconstrained by the engine, so the Lower/Upper
 columns are inert "--" placeholders and only the Value input is editable.
 }

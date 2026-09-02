@@ -19,8 +19,11 @@ data is invalid; the panel fits whatever non-empty frame it is given.}
 uses a generic "Concentration" label.}
 }
 \value{
-A reactive returning the current fit (a \code{\link[=analyse_single]{analyse_single()}}/\code{\link[=eval_single]{eval_single()}}
-result), or NULL before any fit.
+A list of two reactives: \code{fit}, the current fit (a
+\code{\link[=analyse_single]{analyse_single()}}/\code{\link[=eval_single]{eval_single()}} result, \code{NULL} before any fit), and
+\code{constraints}, this panel's \code{\link[=panel_constraints]{panel_constraints()}} (Lower/Upper cells plus
+ticked Fix boxes). The Singles page feeds \code{constraints} into the campaign
+base fit, so what the user constrains here is honoured downstream.
 }
 \description{
 Curve-fit panel server

@@ -299,3 +299,76 @@ test_that("a pair with no mixture rows is NOT an error (the sub-tab disables ins
   df <- df[!(df$C2 > 0 & df$C3 > 0), ]     # drop every 2x3 mixture row
   expect_equal(validate_upload(df, "campaign", "continuous"), character(0))
 })
+
+test_that("panel_constraints turns a ticked Fix box into equal lower/upper", {
+  vals <- list(lo_slope = 1, hi_slope = 5,
+               pin_ec50 = TRUE, val_ec50 = 0.42,
+               pin_max = FALSE, val_max = 900)
+  b <- panel_constraints(vals)
+  expect_equal(b$lower[["ec50"]], 0.42)
+  expect_equal(b$upper[["ec50"]], 0.42)
+  expect_equal(b$lower[["slope"]], 1)
+  expect_equal(b$upper[["slope"]], 5)
+  expect_false("max" %in% names(b$lower))   # unticked Fix contributes nothing
+})
+
+test_that("panel_constraints ignores a ticked Fix box with no value", {
+  b <- panel_constraints(list(pin_ec50 = TRUE, val_ec50 = NA))
+  expect_null(b$lower)
+  expect_null(b$upper)
+})
+
+test_that("a pinned panel parameter survives split_fixed_bounds as fixed", {
+  b  <- panel_constraints(list(pin_ec50 = TRUE, val_ec50 = 0.42))
+  sp <- split_fixed_bounds(b$lower, b$upper, c(max = 1, slope = 1, ec50 = 9))
+  expect_equal(sp$fixed, "ec50")
+  expect_equal(sp$start[["ec50"]], 0.42)
+  expect_null(sp$lower)
+})
+
+test_that("base_param_names follows the registry's per-arity EC50 spelling", {
+  expect_equal(unname(base_param_names(2, 2)), c("slope2", "ec502"))
+  expect_equal(unname(base_param_names(2, 3)), c("slope2", "ec50_2"))
+})
+
+test_that("campaign_base_bounds renames per-stressor bounds to fit positions", {
+  panels <- list("1" = list(lower = c(ec50 = 0.1), upper = c(ec50 = 0.2)),
+                 "3" = list(lower = c(slope = 2),  upper = NULL))
+  b <- campaign_base_bounds(panels, max_bounds = NULL, chems = c(1L, 2L, 3L))
+  expect_equal(b$lower[["ec50_1"]], 0.1)
+  expect_equal(b$upper[["ec50_1"]], 0.2)
+  expect_equal(b$lower[["slope3"]], 2)
+})
+
+test_that("campaign_base_bounds maps a non-contiguous stressor set by position", {
+  # Stressors 1 and 3 only: stressor 3 is the SECOND column of the fit.
+  panels <- list("3" = list(lower = c(ec50 = 0.5), upper = NULL))
+  b <- campaign_base_bounds(panels, max_bounds = NULL, chems = c(1L, 3L))
+  expect_equal(b$lower[["ec502"]], 0.5)   # binary names for a 2-stressor fit
+})
+
+test_that("campaign_base_bounds takes max from the campaign row, not the panels", {
+  panels <- list("1" = list(lower = c(max = 100), upper = c(max = 200)))
+  b <- campaign_base_bounds(panels, max_bounds = list(lower = c(max = 850),
+                                                      upper = c(max = 850)),
+                            chems = c(1L, 2L))
+  expect_equal(b$lower[["max"]], 850)
+  expect_equal(b$upper[["max"]], 850)
+})
+
+test_that("pair_bounds renames a ternary campaign's bounds onto the pair", {
+  b <- list(lower = c(max = 850, slope2 = 1, ec50_2 = 0.3, ec50_3 = 0.9),
+            upper = c(ec50_3 = 1.1))
+  p <- pair_bounds(b, 2, 3)
+  expect_equal(p$lower[["slope1"]], 1)      # stressor 2 is the pair's first
+  expect_equal(p$lower[["ec501"]], 0.3)
+  expect_equal(p$lower[["ec502"]], 0.9)
+  expect_equal(p$lower[["max"]], 850)
+  expect_equal(p$upper[["ec502"]], 1.1)
+})
+
+test_that("pair_bounds drops bounds for a stressor outside the pair", {
+  b <- list(lower = c(ec50_1 = 0.1, ec50_2 = 0.3), upper = NULL)
+  p <- pair_bounds(b, 2, 3)
+  expect_equal(names(p$lower), "ec501")
+})

@@ -1,3 +1,25 @@
+# mixdra (development version)
+
+* The **Campaign** tab is now called **Multiple stressors** (#12). Only the
+  user-facing labels changed; the uploaded-file format is unchanged.
+* Lower/upper constraints and fixed values entered on the Singles page are now
+  carried into the joint single-stressor fit and into each pair's "Optimize all
+  params (joint)" (#12). Previously the panels were exploratory only and every
+  constraint was silently discarded. Each parameter row gained a **Fix**
+  checkbox, so pinning no longer means typing the same number into Lower and
+  Upper.
+* `max` is a single campaign-wide quantity (one control group, one asymptote),
+  so it now has one shared constraint row above the stressor panels instead of
+  one per stressor.
+* `fit_single()` / `analyse_single()` gained a `fixed` argument; pinning through
+  equal bounds is not possible because L-BFGS-B cannot difference inside a
+  zero-width box.
+* The ternary hub table reports each mixture ratio in **toxic units**
+  (`TU = C / EC50`) alongside the concentration ratio it was dosed at (#11), and
+  warns when a stressor's fitted EC50 lies above every dose tested for it, since
+  its TU share is then an extrapolation. The TU ratio is a relabelling only: it
+  groups the data identically, so no fitted value changes.
+
 # mixdra 0.1.0
 
 First tagged release: the point at which the engine, the app and the validation

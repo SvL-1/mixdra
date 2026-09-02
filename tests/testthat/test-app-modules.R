@@ -264,6 +264,21 @@ test_that("ternary_server: consumes the store's frozen base + pairwise -> hub + 
     expect_equal(nrow(h), 1L + nrow(res$individual))
     expect_null(selected_ratio())             # row 1 (Overall) -> NULL ratio
 
+    # Issue #11: every ratio is reported in toxic units next to the
+    # concentration ratio it was dosed at, and the two genuinely differ here
+    # (stressor 2 is ~70-88% of the mass but a few percent of the toxicity).
+    expect_true("TU ratio" %in% names(h))
+    expect_false(any(h[["TU ratio"]][-1] == h$Ratio[-1]))
+    expect_equal(
+      h[["TU ratio"]][2],
+      ratio_label(tu_shares(
+        c(res$individual$C1[1], res$individual$C2[1], res$individual$C3[1]),
+        c(res$base[["ec50_1"]], res$base[["ec50_2"]], res$base[["ec50_3"]]))))
+
+    # ... and the extrapolated EC50 behind those TU shares is flagged.
+    expect_match(as.character(output$ec50_note$html), "Extrapolated EC50",
+                 fixed = TRUE)
+
     # Clicking a ratio row selects that ratio.
     session$setInputs(hub_rows_selected = 2)
     expect_equal(selected_ratio(), h$.key[2])
@@ -816,4 +831,46 @@ test_that("pair_workspace reproduces the binary tab's staged S/A fit", {
   expect_true(is.finite(fit$par[["a"]]))
   expect_named(fit$par[names(base)], names(base))
   expect_equal(unname(fit$par[names(base)]), unname(base), tolerance = 1e-8)
+})
+
+test_that("campaign_fit_base holds a pinned base parameter at its value", {
+  df <- to_engine_df(read_upload(system.file(
+    "extdata", "ternary_ca_fbsa_cpf_imi_continuous.csv", package = "mixdra")), "campaign")
+
+  free   <- campaign_fit_base(df, c(1L, 2L, 3L), "CA", "continuous")
+  pinned <- campaign_fit_base(df, c(1L, 2L, 3L), "CA", "continuous",
+                              bounds = list(lower = c(ec50_1 = 0.2),
+                                            upper = c(ec50_1 = 0.2)))
+  expect_equal(unname(pinned[["ec50_1"]]), 0.2)
+  expect_false(isTRUE(all.equal(unname(free[["ec50_1"]]), 0.2)))
+})
+
+test_that("campaign_fit_base respects a plain upper bound", {
+  df <- to_engine_df(read_upload(system.file(
+    "extdata", "ternary_ca_fbsa_cpf_imi_continuous.csv", package = "mixdra")), "campaign")
+
+  # The unconstrained fit puts ec50_2 far above the highest tested dose (34.7);
+  # capping it at the top of the tested range must bite.
+  got <- campaign_fit_base(df, c(1L, 2L, 3L), "CA", "continuous",
+                           bounds = list(lower = NULL, upper = c(ec50_2 = 4)))
+  expect_lte(unname(got[["ec50_2"]]), 4 + 1e-6)
+})
+
+test_that("campaign_fit_base is unchanged when no bounds are given", {
+  df <- to_engine_df(read_upload(system.file(
+    "extdata", "ternary_ca_fbsa_cpf_imi_continuous.csv", package = "mixdra")), "campaign")
+
+  expect_equal(campaign_fit_base(df, c(1L, 2L, 3L), "CA", "continuous"),
+               campaign_fit_base(df, c(1L, 2L, 3L), "CA", "continuous",
+                                 bounds = list(lower = NULL, upper = NULL)))
+})
+
+test_that("ec50_out_of_range flags an EC50 above every tested dose", {
+  df <- to_engine_df(read_upload(system.file(
+    "extdata", "ternary_ca_fbsa_cpf_imi_continuous.csv", package = "mixdra")), "campaign")
+  base <- campaign_fit_base(df, c(1L, 2L, 3L), "CA", "continuous")
+  ec <- c(base[["ec50_1"]], base[["ec50_2"]], base[["ec50_3"]])
+
+  # Stressor 2's fitted EC50 (~34.7) sits well above its highest dose (4).
+  expect_equal(ec50_out_of_range(df, ec, 1:3), c(FALSE, TRUE, FALSE))
 })

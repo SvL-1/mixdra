@@ -365,3 +365,129 @@ split_fixed_bounds <- function(lower, upper, start) {
        lower = if (length(drop_lo)) drop_lo else NULL,
        upper = if (length(drop_hi)) drop_hi else NULL)
 }
+
+#' Read one curve-fit panel's constraints, pins included
+#'
+#' [collect_bounds()] reads the Lower/Upper cells; this adds the panel's "Fix"
+#' checkboxes. A ticked `pin_<param>` with a Value present is expressed as
+#' `lower == upper == value`, which is the representation
+#' [split_fixed_bounds()] already turns into a held-fixed parameter. Keeping
+#' pinning in that one representation means the panel, the campaign base fit and
+#' the joint optimisation all pin through the same code path.
+#' @param values Named list (e.g. a Shiny `input`) holding `lo_*`/`hi_*`,
+#'   `pin_*` and `val_*`.
+#' @param params Character vector of panel parameter names.
+#' @return A list with `lower` and `upper` named numeric vectors (or NULL).
+#' @keywords internal
+panel_constraints <- function(values, params = c("max", "slope", "ec50")) {
+  b  <- collect_bounds(values, params)
+  lo <- if (is.null(b$lower)) numeric(0) else b$lower
+  hi <- if (is.null(b$upper)) numeric(0) else b$upper
+  for (p in params) {
+    if (!isTRUE(values[[paste0("pin_", p)]])) next
+    v <- values[[paste0("val_", p)]]
+    if (is.null(v) || length(v) == 0 || is.na(v)) next
+    lo[[p]] <- as.numeric(v)
+    hi[[p]] <- as.numeric(v)
+  }
+  list(lower = if (length(lo)) lo else NULL,
+       upper = if (length(hi)) hi else NULL)
+}
+
+#' Engine parameter names for one stressor's slope and EC50
+#'
+#' The registry names a stressor's curve parameters by its POSITION in the
+#' fitted model, and the two arities spell EC50 differently (`ec501` for the
+#' binary model, `ec50_1` for the ternary one).
+#' @param pos Position of the stressor in the fit (1-based).
+#' @param n_chem Number of stressors in the fit (2 or 3).
+#' @return A named character vector: `slope`, `ec50`.
+#' @keywords internal
+base_param_names <- function(pos, n_chem) {
+  c(slope = paste0("slope", pos),
+    ec50  = if (n_chem == 2) paste0("ec50", pos) else paste0("ec50_", pos))
+}
+
+#' Campaign base bounds from the per-stressor panels and the shared-max row
+#'
+#' Translates what the user typed on the Singles page into the engine's base
+#' parameter space. Each stressor's `slope`/`ec50` constraints come from its own
+#' panel and are renamed to that stressor's POSITION in the fit (the campaign
+#' base drops undosed columns, so stressor 3 of a 1+3 campaign is `slope2`).
+#'
+#' `max` is deliberately NOT read from the panels: the campaign has one control
+#' group and therefore one shared upper asymptote, so three panels each naming
+#' their own `max` bound would be contradictory. It comes from the single
+#' campaign-level row instead, and the panels' own `max` cells constrain only
+#' their own exploratory Autofit.
+#' @param panels Named list of [panel_constraints()] results, keyed by stressor
+#'   index as a character (`"1"`, `"2"`, `"3"`). Missing entries are skipped.
+#' @param max_bounds A [panel_constraints()]-shaped list for the shared `max`,
+#'   or `NULL`.
+#' @param chems Integer stressor indices, from [campaign_chems()].
+#' @return A list with `lower` and `upper` named numeric vectors (or NULL).
+#' @keywords internal
+campaign_base_bounds <- function(panels, max_bounds = NULL, chems) {
+  n <- length(chems)
+  side <- function(which) {
+    out <- numeric(0)
+    for (pos in seq_along(chems)) {
+      v <- panels[[as.character(chems[pos])]][[which]]
+      if (is.null(v)) next
+      nm <- base_param_names(pos, n)
+      for (p in c("slope", "ec50"))
+        if (p %in% names(v)) out[[nm[[p]]]] <- unname(v[[p]])
+    }
+    mb <- max_bounds[[which]]
+    if (!is.null(mb) && "max" %in% names(mb)) out[["max"]] <- unname(mb[["max"]])
+    if (length(out)) out else NULL
+  }
+  list(lower = side("lower"), upper = side("upper"))
+}
+
+#' Map campaign base bounds onto one pair's binary parameter names
+#'
+#' The bounds counterpart of [pair_base()]: a three-stressor campaign's bounds
+#' are named for the ternary registry, but the pair is fitted with the binary
+#' model. Bounds for the stressor a pair does not contain are dropped. A
+#' two-stressor campaign's bounds are already in binary shape.
+#' @param bounds A list with `lower`/`upper`, from [campaign_base_bounds()].
+#' @param i,j Stressor indices of the pair, `i < j`.
+#' @return A list with `lower` and `upper` named numeric vectors (or NULL).
+#' @keywords internal
+pair_bounds <- function(bounds, i, j) {
+  stopifnot(i < j)
+  if (is.null(bounds)) return(list(lower = NULL, upper = NULL))
+  rename <- c(stats::setNames(c("slope1", "slope2"), paste0("slope", c(i, j))),
+              stats::setNames(c("ec501", "ec502"), paste0("ec50_", c(i, j))),
+              max = "max")
+  side <- function(v) {
+    if (is.null(v) || !length(v)) return(NULL)
+    if (any(c("ec501", "ec502") %in% names(v))) return(v)   # already binary
+    keep <- intersect(names(v), names(rename))
+    if (!length(keep)) return(NULL)
+    stats::setNames(unname(v[keep]), unname(rename[keep]))
+  }
+  list(lower = side(bounds$lower), upper = side(bounds$upper))
+}
+
+#' Which stressors have a fitted EC50 beyond their highest tested dose
+#'
+#' An EC50 above every concentration actually dosed is an extrapolation of the
+#' curve, not a measurement. That matters wherever the EC50 is used as a
+#' denominator -- a toxic-unit share computed from it inherits the extrapolation
+#' -- so the ternary hub flags it rather than presenting the number bare.
+#' @param df Campaign engine frame with `C1`/`C2`/`C3` columns.
+#' @param ec50 Numeric vector of fitted EC50s, in stressor order.
+#' @param chems Integer stressor indices matching `ec50` (default `1:length(ec50)`).
+#' @return A logical vector, one per stressor.
+#' @keywords internal
+ec50_out_of_range <- function(df, ec50, chems = seq_along(ec50)) {
+  vapply(seq_along(chems), function(pos) {
+    col <- paste0("C", chems[pos])
+    if (!col %in% names(df)) return(FALSE)
+    dosed <- df[[col]][df[[col]] > 0]
+    if (!length(dosed)) return(FALSE)
+    isTRUE(ec50[pos] > max(dosed, na.rm = TRUE))
+  }, logical(1))
+}

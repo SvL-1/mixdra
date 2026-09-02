@@ -153,9 +153,13 @@ analyse_mixture <- function(df, reference, response = c("continuous", "binary"),
 #' @param df Data frame with `C1` and `Res` (or `Exposed`/`Affected`).
 #' @param lower,upper,start Optional named numeric vectors forwarded to
 #'   [fit_single()] (`max`/`slope`/`ec50`).
+#' @param fixed Character vector of parameter names held fixed at their `start`
+#'   value, forwarded to [fit_single()].
 #' @return The [fit_single()] result.
 #' @export
-analyse_single <- function(df, lower = NULL, upper = NULL, start = NULL) {
+analyse_single <- function(df, lower = NULL, upper = NULL, start = NULL,
+                           fixed = character(0)) {
   resp <- if ("Res" %in% names(df)) df$Res else df$Affected / df$Exposed
-  fit_single(df$C1, resp, lower = lower, upper = upper, start = start)
+  fit_single(df$C1, resp, lower = lower, upper = upper, start = start,
+             fixed = fixed)
 }

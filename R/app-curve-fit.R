@@ -29,13 +29,15 @@ param_row <- function(ns, param, label, meaning, hi_default = NA) {
     shiny::column(3, shiny::tags$small(meaning)),
     shiny::column(2, shiny::numericInput(ns(paste0("lo_", param)), NULL, value = NA)),
     shiny::column(2, shiny::numericInput(ns(paste0("hi_", param)), NULL, value = hi_default)),
-    shiny::column(3, shiny::numericInput(ns(paste0("val_", param)), NULL, value = NA))
+    shiny::column(2, shiny::numericInput(ns(paste0("val_", param)), NULL, value = NA)),
+    shiny::column(1, shiny::checkboxInput(ns(paste0("pin_", param)), NULL,
+                                          value = FALSE))
   )
 }
 
 #' One interaction-parameter row: label, meaning, inert bound cells, value input
 #'
-#' Same five-column layout as [param_row()] for visual consistency with the
+#' Same six-column layout as [param_row()] for visual consistency with the
 #' curve grid, but `a`/`b` are unconstrained by the engine, so the Lower/Upper
 #' columns are inert "--" placeholders and only the Value input is editable.
 #' @param ns Module namespace function.
@@ -49,7 +51,8 @@ interaction_param_row <- function(ns, param, label, meaning) {
     shiny::column(3, shiny::tags$small(meaning)),
     shiny::column(2, shiny::tags$small("\u2014")),
     shiny::column(2, shiny::tags$small("\u2014")),
-    shiny::column(3, shiny::numericInput(ns(paste0("val_", param)), NULL, value = NA))
+    shiny::column(2, shiny::numericInput(ns(paste0("val_", param)), NULL, value = NA)),
+    shiny::column(1, shiny::tags$small("\u2014"))
   )
 }
 
@@ -74,11 +77,16 @@ curve_fit_ui <- function(id) {
         shiny::column(3, shiny::tags$small(shiny::tags$b("Meaning"))),
         shiny::column(2, shiny::tags$small(shiny::tags$b("Lower constraint"))),
         shiny::column(2, shiny::tags$small(shiny::tags$b("Upper constraint"))),
-        shiny::column(3, shiny::tags$small(shiny::tags$b("Value")))
+        shiny::column(2, shiny::tags$small(shiny::tags$b("Value"))),
+        shiny::column(1, shiny::tags$small(shiny::tags$b("Fix")))
       ),
       param_row(ns, "max", "max", "Upper asymptote."),
       param_row(ns, "slope", "slope", "Steepness of the curve."),
       param_row(ns, "ec50", "EC50", "50% Effect concentration."),
+      shiny::tags$small(shiny::tags$em(
+        "Tick Fix to hold a parameter at its Value instead of fitting it. ",
+        "Constraints and fixed values are carried into the campaign fit and ",
+        "the interaction stages.")),
       shiny::tags$small(shiny::HTML(
         "SSR = &Sigma; (y &minus; &#375;)&sup2; &nbsp;&nbsp;(&#375; = model prediction)")),
       shiny::uiOutput(ns("diagnostics")),
@@ -105,8 +113,11 @@ curve_fit_ui <- function(id) {
 #' @param meta Shared reactiveValues for experiment metadata (axis labels).
 #' @param chem_field Optional meta field for the x-axis label (e.g. "chem1"); NULL
 #'   uses a generic "Concentration" label.
-#' @return A reactive returning the current fit (a [analyse_single()]/[eval_single()]
-#'   result), or NULL before any fit.
+#' @return A list of two reactives: `fit`, the current fit (a
+#'   [analyse_single()]/[eval_single()] result, `NULL` before any fit), and
+#'   `constraints`, this panel's [panel_constraints()] (Lower/Upper cells plus
+#'   ticked Fix boxes). The Singles page feeds `constraints` into the campaign
+#'   base fit, so what the user constrains here is honoured downstream.
 #' @keywords internal
 curve_fit_server <- function(id, fit_df, meta, chem_field = NULL) {
   shiny::moduleServer(id, function(input, output, session) {
@@ -122,7 +133,7 @@ curve_fit_server <- function(id, fit_df, meta, chem_field = NULL) {
     shiny::observeEvent(input$autofit, {
       df <- fit_df()
       shiny::req(!is.null(df), nrow(df) > 0)
-      b <- collect_bounds(shiny::reactiveValuesToList(input), c("max", "slope", "ec50"))
+      b <- panel_constraints(shiny::reactiveValuesToList(input))
       if (!is.null(b$lower) && !is.null(b$upper)) {
         common <- intersect(names(b$lower), names(b$upper))
         if (length(common) && any(b$lower[common] > b$upper[common])) {
@@ -130,11 +141,15 @@ curve_fit_server <- function(id, fit_df, meta, chem_field = NULL) {
           return()
         }
       }
-      vals <- current_values()
-      start <- vals[!is.na(vals)]
+      # A pinned parameter arrives as lower == upper; split_fixed_bounds() turns
+      # that into `fixed`, because L-BFGS-B cannot difference inside a
+      # zero-width box.
+      sp    <- split_fixed_bounds(b$lower, b$upper, current_values())
+      start <- sp$start[!is.na(sp$start)]
       if (!length(start)) start <- NULL
       fit <- tryCatch(
-        analyse_single(df, lower = b$lower, upper = b$upper, start = start),
+        analyse_single(df, lower = sp$lower, upper = sp$upper, start = start,
+                       fixed = sp$fixed),
         error = function(e) {
           shiny::showNotification(paste("Fit failed:", conditionMessage(e)), type = "error")
           NULL
@@ -178,6 +193,8 @@ curve_fit_server <- function(id, fit_df, meta, chem_field = NULL) {
       )
     })
 
-    current_fit
+    list(fit = current_fit,
+         constraints = shiny::reactive(
+           panel_constraints(shiny::reactiveValuesToList(input))))
   })
 }

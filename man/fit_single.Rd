@@ -4,7 +4,14 @@
 \alias{fit_single}
 \title{Fit a three-parameter log-logistic curve to single-chemical data}
 \usage{
-fit_single(conc, resp, lower = NULL, upper = NULL, start = NULL)
+fit_single(
+  conc,
+  resp,
+  lower = NULL,
+  upper = NULL,
+  start = NULL,
+  fixed = character(0)
+)
 }
 \arguments{
 \item{conc}{Numeric vector of concentrations.}
@@ -13,6 +20,11 @@ fit_single(conc, resp, lower = NULL, upper = NULL, start = NULL)
 
 \item{lower, upper, start}{Optional named numeric vectors (\code{max}/\code{slope}/\code{ec50})
 overriding the corresponding defaults.}
+
+\item{fixed}{Character vector of parameter names to hold FIXED at their
+\code{start} value. Pinning has to go through here rather than through equal
+lower/upper bounds: L-BFGS-B cannot take a finite difference inside a
+zero-width box and fails with "non-finite finite-difference value".}
 }
 \value{
 A list with \code{par} (named: max, slope, ec50), \code{ssr}, \code{convergence}, and

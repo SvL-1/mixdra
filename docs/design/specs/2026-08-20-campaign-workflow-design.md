@@ -141,6 +141,32 @@ Consequences for the Singles page:
 
 `curve_fit_server()` is still reused unchanged.
 
+### Amended 2026-09-02: constraints are not exploratory (issue #12)
+
+The rule above holds for **fitted values**: a panel Autofit still never becomes
+the campaign's number. It was over-applied to **constraints**. Anything the user
+typed into a panel's Lower/Upper cells was discarded too, so a scientist who
+knows an EC50 or wants an asymptote held had no way to say so — the campaign fit
+ignored it, and so did every stage below.
+
+The distinction the design actually wants is between a *result* the user
+produced by clicking Autofit (exploratory, must not leak) and an *instruction*
+the user gave about how to fit (authoritative, must be honoured). So:
+
+- Each panel's Lower/Upper cells and its new **Fix** checkbox are read by the
+  Singles page and passed to `campaign_fit_base()` as bounds. Pinned parameters
+  (lower == upper) are routed through `fit_model(fixed = )`.
+- `max` is campaign-wide, so it gets ONE constraint row above the panels rather
+  than one per stressor — three panels each naming their own `max` bound would be
+  contradictory. The `max` cells inside a panel still constrain that panel's own
+  exploratory Autofit and nothing else.
+- The same constraints reach each pair's "Optimize all params (joint)" via
+  `pair_bounds()`. The staged pair fits need nothing: they already hold every
+  curve parameter fixed, so degrees of freedom, the LR tests and the selected
+  model are untouched by pinning. Only the joint block can move.
+- `base_version` still does not change when a panel is Autofitted. It changes
+  when the base is refitted, which is where a changed constraint takes effect.
+
 ## 6. Staleness — version stamping
 
 Expensive fits in this app are deliberately imperative: `fits_store` is a
