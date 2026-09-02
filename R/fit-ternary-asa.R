@@ -29,6 +29,38 @@ ternary_ratio_key <- function(df, sig = 6) {
   apply(signif(p, sig), 1, paste, collapse = "_")
 }
 
+#' Toxic-unit shares of a mixture ratio
+#'
+#' `TU_i = C_i / EC50_i`, normalised to sum to 1. This is the same quantity the
+#' interaction models are built on (`z` in the S/A factor), so a ratio expressed
+#' this way says how much of the mixture's TOXICITY each stressor contributes,
+#' where the concentration proportion says only how much MASS it contributes.
+#' The two can disagree sharply when the stressors differ in potency, which is
+#' why the ternary hub reports both (issue #11).
+#'
+#' Note this is a relabelling, not a regrouping: TU is a fixed per-stressor
+#' rescaling, so rows sharing a concentration ratio always share a TU ratio and
+#' [ternary_ratio_key()] partitions the data identically either way. The
+#' grouping key stays on nominal concentrations because those are exact and do
+#' not move when a single-stressor curve is refitted.
+#' @param p Numeric vector of concentrations (or concentration proportions).
+#' @param ec50 Numeric vector of EC50 values, same length as `p`.
+#' @return Numeric vector of TU shares summing to 1.
+#' @keywords internal
+tu_shares <- function(p, ec50) {
+  tu <- p / ec50
+  tu / sum(tu)
+}
+
+#' Format a proportion vector as a `a:b:c` label
+#' @param v Numeric vector.
+#' @param digits Decimal places (default 2).
+#' @return A single string.
+#' @keywords internal
+ratio_label <- function(v, digits = 2) {
+  paste(sprintf(paste0("%.", digits, "f"), v), collapse = ":")
+}
+
 #' Staged Advanced S/A ternary fit (internal)
 #'
 #' Stage 1: base curve params from singles (+control). Stage 2: A1/A2/A3 from

@@ -46,3 +46,21 @@ test_that("analyse_single forwards bounds to fit_single", {
   fit <- analyse_single(d, upper = c(slope = 1.5))
   expect_lte(fit$par[["slope"]], 1.5 + 1e-6)
 })
+
+test_that("fit_single holds a pinned parameter at its start value", {
+  conc <- c(0, 0.1, 0.3, 1, 3, 10)
+  d <- data.frame(C1 = conc, Res = ll3_predict(conc, 100, 2, 0.5))
+  fit <- analyse_single(d, start = c(ec50 = 0.7), fixed = "ec50")
+  expect_equal(unname(fit$par[["ec50"]]), 0.7)
+  expect_true(fit$ssr > 0)          # the pin costs fit quality
+})
+
+test_that("fit_single with every parameter pinned just evaluates the curve", {
+  conc <- c(0, 0.1, 0.3, 1, 3, 10)
+  d <- data.frame(C1 = conc, Res = ll3_predict(conc, 100, 2, 0.5))
+  fit <- analyse_single(d, start = c(max = 100, slope = 2, ec50 = 0.5),
+                        fixed = c("max", "slope", "ec50"))
+  expect_equal(unname(fit$par[c("max", "slope", "ec50")]), c(100, 2, 0.5))
+  expect_equal(fit$ssr, 0)
+  expect_equal(fit$convergence, 0L)
+})

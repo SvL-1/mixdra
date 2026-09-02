@@ -12,7 +12,8 @@ pair_workspace_server(
   response,
   base_version = NULL,
   on_fit = NULL,
-  labels = NULL
+  labels = NULL,
+  bounds = NULL
 )
 }
 \arguments{
@@ -41,6 +42,12 @@ comparison's selected model key, \code{base_version} is the campaign's
 base-parameter version stamp at fit time (\code{NULL} when \code{base_version} is
 not supplied). \code{NULL} (the default) leaves the workspace's behaviour
 unchanged outside the campaign tab.}
+
+\item{bounds}{Reactive returning a list with \code{lower}/\code{upper} named numeric
+vectors over this pair's binary parameter names (from \code{\link[=pair_bounds]{pair_bounds()}}), or
+\code{NULL} (the default) for no constraints. Only "Optimize all params (joint)"
+uses them: the staged fits already hold every curve parameter fixed, so a
+constraint there would be inert.}
 }
 \description{
 Fits and displays the interaction-model comparison for one stressor pair,

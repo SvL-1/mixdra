@@ -189,3 +189,29 @@ test_that("LINCHPIN: each pair's S/A a IS its ternary A-term at the same base", 
   expect_equal(a_of(1, 3), unname(auto$pairwise[["A2"]]), tolerance = 1e-3)
   expect_equal(a_of(2, 3), unname(auto$pairwise[["A3"]]), tolerance = 1e-3)
 })
+
+test_that("tu_shares converts a mass ratio into toxic-unit shares", {
+  z <- tu_shares(c(0.5, 0.5), c(0.1, 1))
+  expect_equal(z, c(10 / 11, 1 / 11))
+  expect_equal(sum(z), 1)
+})
+
+test_that("tu_shares leaves an equipotent mixture unchanged", {
+  expect_equal(tu_shares(c(0.2, 0.3, 0.5), c(1, 1, 1)), c(0.2, 0.3, 0.5))
+})
+
+test_that("ternary_ratio_key groups identically in concentration and TU space", {
+  # The point of issue #11: TU is a fixed per-column rescaling, so switching the
+  # ratio to toxic units is a relabelling and never a regrouping.
+  df <- data.frame(C1 = c(1, 2, 3, 1), C2 = c(2, 4, 6, 1), C3 = c(4, 8, 12, 1))
+  ec <- c(0.1, 5, 0.7)
+  conc_keys <- ternary_ratio_key(df)
+  tu <- as.data.frame(t(apply(as.matrix(df), 1, function(p) p / ec)))
+  names(tu) <- c("C1", "C2", "C3")
+  expect_equal(as.integer(factor(conc_keys)),
+               as.integer(factor(ternary_ratio_key(tu))))
+})
+
+test_that("ratio_label formats a proportion vector", {
+  expect_equal(ratio_label(c(0.5875, 0.0219, 0.3906)), "0.59:0.02:0.39")
+})

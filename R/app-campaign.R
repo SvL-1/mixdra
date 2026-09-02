@@ -46,12 +46,12 @@ campaign_ui <- function(id) {
                           c("Concentration addition (CA)" = "CA",
                             "Independent action (IA)" = "IA")),
       shiny::helpText(shiny::tags$small(
-        "One file for the whole campaign: single-stressor rows carry zeros in ",
+        "One file for the whole experiment: single-stressor rows carry zeros in ",
         "the other concentrations, pair rows carry zero in the third.")),
       shiny::downloadButton(ns("template"), "Download template"),
-      shiny::fileInput(ns("file"), "Upload campaign CSV", accept = ".csv"),
+      shiny::fileInput(ns("file"), "Upload CSV", accept = ".csv"),
       shiny::helpText(shiny::tags$small(
-        "An example campaign (FBSA + CPF + IMI, continuous) is loaded until ",
+        "An example experiment (FBSA + CPF + IMI, continuous) is loaded until ",
         "you upload your own.")),
       shiny::uiOutput(ns("errors")),
       shiny::uiOutput(ns("summary"))
@@ -75,7 +75,8 @@ campaign_server <- function(id, meta) {
     store$pairs   <- list()
 
     output$template <- shiny::downloadHandler(
-      filename = function() paste0("campaign_", input$response, "_template.csv"),
+      filename = function() paste0("multiple_stressors_", input$response,
+                                   "_template.csv"),
       content  = function(file)
         utils::write.csv(template_df("campaign", input$response), file,
                          row.names = FALSE)
@@ -119,7 +120,8 @@ campaign_server <- function(id, meta) {
     # observe the new data next to the old base: the whole derived state is
     # gone before a single new value lands.
     shiny::observeEvent(list(input$file, input$response, input$reference), {
-      store$base    <- NULL
+      store$base        <- NULL
+      store$base_bounds <- NULL
       store$singles <- list()
       store$pairs   <- list()
       store$ternary <- NULL
@@ -166,6 +168,10 @@ campaign_server <- function(id, meta) {
           b <- campaign_base(store)
           if (is.null(b)) NULL else pair_base(b, pp[1], pp[2])
         }),
+        # The campaign's constraints, renamed onto this pair's binary parameter
+        # names, so "Optimize all params (joint)" cannot free a curve parameter
+        # the user pinned on the Singles page (issue #12).
+        bounds = shiny::reactive(pair_bounds(store$base_bounds, pp[1], pp[2])),
         reference    = shiny::reactive(store$reference),
         # The store holds the USER-facing response key ("continuous"/"quantal")
         # because the gating and the template download read it; the engine's key
@@ -297,7 +303,7 @@ campaign_stage_nav <- function(ns, store, selected = NULL) {
                    axis_label(store, paste0("chem", p[2])))
     body <- if (!pair_has_rows(store$raw, p[1], p[2])) {
       shiny::div(class = "p-3 text-muted",
-                 "This campaign has no mixture rows for this pair.")
+                 "This experiment has no mixture rows for this pair.")
     } else if (!ready) {
       shiny::div(class = "p-3 text-muted",
                  sprintf("Fit all %d single-stressor curves first.",
@@ -311,12 +317,12 @@ campaign_stage_nav <- function(ns, store, selected = NULL) {
   if (length(store$chems) == 3) {
     body <- if (!campaign_has_ternary_rows(store$raw)) {
       shiny::div(class = "p-3 text-muted",
-                 "This campaign has no ternary rows (all three stressors ",
+                 "This experiment has no ternary rows (all three stressors ",
                  "dosed together), so the per-ratio A4 step has nothing to fit.")
     } else if (!identical(store$reference, "CA")) {
       shiny::div(class = "p-3 text-muted",
                  "The ternary stage is not yet supported for Independent ",
-                 "Action. Switch the campaign reference model to Concentration ",
+                 "Action. Switch the reference model to Concentration ",
                  "Addition to use it.")
     } else if (!identical(store$response, "continuous")) {
       shiny::div(class = "p-3 text-muted",

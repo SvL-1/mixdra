@@ -4,7 +4,7 @@
 \alias{campaign_fit_base}
 \title{Joint single-stressor fit for a campaign}
 \usage{
-campaign_fit_base(df, chems, reference, response)
+campaign_fit_base(df, chems, reference, response, bounds = NULL)
 }
 \arguments{
 \item{df}{Campaign engine frame (\code{C1}, \code{C2}, optionally \code{C3}, response cols).}
@@ -14,6 +14,12 @@ campaign_fit_base(df, chems, reference, response)
 \item{reference}{"CA" or "IA".}
 
 \item{response}{"continuous" or "quantal" (mapped to the engine's "binary").}
+
+\item{bounds}{Optional list with \code{lower}/\code{upper} named numeric vectors over
+the base parameters, from \code{\link[=campaign_base_bounds]{campaign_base_bounds()}}. A parameter whose lower
+and upper bound are equal is held FIXED at that value. This is how the
+Lower/Upper cells and "Fix" boxes on the Singles page reach the campaign
+fit; without it the panels would be purely exploratory (issue #12).}
 }
 \value{
 A named numeric vector of base curve parameters.

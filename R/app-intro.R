@@ -25,7 +25,7 @@ intro_ui <- function(id) {
     bslib::card(
       bslib::card_header("Welcome"),
       shiny::p("Upload concentration-response data on the Single Stressor and ",
-               "Campaign tabs. The experiment details entered here are used ",
+               "Multiple stressors tabs. The experiment details entered here are used ",
                "to label plots and axes.")
     )
   )
