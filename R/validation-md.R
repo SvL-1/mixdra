@@ -26,7 +26,7 @@
 .vm_mark <- function(kind, verdict) {
   if (identical(verdict, "fail")) return("✗")
   if (identical(verdict, "pass"))
-    return(if (identical(kind, "divergent")) "≠" else "✓")
+    return(switch(kind, divergent = "≠", regression = "=", "✓"))
   if (identical(verdict, "missing")) return("?")
   "–"
 }
@@ -146,10 +146,16 @@ validation_report_md <- function(report, path = "VALIDATION.md") {
            "percentage is a strong agreement, near 100% only just qualifies."),
     "",
     paste0("The last column reads: **✓** the engine matches the reference; ",
-           "**≠** it differs from the reference on purpose, and reproduced the ",
-           "value it is expected to produce instead — read the footnote; ",
-           "**✗** it failed; **–** no point value is claimed, and the bound is ",
-           "asserted in the test suite instead."),
+           "**≠** it disagrees with the reference on purpose — read the ",
+           "footnote; **=** there is no published counterpart, and the value is ",
+           "pinned against what this engine produced before, to catch a ",
+           "regression in the fitter; **✗** it failed; **–** no point value is ",
+           "claimed, and the bound is asserted in the test suite instead."),
+    "",
+    paste0("Only the **✓** rows count towards the score above. A regression pin ",
+           "is a claim about this engine's own stability, not about reproducing ",
+           "anyone else's result, and counting it as evidence of the latter ",
+           "would overstate the case."),
     "")
 
   for (ds in unique(report$dataset)) {

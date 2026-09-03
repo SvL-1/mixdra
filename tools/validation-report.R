@@ -19,8 +19,24 @@ html <- if (length(args)) args[[1]] else "validation-report.html"
 
 options(mixdra.validation_fixtures = normalizePath("tests/testthat/fixtures",
                                                    winslash = "/"))
-set.seed(42)
-rep <- validation_report()
+# Fit first and keep the fits, so that editing the oracle table -- adding a row,
+# reclassifying one, rewording a note -- can be re-rendered from validate.R
+# without paying for the fits again. Only a change to the engine or the fixtures
+# needs a fresh run.
+reg  <- validation_datasets()
+fits <- list()
+for (id in names(reg)) {
+  csv <- file.path(validation_fixtures(), reg[[id]]$path)
+  if (!file.exists(csv)) {
+    message("fixture missing, skipping: ", id)
+    next
+  }
+  message("fitting ", id, " ...")
+  fits[[id]] <- validation_run(reg[[id]], utils::read.csv(csv))
+}
+saveRDS(fits, "validation-fits.rds")
+
+rep <- validation_report(fits = fits)
 
 # A failed row must not quietly ship inside a document that reads as evidence.
 bad <- rep[rep$verdict %in% c("fail", "missing"), , drop = FALSE]

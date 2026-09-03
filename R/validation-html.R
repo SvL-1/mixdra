@@ -27,6 +27,7 @@
 .vh_kind_label <- c(
   match        = "matches reference",
   divergent    = "deliberate difference",
+  regression   = "engine pin, no reference",
   pinned       = "fixed in both",
   unidentified = "not identified by the data",
   bounded      = "inequality only")

@@ -106,7 +106,8 @@ h1{margin:0;font-family:var(--serif);font-weight:600;line-height:1.15;
   border-left:2px solid var(--rule)}
 .row--match{border-left-color:var(--accent)}
 .row--divergent{border-left-color:var(--diverge)}
-.row--pinned,.row--unidentified,.row--bounded{border-left-color:var(--rule)}
+.row--pinned,.row--unidentified,.row--bounded,
+.row--regression{border-left-color:var(--rule)}
 .row__q{font-weight:450;display:flex;flex-direction:column;gap:.1rem}
 .row__param{font-family:var(--mono);font-size:.73rem;color:var(--quiet)}
 .row__v{font-family:var(--mono);font-size:.95rem;font-variant-numeric:tabular-nums;
@@ -206,6 +207,14 @@ code{font-family:var(--mono);font-size:.85em;background:var(--accent-soft);
   fit the dose&ndash;response curves on the mixture data; this engine fits them
   from the single-compound data alone and then holds them fixed, so interaction
   shows up as interaction instead of being absorbed into the curves.</p>
+  <p><b>engine pin, no reference</b> &mdash; nobody else has published this
+  quantity, so no reference is shown beside it. The staged model has five fewer
+  free parameters than the published one, and its residual is simply not
+  comparable to any published figure; putting one next to it would invite exactly
+  the wrong conclusion. The value is pinned against what this engine produced
+  before, which catches a regression in the fitter. These rows do not count
+  towards the score &mdash; a claim about this engine's own stability is not
+  evidence of reproducing anyone else's result.</p>
   <p><b>fixed in both</b> &mdash; the parameter is pinned in the workbook and
   pinned here, so agreement is arithmetic rather than evidence.
   <b>not identified by the data</b> and <b>inequality only</b> mark quantities the
