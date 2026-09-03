@@ -5,7 +5,7 @@
 [![R-CMD-check](https://github.com/SvL-1/mixdra/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/SvL-1/mixdra/actions/workflows/R-CMD-check.yaml)
 <!-- validation-badges:start -->
 [![validation](https://github.com/SvL-1/mixdra/actions/workflows/validation-report.yaml/badge.svg)](https://github.com/SvL-1/mixdra/actions/workflows/validation-report.yaml)
-[![reference values](https://img.shields.io/badge/reference_values-14%2F14-brightgreen)](VALIDATION.md)
+[![reference values](https://img.shields.io/badge/reference_values-16%2F16-brightgreen)](VALIDATION.md)
 <!-- validation-badges:end -->
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)

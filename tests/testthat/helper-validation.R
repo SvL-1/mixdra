@@ -1,8 +1,8 @@
 # Shared, memoised fits for the workbook-validation tests. The ternary fit alone
 # is ~2 min on 419 rows with 10 starts, and three test files need it; caching it
 # per R session means CI pays for each dataset once instead of once per file.
-# set.seed() immediately before each fit keeps the multi-start optimiser
-# reproducible, exactly as the individual tests used to do.
+# validation_run() seeds each fit, so the multi-start optimiser is
+# reproducible and the tests fit exactly what the report reports.
 
 .validation_cache <- new.env(parent = emptyenv())
 
@@ -12,8 +12,7 @@ validation_fit <- function(id) {
   if (is.null(spec)) stop("unregistered validation dataset: ", id)
   csv <- testthat::test_path("fixtures", spec$path)
   if (!file.exists(csv)) return(NULL)
-  set.seed(42)
-  .validation_cache[[id]] <- spec$fit(utils::read.csv(csv))
+  .validation_cache[[id]] <- validation_run(spec, utils::read.csv(csv))
   .validation_cache[[id]]
 }
 

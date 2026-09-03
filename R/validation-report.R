@@ -77,7 +77,13 @@ validation_datasets <- function() {
       endpoint   = "reproduction (number of juveniles)",
       title = "Binary CPF + MPs, concentration addition, continuous response",
       fit   = function(df) analyse_mixture(df, reference = "CA",
-                                           response = "continuous", n_starts = 1)),
+                                           response = "continuous", n_starts = 1),
+      # The binary reference values were produced by the original joint fit, so
+      # to compare with them on their own terms the same model has to be fitted
+      # here too. Without this the staged residual looks like a worse fit rather
+      # than a more constrained one. See `joint` in the oracle table.
+      joint = function(res, df) refine_joint(res$fits$reference, df,
+                                             n_starts = 8, time_limit = 120)),
     binary_mps_cpf_quantal = list(
       path  = file.path("binary", "survival", "binary_mps_cpf_quantal.csv"),
       experiment = "experiment_2",
@@ -86,7 +92,9 @@ validation_datasets <- function() {
       endpoint   = "adult survival (quantal)",
       title = "Binary CPF + MPs, concentration addition, quantal (survival)",
       fit   = function(df) analyse_mixture(df, reference = "CA",
-                                           response = "binary", n_starts = 1)),
+                                           response = "binary", n_starts = 1),
+      joint = function(res, df) refine_joint(res$fits$reference, df,
+                                             n_starts = 8, time_limit = 120)),
     ternary_fbsa_cpf_imi = list(
       path  = file.path("ternary", "fbsa_cpf_imi",
                         "ternary_fbsa_cpf_imi_continuous.csv"),
@@ -98,6 +106,32 @@ validation_datasets <- function() {
                                            lower = c(ec50_2 = 5.579),
                                            upper = c(ec50_2 = 5.581)))
   )
+}
+
+#' Fit one validation dataset
+#'
+#' Runs the dataset's staged fit and, where the dataset registers one, the joint
+#' refit that makes its reference values comparable on their own terms. Seeded,
+#' because both fitters are multi-start. Shared by [validation_report()] and the
+#' validation tests so the report and the assertions cannot fit differently.
+#' @param spec One entry of [validation_datasets()].
+#' @param df The fixture data frame.
+#' @param seed RNG seed; the global RNG state is restored afterwards.
+#' @return The fit result, with a `joint` element when the dataset has one.
+#' @keywords internal
+validation_run <- function(spec, df, seed = 42) {
+  if (!is.null(seed)) {
+    old <- if (exists(".Random.seed", .GlobalEnv))
+             get(".Random.seed", .GlobalEnv) else NULL
+    on.exit(if (!is.null(old)) assign(".Random.seed", old, .GlobalEnv), add = TRUE)
+    set.seed(seed)
+  }
+  res <- spec$fit(df)
+  if (!is.null(spec$joint)) {
+    if (!is.null(seed)) set.seed(seed)
+    res$joint <- spec$joint(res, df)
+  }
+  res
 }
 
 #' Pull one fitted quantity out of a result object
@@ -116,6 +150,10 @@ validation_extract <- function(res, stage, parameter) {
     selection = if (identical(parameter, "chosen")) res$chosen %||% NA else NA,
     base      = pick(as.list(res$base), parameter),
     pairwise  = pick(as.list(res$pairwise), parameter),
+    joint     = if (is.null(res$joint)) NA
+                else if (identical(parameter, "objective"))
+                  res$joint$objective %||% NA
+                else pick(as.list(res$joint$par), parameter),
     overall   = if (identical(parameter, "objective"))
                   res$fits$overall$objective %||% NA else NA,
     NA)
@@ -176,7 +214,7 @@ validation_report <- function(datasets = NULL, fits = NULL,
       fits[[id]] <- NULL
       next
     }
-    fits[[id]] <- spec$fit(utils::read.csv(csv))
+    fits[[id]] <- validation_run(spec, utils::read.csv(csv))
   }
 
   obs <- vapply(seq_len(nrow(orc)), function(i) {

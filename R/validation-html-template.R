@@ -174,6 +174,25 @@ code{font-family:var(--mono);font-size:.85em;background:var(--accent-soft);
 </header>
 
 <section class="legend">
+  <h2>Two fitting designs, and why a residual can look worse</h2>
+  <p>A mixture can look more toxic than expected for two different reasons: the
+  chemicals interact, or one of them is simply more potent than its own curve
+  suggested. Both explanations fit the data about equally well, and an optimiser
+  has no way to prefer one &mdash; it takes whichever lowers the residual, which
+  usually means quietly moving the curve and reporting no interaction.</p>
+  <p>This engine fits each chemical's curve from the single-compound data alone
+  and then holds it fixed, so the mixture data can only answer one question: how
+  far does it deviate? That is the <b>staged</b> design. It has fewer free
+  parameters than a <b>joint</b> fit, which re-estimates the curves on the mixture
+  data too, and so it always leaves a larger residual. That is the price of the
+  sharper question, not a worse fit.</p>
+  <p>Because the binary reference values were produced jointly, those datasets are
+  reported both ways. The <b>joint refit</b> rows fit the reference model exactly
+  as the workbook did and land on its residual, which is what shows the larger
+  staged residual beside them to be the model rather than the arithmetic. The
+  ternary reference values were themselves produced with a staged fit, so they
+  compare directly and need no second fit.</p>
+
   <h2>What each row claims</h2>
   <p><b>matches reference</b> &mdash; the engine must land on the reference value
   within the stated tolerance. The bar shows how much of that tolerance the
