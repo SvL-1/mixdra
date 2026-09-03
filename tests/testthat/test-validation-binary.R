@@ -16,7 +16,7 @@
 # express as a value-plus-tolerance: significance inequalities.
 
 test_that("staged engine: binary CA continuous analysis on MPs+CPF", {
-  expect_matches_workbook("binary_mps_cpf_ca_continuous")
+  expect_matches_reference("binary_mps_cpf_ca_continuous")
 
   res <- validation_fit("binary_mps_cpf_ca_continuous")
   # S/A remains significant, though weaker than the joint workbook's chi ~13.
@@ -26,7 +26,7 @@ test_that("staged engine: binary CA continuous analysis on MPs+CPF", {
 })
 
 test_that("staged engine: binary CA quantal analysis on MPs+CPF", {
-  expect_matches_workbook("binary_mps_cpf_quantal")
+  expect_matches_reference("binary_mps_cpf_quantal")
 
   res <- validation_fit("binary_mps_cpf_quantal")
   # The interaction is strongly supported (CA-vs-S/A p well below 0.001).

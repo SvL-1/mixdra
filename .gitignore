@@ -33,3 +33,11 @@ t?-*.png
 
 # generated locally by tools/validation-report.R; CI attaches it to the run
 validation-report.html
+validation-report.rds
+
+# The workbooks that produced the validation reference values ARE tracked, so
+# every number in VALIDATION.md can be traced back to the cell it came from.
+# (R CMD build still excludes them via .Rbuildignore, so the tarball stays small.)
+!FBSA CPF IMI ternary -simplified_correct.xls
+!tests/testthat/fixtures/binary/binary mixtox calculations CA continuous refitted to singles and binary residuals_correct.xlsm
+!tests/testthat/fixtures/ternary/fbsa_cpf_imi/CA Juveniles A4 fitting DR FBSA CPF IMI_simplified.xls

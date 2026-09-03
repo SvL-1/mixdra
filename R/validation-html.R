@@ -25,7 +25,7 @@
 }
 
 .vh_kind_label <- c(
-  match        = "reproduces workbook",
+  match        = "matches reference",
   divergent    = "deliberate difference",
   pinned       = "fixed in both",
   unidentified = "not identified by the data",
@@ -46,6 +46,44 @@
           if (over) "over" else sprintf("%.0f%% of tol.", frac * 100))
 }
 
+# What was actually measured, on what, under which guideline, and where it was
+# published. A reference value without this is just a number someone typed, so
+# it sits above the table rather than in a footnote.
+.vh_provenance <- function(spec, exp) {
+  e <- exp[exp$experiment == (spec$experiment %||% ""), , drop = FALSE]
+  if (nrow(e) != 1) return("")
+  e <- e[1, ]
+  item <- function(name, value)
+    if (is.na(value) || !nzchar(value)) "" else
+      sprintf('<div><dt>%s</dt><dd>%s</dd></div>', .vh_esc(name), value)
+
+  doi <- function(d) sprintf('<a href="https://doi.org/%s">doi:%s</a>',
+                             .vh_esc(d), .vh_esc(d))
+  fields <- paste0(
+    item("Experiment", .vh_esc(e$label)),
+    item("Organism", sprintf("<i>%s</i>", .vh_esc(sub(" \\(.*", "", e$organism)))),
+    item("Life stage", .vh_esc(e$life_stage)),
+    item("Endpoint", .vh_esc(spec$endpoint %||% e$endpoint)),
+    item("Exposure", .vh_esc(sprintf("%s days", e$duration_days))),
+    item("Guideline", .vh_esc(e$guideline)),
+    item("Soil", .vh_esc(e$soil)),
+    item("Units", .vh_esc(e$units)),
+    item("Mixture ratios", .vh_esc(e$ratios)),
+    item("Published in", paste0(.vh_esc(e$publication), " &mdash; ", doi(e$doi))),
+    item("Raw data", doi(e$data_doi)))
+
+  caveats <- trimws(strsplit(e$caveats %||% "", "|", fixed = TRUE)[[1]])
+  caveats <- caveats[nzchar(caveats)]
+
+  sprintf('<details class="prov"><summary>Provenance</summary><dl>%s</dl>%s</details>',
+          fields,
+          if (length(caveats))
+            paste0('<p class="prov__cav"><b>Caveats for this experiment</b></p><ul>',
+                   paste(sprintf("<li>%s</li>", .vh_esc(caveats)), collapse = ""),
+                   "</ul>")
+          else "")
+}
+
 #' Render a validation report as a standalone HTML page
 #'
 #' @param report A [validation_report()] data frame.
@@ -60,6 +98,7 @@
 validation_report_html <- function(report, path = "validation-report.html",
                                    generated = Sys.time(), standalone = TRUE) {
   reg <- validation_datasets()
+  exp <- validation_experiments()
   n_match <- sum(report$kind == "match")
   n_pass  <- sum(report$kind == "match" & report$verdict == "pass")
   n_fail  <- sum(report$verdict == "fail")
@@ -69,19 +108,20 @@ validation_report_html <- function(report, path = "validation-report.html",
     d <- report[report$dataset == ds, , drop = FALSE]
     title <- reg[[ds]]$title %||% ds
     rows <- vapply(seq_len(nrow(d)), function(i) {
-      wb  <- if (nzchar(as.character(d$workbook[i])) && !is.na(d$workbook[i]))
-               .vh_num(d$workbook[i]) else "\u2014"
+      wb  <- if (nzchar(as.character(d$reference[i])) && !is.na(d$reference[i]))
+               .vh_num(d$reference[i]) else "\u2014"
       obs <- if (!is.na(d$observed[i])) .vh_num(d$observed[i]) else "not produced"
       sprintf(paste0(
         '<div class="row row--%s">',
         '<div class="row__q">%s<span class="row__param">%s</span></div>',
-        '<div class="row__v"><span class="row__cap">workbook</span>%s</div>',
+        '<div class="row__v"><span class="row__cap">%s</span>%s</div>',
         '<div class="row__v"><span class="row__cap">mixdra</span>%s</div>',
         '<div class="row__d">%s</div>',
         '<div class="row__k">%s</div>',
         '</div>%s'),
         .vh_esc(d$kind[i]), .vh_esc(d$label[i]), .vh_esc(d$parameter[i]),
-        wb, obs, .vh_bar(d$rel_diff[i], suppressWarnings(as.numeric(d$tolerance[i]))),
+        .vh_esc(d$source_type[i]), wb, obs,
+        .vh_bar(d$rel_diff[i], suppressWarnings(as.numeric(d$tolerance[i]))),
         .vh_esc(.vh_kind_label[[d$kind[i]]] %||% d$kind[i]),
         if (nzchar(d$note[i]))
           sprintf('<p class="note"><span>%s</span>%s</p>',
@@ -90,8 +130,10 @@ validation_report_html <- function(report, path = "validation-report.html",
           sprintf('<p class="note"><span>%s</span></p>', .vh_esc(d$source[i]))
         else "")
     }, character(1))
-    sprintf('<section class="panel"><h2>%s</h2><p class="panel__id">%s</p>%s</section>',
-            .vh_esc(title), .vh_esc(ds), paste(rows, collapse = "\n"))
+    sprintf('<section class="panel"><h2>%s</h2><p class="panel__id">%s</p>%s%s</section>',
+            .vh_esc(title), .vh_esc(ds),
+            .vh_provenance(reg[[ds]], exp),
+            paste(rows, collapse = "\n"))
   }, character(1))
 
   # Placeholder substitution rather than sprintf: the template is mostly CSS,

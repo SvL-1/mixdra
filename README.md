@@ -5,7 +5,7 @@
 [![R-CMD-check](https://github.com/SvL-1/mixdra/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/SvL-1/mixdra/actions/workflows/R-CMD-check.yaml)
 <!-- validation-badges:start -->
 [![validation](https://github.com/SvL-1/mixdra/actions/workflows/validation-report.yaml/badge.svg)](https://github.com/SvL-1/mixdra/actions/workflows/validation-report.yaml)
-[![workbook values](https://img.shields.io/badge/workbook_values-11%2F11-brightgreen)](VALIDATION.md)
+[![reference values](https://img.shields.io/badge/reference_values-14%2F14-brightgreen)](VALIDATION.md)
 <!-- validation-badges:end -->
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
@@ -215,17 +215,28 @@ real dataset — see the **methodology vignette** (`vignette("methodology", pack
 
 The engine is checked two ways:
 
-1. **Against the source workbooks** — `mixdra` is expected to select the same best model and land
-   on parameters consistent with the published Excel/VBA + Solver results (fixtures extracted from
-   the original binary and ternary workbooks).
+1. **Against the published results** — `mixdra` is expected to land on the EC50 values printed in
+   van Loon et al. (2025), and on the parameters and model selections of the original Excel/VBA +
+   Solver workbooks the fixtures were extracted from.
 2. **Against the truth** — synthetic datasets are generated with known parameters and noise-free,
    then re-fit; the engine must recover the generating parameters.
 
-Every workbook target lives in [`inst/validation/oracles.csv`](inst/validation/oracles.csv), one
-row per fitted quantity, recording the published value, the sheet and column it was read from, the
-tolerance, and whether the engine is expected to reproduce it or to differ from it deliberately.
-That one table drives both the automated tests and the rendered validation report, so a number
-cannot be reported without being asserted, or asserted without being reported.
+Every reference target lives in [`inst/validation/oracles.csv`](inst/validation/oracles.csv), one
+row per fitted quantity, recording the reference value, where it was read from, the tolerance, and
+whether the engine is expected to reproduce it or to differ from it deliberately. References come
+from two places: **published** values printed in the peer-reviewed paper (citable, and independent
+of the spreadsheet the data was extracted from), and **workbook** cells, which cover quantities the
+paper does not print. That one table drives both the automated tests and the rendered validation
+report, so a number cannot be reported without being asserted, or asserted without being reported.
+
+The experiments behind the data are recorded in
+[`inst/validation/datasets.csv`](inst/validation/datasets.csv): organism and life stage, endpoint,
+exposure duration, OECD guideline, soil, units, mixture ratios, the publication and its DOI, and
+the caveats a reader needs in order to read the reference values correctly — for instance that the
+microplastics EC50 is not measured but fixed at three times the NOEC, and that the FBSA EC50 of
+5.58 mg/kg comes from a range-finding test rather than the experiment itself. The raw survival and
+reproduction data are openly available at
+[doi:10.5281/zenodo.14961673](https://doi.org/10.5281/zenodo.14961673).
 
 ```r
 # run the suite (or a single file)

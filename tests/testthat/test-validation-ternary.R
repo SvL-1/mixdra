@@ -26,7 +26,7 @@
 # test files by helper-validation.R and seeded for stability.
 
 test_that("ternary Advanced S/A engine reproduces the FBSA workbook", {
-  expect_matches_workbook("ternary_fbsa_cpf_imi")
+  expect_matches_reference("ternary_fbsa_cpf_imi")
 
   res <- validation_fit("ternary_fbsa_cpf_imi")
   df  <- read.csv(testthat::test_path("fixtures", "ternary", "fbsa_cpf_imi",

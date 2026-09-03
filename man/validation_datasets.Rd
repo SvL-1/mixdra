@@ -7,11 +7,13 @@
 validation_datasets()
 }
 \value{
-A named list of \code{list(path, fit, title, chemicals)} entries.
+A named list of \code{list(path, experiment, endpoint, title, fit)} entries.
 }
 \description{
 One entry per \code{dataset} id used in \code{\link[=validation_oracles]{validation_oracles()}}: the fixture path
-(relative to the test fixtures root) and the call that produces the fit.
-Kept next to the oracle table so a new dataset is registered in one place.
+(relative to the test fixtures root), the experiment it came from (a row of
+\code{\link[=validation_experiments]{validation_experiments()}}), the measured endpoint, and the call that
+produces the fit. Kept next to the oracle table so a new dataset is
+registered in one place.
 }
 \keyword{internal}

@@ -79,8 +79,26 @@ h1{margin:0;font-family:var(--serif);font-weight:600;line-height:1.15;
 .panel{display:flex;flex-direction:column}
 .panel h2{margin:0;font-family:var(--serif);font-weight:600;font-size:1.3rem;
   line-height:1.3;text-wrap:balance}
-.panel__id{margin:.15rem 0 1.25rem;font-family:var(--mono);font-size:.75rem;
+.panel__id{margin:.15rem 0 1rem;font-family:var(--mono);font-size:.75rem;
   color:var(--quiet)}
+
+/* Provenance: what was measured, on what, and where it was published. Folded
+   away by default so it never competes with the numbers, but one click from
+   every table it justifies. */
+.prov{margin:0 0 1.5rem;border:1px solid var(--rule);border-radius:3px;
+  background:var(--panel);font-size:.87rem}
+.prov summary{cursor:pointer;padding:.6rem .9rem;font-family:var(--mono);
+  font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--muted)}
+.prov summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.prov dl{margin:0;padding:.2rem .9rem .7rem;display:grid;gap:.4rem}
+.prov dl>div{display:grid;grid-template-columns:9.5rem 1fr;gap:.9rem}
+.prov dt{color:var(--quiet)}
+.prov dd{margin:0}
+.prov a{color:var(--accent)}
+.prov__cav{margin:0 .9rem;color:var(--ink)}
+.prov ul{margin:.35rem 0 .9rem;padding-left:2.6rem;color:var(--muted)}
+.prov li+li{margin-top:.3rem}
 
 .row{display:grid;align-items:baseline;gap:.35rem 1.25rem;
   grid-template-columns:minmax(10rem,1.5fr) 7.5rem 7.5rem minmax(6rem,1fr) 8.5rem;
@@ -128,6 +146,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--accent-soft);
   .row__q{grid-column:1/-1}
   .row__d{grid-column:1/-1}
   .row__k{grid-column:1/-1;text-align:left}
+  .prov dl>div{grid-template-columns:1fr;gap:.15rem}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -136,15 +155,17 @@ code{font-family:var(--mono);font-size:.85em;background:var(--accent-soft);
 <div class="wrap">
 <header class="head">
   <p class="eyebrow">Generated validation report</p>
-  <h1>Does mixdra reproduce the published workbooks?</h1>
+  <h1>Does mixdra reproduce the published results?</h1>
   <p class="lede">Every figure below was produced by re-fitting the reference
-  datasets with the current version of the package. The <strong>workbook</strong>
-  column comes from <code>inst/validation/oracles.csv</code>, which records each
-  published value together with the sheet and column it was read from &mdash; and
-  which is also what the automated test suite asserts against. A number cannot
-  appear on this page without being tested, or be tested without appearing here.</p>
+  datasets with the current version of the package. The <strong>reference</strong>
+  values come from <code>inst/validation/oracles.csv</code>, which records each
+  one together with where it was read from &mdash; a table in the peer-reviewed
+  paper, or a named sheet and column in the MixTox workbook &mdash; and which is
+  also what the automated test suite asserts against. A number cannot appear on
+  this page without being tested, or be tested without appearing here. Each
+  dataset's <strong>Provenance</strong> panel carries the experiment behind it.</p>
   <dl class="summary">
-    <div class="is-ok"><dt>Workbook values reproduced</dt>
+    <div class="is-ok"><dt>Reference values reproduced</dt>
       <dd>{{PASS}}<small>&thinsp;/&thinsp;{{MATCH}}</small></dd></div>
     <div class="is-div"><dt>Deliberate differences</dt><dd>{{DIV}}</dd></div>
     <div class="is-fail"><dt>Failures</dt><dd>{{FAIL}}</dd></div>
@@ -154,16 +175,18 @@ code{font-family:var(--mono);font-size:.85em;background:var(--accent-soft);
 
 <section class="legend">
   <h2>What each row claims</h2>
-  <p><b>reproduces workbook</b> &mdash; the engine must land on the published
-  value within the stated tolerance. The bar shows how much of that tolerance the
+  <p><b>matches reference</b> &mdash; the engine must land on the reference value
+  within the stated tolerance. The bar shows how much of that tolerance the
   result actually used: a short bar is a strong agreement, a full bar only just
-  qualifies.</p>
-  <p><b>deliberate difference</b> &mdash; the engine departs from the workbook on
+  qualifies. Each row is labelled <b>publication</b> or <b>workbook</b> for where
+  its reference came from; publication values are the stronger evidence, being
+  citable and independent of the spreadsheet the data was extracted from.</p>
+  <p><b>deliberate difference</b> &mdash; the engine departs from the reference on
   purpose, and the note says why. These are not failures, but they are the rows
-  worth reading rather than skimming. The workbook fits the dose&ndash;response
-  curves jointly on the mixture data; this engine fits them from the
-  single-compound data alone and then holds them fixed, so interaction shows up
-  as interaction instead of being absorbed into the curves.</p>
+  worth reading rather than skimming. The published and workbook joint analyses
+  fit the dose&ndash;response curves on the mixture data; this engine fits them
+  from the single-compound data alone and then holds them fixed, so interaction
+  shows up as interaction instead of being absorbed into the curves.</p>
   <p><b>fixed in both</b> &mdash; the parameter is pinned in the workbook and
   pinned here, so agreement is arithmetic rather than evidence.
   <b>not identified by the data</b> and <b>inequality only</b> mark quantities the
@@ -181,9 +204,15 @@ code{font-family:var(--mono);font-size:.85em;background:var(--accent-soft);
   and the engine has to invert it back to those parameters. Those live in
   <code>tests/testthat/test-recovery.R</code> and run in the same CI job that
   produced this page.</p>
+  <p>Nor does it cover every fixture in the repository. Three laboratory
+  experiments produced four ternary mixtures and eleven binary pairs; only the
+  datasets above carry reference values so far. Registering the rest means
+  adding rows to the oracle table, not writing new code.</p>
   <p>Reference data are <em>Folsomia candida</em> soil reproduction assays
-  (chlorpyrifos, microplastics, imidacloprid and FBSA, in mg&thinsp;kg&#8315;&sup1;),
-  fitted with the Jonker et&nbsp;al. (2005) mixture dose&ndash;response method.</p>
+  (chlorpyrifos, microplastics, imidacloprid and FBSA), fitted with the
+  Jonker et&nbsp;al. (2005) mixture dose&ndash;response method. The raw survival
+  and reproduction data are openly available at
+  <a href="https://doi.org/10.5281/zenodo.14961673">doi:10.5281/zenodo.14961673</a>.</p>
 </footer>
 </div>
 )---"

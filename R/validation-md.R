@@ -19,7 +19,55 @@
 
 # Literal characters rather than HTML entities: GitHub sanitises rendered
 # markdown, and these have to survive that as well as a plain-text read.
-.vm_status <- c(pass = "✓", fail = "✗", info = "–", missing = "?")
+#
+# A `divergent` row that passes gets its own mark. It passed against what this
+# engine is expected to produce, not against the reference value beside it, and
+# a tick next to two visibly different numbers would read as a claim they match.
+.vm_mark <- function(kind, verdict) {
+  if (identical(verdict, "fail")) return("✗")
+  if (identical(verdict, "pass"))
+    return(if (identical(kind, "divergent")) "≠" else "✓")
+  if (identical(verdict, "missing")) return("?")
+  "–"
+}
+
+# The provenance block above each table: what was actually measured, on what,
+# under which guideline, and where it was published. Without this a reference
+# value is just a number someone typed.
+.vm_provenance <- function(spec, exp) {
+  e <- exp[exp$experiment == (spec$experiment %||% ""), , drop = FALSE]
+  if (nrow(e) != 1) return(character(0))
+  e <- e[1, ]
+  field <- function(name, value)
+    if (is.na(value) || !nzchar(value)) NULL else
+      sprintf("| **%s** | %s |", name, .vm_cell(value))
+
+  rows <- c(
+    field("Experiment", e$label),
+    field("Organism", e$organism),
+    field("Life stage", e$life_stage),
+    field("Endpoint", spec$endpoint %||% e$endpoint),
+    field("Exposure", sprintf("%s days", e$duration_days)),
+    field("Guideline", e$guideline),
+    field("Soil", e$soil),
+    field("Units", e$units),
+    field("Mixture ratios", e$ratios),
+    field("Published in", sprintf("%s — [doi:%s](https://doi.org/%s)",
+                                  e$publication, e$doi, e$doi)),
+    field("Raw data", sprintf("[doi:%s](https://doi.org/%s)",
+                              e$data_doi, e$data_doi)))
+
+  caveats <- trimws(strsplit(e$caveats %||% "", "|", fixed = TRUE)[[1]])
+  caveats <- caveats[nzchar(caveats)]
+
+  c("<details><summary>Provenance</summary>", "",
+    "| | |", "|---|---|", rows, "",
+    if (length(caveats))
+      c("**Caveats for this experiment**", "",
+        paste0("- ", vapply(caveats, .vm_cell, character(1))), "")
+    else NULL,
+    "</details>", "")
+}
 
 #' Render a validation report as markdown
 #'
@@ -30,6 +78,7 @@
 #' @export
 validation_report_md <- function(report, path = "VALIDATION.md") {
   reg <- validation_datasets()
+  exp <- validation_experiments()
   n_match <- sum(report$kind == "match")
   n_pass  <- sum(report$kind == "match" & report$verdict == "pass")
   n_fail  <- sum(report$verdict == "fail")
@@ -44,24 +93,37 @@ validation_report_md <- function(report, path = "VALIDATION.md") {
     # Deliberately no timestamp: the file is regenerated on every CI run and
     # diffed against the committed copy, so a clock in it would fail that check
     # every time. Git history already records when the numbers last moved.
-    sprintf(paste0("**%d of %d** published workbook values reproduced, ",
+    sprintf(paste0("**%d of %d** reference values reproduced, ",
                    "%d deliberate difference%s, %d failure%s."),
             n_pass, n_match, n_div, if (n_div == 1) "" else "s",
             n_fail, if (n_fail == 1) "" else "s"),
     "",
     paste0("Every figure in the `mixdra` column was produced by re-fitting the ",
            "reference datasets with the current version of the package. The ",
-           "`workbook` column comes from ",
+           "`Reference` column comes from ",
            "[`inst/validation/oracles.csv`](inst/validation/oracles.csv), which ",
-           "records each published value together with the sheet and column it ",
-           "was read from, and which is also what the test suite asserts ",
-           "against. A number cannot appear here without being tested, or be ",
-           "tested without appearing here."),
+           "records each value together with where it was read from, and which ",
+           "is also what the test suite asserts against. A number cannot appear ",
+           "here without being tested, or be tested without appearing here."),
     "",
-    paste0("**Diff** is the distance from the published value. **Tol.** is how ",
+    paste0("Reference values come from two places. Rows sourced from the ",
+           "**publication** are values printed in the peer-reviewed paper: ",
+           "citable, and independent of the spreadsheet the data was extracted ",
+           "from. Rows sourced from the **workbook** are cells in the ",
+           "MixTox/Excel workbook itself, which covers quantities the paper ",
+           "does not print. Not every quantity is comparable across the two — ",
+           "the published single-compound curves are fitted per compound with ",
+           "their own upper asymptote, while the mixture model shares one — and ",
+           "where that matters the row says so."),
+    "",
+    paste0("**Diff** is the distance from the reference value. **Tol.** is how ",
            "much of the allowed tolerance that distance uses — a low ",
-           "percentage is a strong agreement, near 100% only just qualifies. ",
-           "Rows marked – make no point-value claim; their bounds are ",
+           "percentage is a strong agreement, near 100% only just qualifies."),
+    "",
+    paste0("The last column reads: **✓** the engine matches the reference; ",
+           "**≠** it differs from the reference on purpose, and reproduced the ",
+           "value it is expected to produce instead — read the footnote; ",
+           "**✗** it failed; **–** no point value is claimed, and the bound is ",
            "asserted in the test suite instead."),
     "")
 
@@ -74,7 +136,8 @@ validation_report_md <- function(report, path = "VALIDATION.md") {
       "",
       sprintf("`%s`", .vm_cell(ds)),
       "",
-      "| Quantity | Workbook | mixdra | Diff | Tol. | |",
+      .vm_provenance(reg[[ds]], exp),
+      "| Quantity | Reference | mixdra | Diff | Tol. | |",
       "|---|---:|---:|---:|---:|:-:|")
     for (i in seq_len(nrow(d))) {
       tol <- suppressWarnings(as.numeric(d$tolerance[i]))
@@ -83,16 +146,17 @@ validation_report_md <- function(report, path = "VALIDATION.md") {
       out <- c(out, sprintf("| %s%s | %s | %s | %s | %s | %s |",
         .vm_cell(d$label[i]),
         if (is.na(fn[i])) "" else sprintf(" [^%s-%d]", ds, fn[i]),
-        if (is.na(d$workbook[i])) "" else paste0("`", .vm_cell(.vh_num(d$workbook[i])), "`"),
+        if (is.na(d$reference[i])) "" else paste0("`", .vm_cell(.vh_num(d$reference[i])), "`"),
         if (is.na(d$observed[i])) "" else paste0("`", .vm_cell(.vh_num(d$observed[i])), "`"),
-        .vm_pct(d$rel_diff_workbook[i]), used,
-        .vm_status[[d$verdict[i]]] %||% d$verdict[i]))
+        .vm_pct(d$rel_diff_reference[i]), used,
+        .vm_mark(d$kind[i], d$verdict[i])))
     }
     out <- c(out, "")
     for (i in which(!is.na(fn)))
       out <- c(out, sprintf("[^%s-%d]: %s%s", ds, fn[i],
                             if (nzchar(d$source[i]))
-                              sprintf("*%s.* ", .vm_cell(d$source[i])) else "",
+                              sprintf("*%s — %s.* ", .vm_cell(d$source_type[i]),
+                                      .vm_cell(d$source[i])) else "",
                             .vm_cell(d$note[i])), "")
   }
 
@@ -106,9 +170,18 @@ validation_report_md <- function(report, path = "VALIDATION.md") {
            "invert it back to those parameters. Those live in ",
            "[`tests/testthat/test-recovery.R`](tests/testthat/test-recovery.R)."),
     "",
+    paste0("Nor does it cover every fixture in the repository. Three ",
+           "laboratory experiments produced four ternary mixtures and eleven ",
+           "binary pairs; only the datasets listed above carry reference values ",
+           "so far. Registering the rest is a matter of adding rows to the ",
+           "oracle table, not new code."),
+    "",
     paste0("Reference data are *Folsomia candida* soil reproduction assays ",
-           "(chlorpyrifos, microplastics, imidacloprid and FBSA, in mg/kg), ",
-           "fitted with the Jonker et al. (2005) mixture dose-response method."),
+           "(chlorpyrifos, microplastics, imidacloprid and FBSA), fitted with ",
+           "the Jonker et al. (2005) mixture dose-response method. The raw ",
+           "survival and reproduction data are openly available at ",
+           "[doi:10.5281/zenodo.14961673]",
+           "(https://doi.org/10.5281/zenodo.14961673)."),
     "")
 
   if (is.null(path)) return(out)
@@ -139,8 +212,8 @@ validation_badges <- function(report, path = "README.md", repo = "SvL-1/mixdra")
                    "validation-report.yaml/badge.svg)]",
                    "(https://github.com/%s/actions/workflows/",
                    "validation-report.yaml)"), repo, repo),
-    sprintf(paste0("[![workbook values](https://img.shields.io/badge/",
-                   "workbook_values-%d%%2F%d-%s)](VALIDATION.md)"),
+    sprintf(paste0("[![reference values](https://img.shields.io/badge/",
+                   "reference_values-%d%%2F%d-%s)](VALIDATION.md)"),
             n_pass, n_match, colour))
 
   lines <- readLines(path, warn = FALSE)

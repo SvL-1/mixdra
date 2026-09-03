@@ -34,6 +34,11 @@ validation_report_md(rep, "VALIDATION.md")
 validation_badges(rep, "README.md")
 validation_report_html(rep, html)
 
+# Keep the comparison itself, so wording or layout changes can be re-rendered
+# without paying for the fits again. Gitignored: VALIDATION.md is the committed
+# artifact.
+saveRDS(rep, "validation-report.rds")
+
 message(sprintf("%d quantities, %d passing | wrote VALIDATION.md, README badges, %s",
                 nrow(rep), sum(rep$verdict == "pass"), html))
 

@@ -10,12 +10,22 @@ validation_oracles()
 A data frame.
 }
 \description{
-The workbook targets that \code{\link[=validation_report]{validation_report()}} checks the engine against.
-Columns: \code{dataset}, \code{stage}, \code{parameter}, \code{label}, \code{workbook} (the published
-value), \code{expected} (what this engine must produce), \code{tolerance} (relative,
-as in \code{\link[testthat:expect_equal]{testthat::expect_equal()}}), \code{kind}, \code{source}, \code{note}.
+The reference targets that \code{\link[=validation_report]{validation_report()}} checks the engine against.
+Columns: \code{dataset}, \code{stage}, \code{parameter}, \code{label}, \code{reference} (the
+externally published value), \code{expected} (what this engine must produce),
+\code{tolerance} (relative, as in \code{\link[testthat:expect_equal]{testthat::expect_equal()}}), \code{kind},
+\code{source_type}, \code{source}, \code{note}.
 }
 \details{
+\code{source_type} says where the reference value came from: \code{workbook} for a cell
+in the MixTox/Excel workbook the fixture was extracted from, and
+\code{publication} for a number printed in the peer-reviewed paper. Publication
+values are the stronger evidence — they are citable and independent of the
+spreadsheet — but only some quantities are comparable across the two, because
+the published single-compound curves are fitted per compound with their own
+asymptote while the mixture model shares one. Where that makes a quantity
+incomparable, the row says so in its note.
+
 \code{kind} says what sort of claim the row makes:
 \describe{
 \item{\code{match}}{The engine must reproduce the workbook value.}

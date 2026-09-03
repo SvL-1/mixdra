@@ -20,11 +20,11 @@ alone takes ~2 minutes).}
 \item{fixtures}{Root of the test fixtures tree; see \code{\link[=validation_fixtures]{validation_fixtures()}}.}
 }
 \value{
-The oracle table plus \code{observed}, \code{rel_diff}, \code{rel_diff_workbook}
+The oracle table plus \code{observed}, \code{rel_diff}, \code{rel_diff_reference}
 and \code{verdict} columns.
 \code{verdict} is \code{"pass"}, \code{"fail"}, or \code{"info"} for rows that make no
 point-value claim. \code{rel_diff} is the distance from \code{expected} (the
-assertion target); \code{rel_diff_workbook} the distance from the published
+assertion target); \code{rel_diff_reference} the distance from the published
 value, which differs for \code{divergent} rows.
 }
 \description{

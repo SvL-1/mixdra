@@ -21,7 +21,7 @@ validation_fit <- function(id) {
 # row that makes a point-value claim. Rows of kind "info"/"missing" are reported
 # by validation_report() but not asserted here -- their claims are inequalities
 # or sign conditions, asserted explicitly in the calling test.
-expect_matches_workbook <- function(id) {
+expect_matches_reference <- function(id) {
   fit <- validation_fit(id)
   testthat::skip_if(is.null(fit), paste0("fixture for ", id, " missing"))
   rep <- validation_report(datasets = id, fits = stats::setNames(list(fit), id))
@@ -29,8 +29,8 @@ expect_matches_workbook <- function(id) {
     if (!rep$verdict[i] %in% c("pass", "fail")) next
     testthat::expect_equal(
       rep$verdict[i], "pass",
-      info = sprintf("%s / %s: workbook %s, expected %s, got %s (rel. diff %.3g)",
-                     id, rep$label[i], rep$workbook[i], rep$expected[i],
+      info = sprintf("%s / %s: reference %s, expected %s, got %s (rel. diff %.3g)",
+                     id, rep$label[i], rep$reference[i], rep$expected[i],
                      rep$observed[i], rep$rel_diff[i]))
   }
   invisible(rep)
