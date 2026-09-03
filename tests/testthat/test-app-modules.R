@@ -275,9 +275,11 @@ test_that("ternary_server: consumes the store's frozen base + pairwise -> hub + 
         c(res$individual$C1[1], res$individual$C2[1], res$individual$C3[1]),
         c(res$base[["ec50_1"]], res$base[["ec50_2"]], res$base[["ec50_3"]]))))
 
-    # ... and the extrapolated EC50 behind those TU shares is flagged.
-    expect_match(as.character(output$ec50_note$html), "Extrapolated EC50",
-                 fixed = TRUE)
+    # ... and the extrapolated EC50 behind those TU shares is flagged, with the
+    # remedy named: pin that EC50 on the Singles page (issue #11 discussion).
+    note <- as.character(output$ec50_note$html)
+    expect_match(note, "Extrapolated EC50", fixed = TRUE)
+    expect_match(note, "Singles", fixed = TRUE)
 
     # Clicking a ratio row selects that ratio.
     session$setInputs(hub_rows_selected = 2)

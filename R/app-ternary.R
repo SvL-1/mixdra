@@ -172,7 +172,11 @@ ternary_server <- function(id, store) {
 
     # A TU share is only as good as the EC50 in its denominator: when a fitted
     # EC50 sits above every dose actually tested for that stressor it is an
-    # extrapolation, and so is its contribution to the TU ratio.
+    # extrapolation, and so is its contribution to the TU ratio. The note names
+    # the remedy rather than just the defect: the scientist usually knows a
+    # better EC50 than an unconstrained fit can find from truncated data, and
+    # since issue #12 can pin it on the Singles page -- at which point the TU
+    # ratios recompute from the pinned value and this note clears itself.
     output$ec50_note <- shiny::renderUI({
       res <- asa_res(); shiny::req(res, store$raw)
       ec  <- c(res$base[["ec50_1"]], res$base[["ec50_2"]], res$base[["ec50_3"]])
@@ -186,7 +190,9 @@ ternary_server <- function(id, store) {
                        character(1)), collapse = ", "),
           ": the fitted EC50 lies above every dose tested for that stressor, ",
           "so its share of the TU ratio is a model extrapolation rather than a ",
-          "measured quantity."))
+          "measured quantity. If you have a better estimate, tick ",
+          shiny::tags$b("Fix"), " next to that stressor's EC50 on the Singles ",
+          "page and refit \u2014 the TU ratios follow the fixed value."))
     })
 
     output$hub <- DT::renderDT({
