@@ -1,0 +1,18 @@
+dataset,stage,parameter,label,workbook,expected,tolerance,kind,source,note
+binary_mps_cpf_ca_continuous,reference,ec501,EC50 CPF (C1),0.094,0.094,0.05,match,single-compound curve,EC50 of the toxic component taken from its own single-compound curve.
+binary_mps_cpf_ca_continuous,reference,objective,Residual SS (reference),1633769.68,2224215.9,0.02,divergent,workbook joint fit,"The workbook re-fits the curve parameters on the mixture data, which absorbs interaction into the curves and lowers its residual. This engine fixes the curves on the singles, so its reference residual is necessarily higher."
+binary_mps_cpf_ca_continuous,selection,chosen,Selected deviation,DL,DL,NA,match,workbook model selection,Dose-level deviation; agrees with the workbook.
+binary_mps_cpf_quantal,reference,max,Control proportion (max),0.9556,0.9556,0.02,match,workbook,Control survival plateau.
+binary_mps_cpf_quantal,reference,objective,Residual deviance (reference),184.424,231.418,0.02,divergent,workbook joint fit,Same staged-versus-joint difference as the continuous case.
+binary_mps_cpf_quantal,selection,chosen,Selected deviation,reference,DR,NA,divergent,workbook model selection,"Fixing the curves on the singles lets a genuine dose-ratio deviation surface that the workbook's joint fit had absorbed into the re-fitted curves."
+ternary_fbsa_cpf_imi,base,max,Control plateau (max),872.198,872.198,0.01,match,per-ratio sheets / 'Advanced S/A' column,Stage-1 base fitted from singles + control.
+ternary_fbsa_cpf_imi,base,ec50_1,EC50 CPF,0.12747,0.12747,0.08,match,per-ratio sheets / 'Advanced S/A' column,
+ternary_fbsa_cpf_imi,base,ec50_2,EC50 FBSA,5.58,5.58,0.01,pinned,workbook fixes EC50 FBSA at 5.58,Held fixed in both the workbook and this fit; agreement here is by construction and is not an independent check.
+ternary_fbsa_cpf_imi,base,ec50_3,EC50 IMI,0.57507,0.57507,0.06,match,per-ratio sheets / 'Advanced S/A' column,
+ternary_fbsa_cpf_imi,base,slope1,Slope CPF,4.6721,4.6721,0.07,match,per-ratio sheets / 'Advanced S/A' column,
+ternary_fbsa_cpf_imi,base,slope3,Slope IMI,3.6274,3.6274,0.09,match,per-ratio sheets / 'Advanced S/A' column,
+ternary_fbsa_cpf_imi,base,slope2,Slope FBSA,NA,NA,NA,unidentified,workbook beta2 spans ~13-56 across its fits,"Weakly identified because EC50 FBSA is pinned. Only the sign and magnitude are checked (must exceed 10); no point value is claimed."
+ternary_fbsa_cpf_imi,pairwise,A1,A1 (CPF-FBSA),0.7295,0.7295,0.3,match,sheet 'Overall' col G,Stage-2 fit from the binaries with the base held fixed — exactly the workbook's own design. Sign must be positive (synergy).
+ternary_fbsa_cpf_imi,pairwise,A2,A2 (CPF-IMI),-0.2890,-0.2890,0.3,match,sheet 'Overall' col G,Sign must be negative (antagonism).
+ternary_fbsa_cpf_imi,pairwise,A3,A3 (FBSA-IMI),-1.8424,-1.8424,0.3,match,sheet 'Overall' col G,Sign must be negative (antagonism).
+ternary_fbsa_cpf_imi,overall,objective,Residual SS (all 419 rows),11465387,NA,NA,bounded,workbook pure-CA residual SS (df 412),Must sit below the workbook's pure-CA residual — adding interaction terms can only reduce it — while staying the same order of magnitude.

@@ -30,3 +30,6 @@ verify-*.R
 verify-*.out
 verify-*.rds
 t?-*.png
+
+# generated locally by tools/validation-report.R; CI attaches it to the run
+validation-report.html

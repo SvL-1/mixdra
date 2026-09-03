@@ -11,16 +11,17 @@
 # (~0.5%) and diverges in the interior (~9%). Our closed form is exact for the
 # fitted model, so the Excel is not a comparable reference. (Decision 2026-06-01.)
 #
-# SLOW: analyse_ternary on 419 rows ~ 2 min. set.seed for stability.
+# SLOW: analyse_ternary on 419 rows ~ 2 min; the fit is cached across test
+# files by helper-validation.R and seeded there for stability.
 
 test_that("isoplane / markers / sigma-TU land on the fitted model's max/2 surface", {
   fx <- testthat::test_path("fixtures", "ternary", "fbsa_cpf_imi", "ternary_fbsa_cpf_imi_continuous.csv")
   skip_if_not(file.exists(fx), "ternary fixture CSV missing")
 
   df <- read.csv(fx)
-  set.seed(42)
-  res <- analyse_ternary(df, "CA", "continuous", n_starts = 10, time_limit = 120,
-                         lower = c(ec50_2 = 5.579), upper = c(ec50_2 = 5.581))
+  # Shared with the workbook-validation test via helper-validation.R, so the
+  # ~2 min fit is paid for once per session rather than once per file.
+  res <- validation_fit("ternary_fbsa_cpf_imi")
   b <- res$base
   expect_gt(b[["max"]], 0)
   expect_true(is.finite(res$A4_overall))

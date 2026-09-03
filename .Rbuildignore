@@ -20,3 +20,5 @@
 ^recieved$
 ^MixTox_shiny_v2$
 ^diag_.*
+^VALIDATION\.md$
+^validation-report\.html$

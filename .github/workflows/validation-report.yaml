@@ -1,0 +1,49 @@
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+name: validation-report
+
+permissions: read-all
+
+# Re-fits the reference datasets and compares them against the published
+# workbook values. The committed VALIDATION.md and the README badge are
+# regenerated here and diffed: if either has drifted away from what the engine
+# now fits, this job fails and the badge goes red. Kept out of R-CMD-check
+# because it is slow (the ternary fit is several minutes) -- the same numbers
+# are asserted there by the validation tests.
+jobs:
+  validation-report:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::devtools
+
+      - name: Render validation report
+        run: Rscript tools/validation-report.R validation-report.html
+
+      - name: Check the committed report and badge are current
+        run: |
+          if ! git diff --exit-code -- VALIDATION.md README.md; then
+            echo "::error::VALIDATION.md or the README badge is out of date." \
+                 "Run 'Rscript tools/validation-report.R' and commit the result."
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: validation-report
+          path: validation-report.html

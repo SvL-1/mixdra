@@ -3,6 +3,10 @@
 **Mixture dose–response analysis in R — the Jonker et al. (2005) method, made reproducible.**
 
 [![R-CMD-check](https://github.com/SvL-1/mixdra/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/SvL-1/mixdra/actions/workflows/R-CMD-check.yaml)
+<!-- validation-badges:start -->
+[![validation](https://github.com/SvL-1/mixdra/actions/workflows/validation-report.yaml/badge.svg)](https://github.com/SvL-1/mixdra/actions/workflows/validation-report.yaml)
+[![workbook values](https://img.shields.io/badge/workbook_values-11%2F11-brightgreen)](VALIDATION.md)
+<!-- validation-badges:end -->
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
 
@@ -217,11 +221,31 @@ The engine is checked two ways:
 2. **Against the truth** — synthetic datasets are generated with known parameters and noise-free,
    then re-fit; the engine must recover the generating parameters.
 
+Every workbook target lives in [`inst/validation/oracles.csv`](inst/validation/oracles.csv), one
+row per fitted quantity, recording the published value, the sheet and column it was read from, the
+tolerance, and whether the engine is expected to reproduce it or to differ from it deliberately.
+That one table drives both the automated tests and the rendered validation report, so a number
+cannot be reported without being asserted, or asserted without being reported.
+
 ```r
 # run the suite (or a single file)
 devtools::test()
 devtools::test(filter = "recovery")
 ```
+
+**[VALIDATION.md](VALIDATION.md)** is the generated report: every workbook value next to what
+this version of the package actually fits, with the difference and how much of the allowed
+tolerance it uses. It is regenerated rather than edited, and the badge above carries its score.
+The `validation-report` CI workflow rebuilds it on every push to `main`, fails if the committed
+copy has gone stale, and also renders an HTML version attached to the run. To rebuild locally:
+
+```sh
+Rscript tools/validation-report.R
+```
+
+Adding a newly published dataset is a data-entry job: drop the fixture CSV in
+`tests/testthat/fixtures/`, register how to fit it in `validation_datasets()`, and add its rows to
+the oracle table. No new test code.
 
 ## Scope
 
