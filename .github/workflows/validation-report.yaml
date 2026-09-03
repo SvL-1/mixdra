@@ -34,12 +34,32 @@ jobs:
       - name: Render validation report
         run: Rscript tools/validation-report.R validation-report.html
 
-      - name: Check the committed report and badge are current
+      # The badge is a claim -- "n of m reference values reproduced" -- and it
+      # must never outlive the run that justifies it. It counts verdicts, so it
+      # is stable across platforms and can be checked strictly.
+      - name: Check the README badge is current
         run: |
-          if ! git diff --exit-code -- VALIDATION.md README.md; then
-            echo "::error::VALIDATION.md or the README badge is out of date." \
+          if ! git diff --exit-code -- README.md; then
+            echo "::error::The README validation badge disagrees with this run." \
                  "Run 'Rscript tools/validation-report.R' and commit the result."
             exit 1
+          fi
+
+      # The document is not checked strictly. Fitted values can differ in their
+      # last digits between platforms -- the quantal residual deviance came out
+      # as 231.42 on Windows and 231.46 on Linux, a 0.017 % difference against a
+      # 2 % tolerance -- and failing the build over rendering would train people
+      # to ignore a red badge. A real regression fails the step above, or fails
+      # tools/validation-report.R outright, which exits non-zero on any failing
+      # row. Drift in the digits is reported here for whoever wants to refresh
+      # the committed copy.
+      - name: Report drift in the committed report
+        if: always()
+        run: |
+          if ! git diff --quiet -- VALIDATION.md; then
+            echo "::notice::VALIDATION.md differs from this run in its fitted" \
+                 "digits. Regenerate and commit when convenient."
+            git diff -- VALIDATION.md
           fi
 
       - uses: actions/upload-artifact@v4

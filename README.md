@@ -247,8 +247,13 @@ devtools::test(filter = "recovery")
 **[VALIDATION.md](VALIDATION.md)** is the generated report: every workbook value next to what
 this version of the package actually fits, with the difference and how much of the allowed
 tolerance it uses. It is regenerated rather than edited, and the badge above carries its score.
-The `validation-report` CI workflow rebuilds it on every push to `main`, fails if the committed
-copy has gone stale, and also renders an HTML version attached to the run. To rebuild locally:
+
+The `validation-report` CI workflow rebuilds it on every push and pull request. It fails if any
+reference value is no longer reproduced, or if the README badge claims a score the run does not
+support — the badge counts verdicts, so it is stable across platforms. It does *not* fail when the
+committed document differs only in the last digits of a fitted value, which can happen between
+platforms: that drift is reported as a notice for whoever wants to refresh the copy. The run also
+attaches an HTML version. To rebuild locally:
 
 ```sh
 Rscript tools/validation-report.R
