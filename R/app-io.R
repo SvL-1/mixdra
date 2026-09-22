@@ -471,23 +471,88 @@ pair_bounds <- function(bounds, i, j) {
   list(lower = side(bounds$lower), upper = side(bounds$upper))
 }
 
-#' Which stressors have a fitted EC50 beyond their highest tested dose
+#' Which stressors have a fitted EC50 outside their tested dose range
 #'
-#' An EC50 above every concentration actually dosed is an extrapolation of the
+#' An EC50 outside every concentration actually dosed is an extrapolation of the
 #' curve, not a measurement. That matters wherever the EC50 is used as a
 #' denominator -- a toxic-unit share computed from it inherits the extrapolation
-#' -- so the ternary hub flags it rather than presenting the number bare.
+#' -- so the app flags it rather than presenting the number bare.
+#'
+#' Both sides count. Above the highest dose is the common case (a stressor that
+#' showed no toxicity in the tested range); below the lowest is rarer but just
+#' as much an extrapolation, since nothing was dosed low enough to place the
+#' curve's midpoint there either. The side is reported, not just the fact, so
+#' the warning can say which way the fit ran off the data.
 #' @param df Campaign engine frame with `C1`/`C2`/`C3` columns.
 #' @param ec50 Numeric vector of fitted EC50s, in stressor order.
 #' @param chems Integer stressor indices matching `ec50` (default `1:length(ec50)`).
-#' @return A logical vector, one per stressor.
+#' @return A character vector, one per stressor: `"above"`, `"below"`, or `""`.
 #' @keywords internal
-ec50_out_of_range <- function(df, ec50, chems = seq_along(ec50)) {
+ec50_range_flag <- function(df, ec50, chems = seq_along(ec50)) {
   vapply(seq_along(chems), function(pos) {
     col <- paste0("C", chems[pos])
-    if (!col %in% names(df)) return(FALSE)
+    if (!col %in% names(df)) return("")
     dosed <- df[[col]][df[[col]] > 0]
-    if (!length(dosed)) return(FALSE)
-    isTRUE(ec50[pos] > max(dosed, na.rm = TRUE))
-  }, logical(1))
+    dosed <- dosed[!is.na(dosed)]
+    if (!length(dosed)) return("")
+    if (isTRUE(ec50[pos] > max(dosed))) return("above")
+    if (isTRUE(ec50[pos] < min(dosed))) return("below")
+    ""
+  }, character(1))
+}
+
+#' The extrapolated-EC50 warning, for whichever stage is showing it
+#'
+#' A TU share is only as good as the EC50 in its denominator, so an EC50 the fit
+#' placed outside the tested range has to be marked wherever it is used. The note
+#' names the remedy rather than just the defect: the scientist usually knows a
+#' better EC50 than an unconstrained fit can find from truncated data, and since
+#' issue #12 can pin it on the Singles page -- at which point everything
+#' downstream recomputes from the pinned value and this note clears itself.
+#'
+#' One builder serves all three stages so the wording cannot drift apart. Only
+#' the direction changes: on the Singles page the Fix boxes are on screen, so the
+#' remedy points down the page; everywhere else it names the page to go to.
+#' @param df Engine frame with the `C` columns the EC50s were fitted from.
+#' @param ec50 Numeric vector of fitted EC50s, in stressor order.
+#' @param labels Display name per stressor, same order and length as `ec50`.
+#' @param chems Integer stressor indices matching `ec50`.
+#' @param on_singles Is the note being rendered on the Singles page itself?
+#' @return A `shiny` tag, or `NULL` when every EC50 is inside its tested range.
+#' @keywords internal
+ec50_range_note <- function(df, ec50, labels, chems = seq_along(ec50),
+                            on_singles = FALSE) {
+  side <- ec50_range_flag(df, ec50, chems)
+  bad  <- which(nzchar(side))
+  if (!length(bad)) return(NULL)
+  named <- paste(vapply(bad, function(k)
+    sprintf("%s (%s every dose tested)", labels[[k]], side[[k]]),
+    character(1)), collapse = ", ")
+  shiny::div(
+    class = "alert alert-warning mt-2",
+    shiny::tags$small(
+      "Extrapolated EC50 for ", named,
+      ": an EC50 outside the range of doses actually tested is a model ",
+      "extrapolation rather than a measured quantity, and so is every toxic ",
+      "unit computed from it. If you have a better estimate, tick ",
+      shiny::tags$b("Fix"), " next to that stressor's EC50 ",
+      if (on_singles) "below" else "on the Singles page",
+      " and refit \u2014 the toxic units follow the fixed value."))
+}
+
+#' The EC50s of a campaign base, whatever its parameter naming
+#'
+#' A two-stressor campaign's base uses the binary names (`ec501`), a
+#' three-stressor one the ternary names (`ec50_1`). Callers that only want the
+#' numbers should not have to care which.
+#' @param base A campaign base parameter vector.
+#' @param n Number of stressors to read.
+#' @return A numeric vector of length `n`.
+#' @keywords internal
+base_ec50s <- function(base, n) {
+  vapply(seq_len(n), function(pos) {
+    nm <- paste0("ec50_", pos)
+    if (!nm %in% names(base)) nm <- paste0("ec50", pos)
+    unname(base[[nm]])
+  }, numeric(1))
 }

@@ -121,6 +121,7 @@ pair_workspace_ui <- function(id) {
                "The table's interaction columns are empty whenever the models ",
                "have not been run \u2014 or were cleared because the data or the ",
                "curves changed \u2014 so run it again to bring them up to date."),
+      shiny::uiOutput(ns("ec50_note")),
       shiny::div(
         shiny::actionButton(ns("fit_interactions"), "Fit interaction models",
                             class = "btn-primary")),
@@ -207,6 +208,19 @@ pair_workspace_server <- function(id, fit_df, base, reference, response,
       if (isTRUE(input$thorough))
         shiny::div(class = "text-warning",
                    shiny::tags$small("Multi-start fitting may take several minutes."))
+    })
+
+    # This pair's frozen curves come from the Singles page, and so does the
+    # repair: an EC50 fitted outside its tested dose range is an extrapolation
+    # that the DL model's summed toxic units inherit, so say so here rather than leaving it
+    # to the ternary hub, which a two-stressor campaign never reaches (issue #11).
+    output$ec50_note <- shiny::renderUI({
+      b <- base(); d <- fit_df()
+      shiny::req(b, d)
+      labs <- axis_labs()
+      nm <- if (is.null(labs)) c("stressor 1", "stressor 2")
+            else c(labs$x, labs$y)
+      ec50_range_note(d, base_ec50s(b, 2), nm, chems = 1:2)
     })
 
     # Per-model staged interaction fits, keyed by model name. The auto-fill loop

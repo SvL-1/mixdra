@@ -867,12 +867,110 @@ test_that("campaign_fit_base is unchanged when no bounds are given", {
                                  bounds = list(lower = NULL, upper = NULL)))
 })
 
-test_that("ec50_out_of_range flags an EC50 above every tested dose", {
+test_that("ec50_range_flag names the side of the tested range an EC50 falls outside", {
+  df <- data.frame(C1 = c(0, 1, 2, 4), C2 = c(0, 1, 2, 4), C3 = c(0, 1, 2, 4))
+
+  # in range / above every dose tested / below every dose tested
+  expect_equal(ec50_range_flag(df, c(2, 40, 0.01), 1:3), c("", "above", "below"))
+})
+
+test_that("ec50_range_flag flags the real campaign EC50 that sits above every tested dose", {
   df <- to_engine_df(read_upload(system.file(
     "extdata", "ternary_ca_fbsa_cpf_imi_continuous.csv", package = "mixdra")), "campaign")
   base <- campaign_fit_base(df, c(1L, 2L, 3L), "CA", "continuous")
   ec <- c(base[["ec50_1"]], base[["ec50_2"]], base[["ec50_3"]])
 
   # Stressor 2's fitted EC50 (~34.7) sits well above its highest dose (4).
-  expect_equal(ec50_out_of_range(df, ec, 1:3), c(FALSE, TRUE, FALSE))
+  expect_equal(ec50_range_flag(df, ec, 1:3), c("", "above", ""))
+})
+
+test_that("ec50_range_note is silent when every EC50 sits inside the tested range", {
+  df <- data.frame(C1 = c(0, 1, 2, 4), C2 = c(0, 1, 2, 4))
+
+  expect_null(ec50_range_note(df, c(2, 3), c("CPF", "IMI"), 1:2))
+})
+
+test_that("ec50_range_note names the stressor, the side it falls on, and the Fix remedy", {
+  df <- data.frame(C1 = c(0, 1, 2, 4), C2 = c(0, 1, 2, 4))
+  note <- as.character(ec50_range_note(df, c(2, 40), c("CPF", "IMI"), 1:2))
+
+  expect_match(note, "Extrapolated EC50", fixed = TRUE)
+  expect_match(note, "IMI (above every dose tested)", fixed = TRUE)
+  expect_false(grepl("CPF", note, fixed = TRUE))
+  expect_match(note, "Fix", fixed = TRUE)
+  # Away from the Singles page the remedy has to say where to go.
+  expect_match(note, "Singles page", fixed = TRUE)
+})
+
+test_that("ec50_range_note points at the Fix box below when it is already on the Singles page", {
+  df <- data.frame(C1 = c(0, 1, 2, 4), C2 = c(0, 1, 2, 4))
+  note <- as.character(ec50_range_note(df, c(2, 40), c("CPF", "IMI"), 1:2,
+                                       on_singles = TRUE))
+
+  expect_match(note, "Extrapolated EC50", fixed = TRUE)
+  expect_false(grepl("Singles page", note, fixed = TRUE))
+})
+
+test_that("singles_server flags an extrapolated EC50 on the page that can fix it", {
+  # Issue #11: the remedy is a Fix box on THIS page, so the warning has to be
+  # here -- a user who never opens the ternary hub would otherwise never see it.
+  store <- shiny::reactiveValues(
+    n_chem = 2L, chems = c(1L, 2L), base_version = 0L, singles = list(),
+    chem1 = "CPF", chem2 = "IMI",
+    raw = data.frame(C1 = c(0, 1, 2, 4, 0, 0, 0),
+                     C2 = c(0, 0, 0, 0, 1, 2, 4),
+                     Res = c(100, 90, 80, 60, 95, 90, 85)),
+    base = c(max = 100, slope1 = 1, slope2 = 1, ec501 = 2, ec502 = 40))
+
+  shiny::testServer(singles_server, args = list(store = store), {
+    note <- as.character(output$ec50_note$html)
+    expect_match(note, "Extrapolated EC50", fixed = TRUE)
+    expect_match(note, "IMI", fixed = TRUE)
+    expect_false(grepl("CPF", note, fixed = TRUE))
+  })
+})
+
+test_that("singles_server says nothing while the campaign base is unfitted", {
+  store <- shiny::reactiveValues(
+    n_chem = 2L, chems = c(1L, 2L), base_version = 0L, singles = list(),
+    raw = data.frame(C1 = c(0, 1), C2 = c(0, 1), Res = c(100, 90)), base = NULL)
+
+  shiny::testServer(singles_server, args = list(store = store), {
+    # req() on an unfitted base fails silently rather than returning NULL, which
+    # is what renders nothing at all in the browser.
+    expect_error(output$ec50_note, class = "shiny.silent.error")
+  })
+})
+
+test_that("pair_workspace_server flags the extrapolated EC50 behind its toxic units", {
+  df <- data.frame(C1 = c(0, 1, 2, 4, 0, 0, 0, 1, 2),
+                   C2 = c(0, 0, 0, 0, 1, 2, 4, 1, 2),
+                   Res = c(100, 90, 80, 60, 95, 90, 85, 88, 70))
+
+  shiny::testServer(pair_workspace_server, args = list(
+    fit_df    = shiny::reactive(df),
+    base      = shiny::reactive(c(max = 100, slope1 = 1, slope2 = 1,
+                                  ec501 = 2, ec502 = 40)),
+    reference = shiny::reactive("CA"),
+    response  = shiny::reactive("continuous"),
+    labels    = shiny::reactive(list(x = "CPF", y = "IMI", z = "response"))), {
+    note <- as.character(output$ec50_note$html)
+    expect_match(note, "Extrapolated EC50", fixed = TRUE)
+    expect_match(note, "IMI", fixed = TRUE)
+    expect_match(note, "Singles page", fixed = TRUE)
+  })
+})
+
+test_that("pair_workspace_server falls back to stressor numbers when unlabelled", {
+  df <- data.frame(C1 = c(0, 1, 2, 4), C2 = c(0, 1, 2, 4),
+                   Res = c(100, 90, 80, 60))
+
+  shiny::testServer(pair_workspace_server, args = list(
+    fit_df    = shiny::reactive(df),
+    base      = shiny::reactive(c(max = 100, slope1 = 1, slope2 = 1,
+                                  ec501 = 2, ec502 = 40)),
+    reference = shiny::reactive("CA"),
+    response  = shiny::reactive("continuous")), {
+    expect_match(as.character(output$ec50_note$html), "stressor 2", fixed = TRUE)
+  })
 })

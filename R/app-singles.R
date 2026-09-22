@@ -106,6 +106,7 @@ singles_ui <- function(id) {
       "every stage below.")),
     campaign_max_row(ns),
     shiny::uiOutput(ns("base_readout")),
+    shiny::uiOutput(ns("ec50_note")),
     shiny::uiOutput(ns("panels"))
   )
 }
@@ -199,6 +200,21 @@ singles_server <- function(id, store) {
         if (length(pinned))
           shiny::tags$small(shiny::HTML(paste0(
             "<br><b>Held fixed:</b> ", paste(pinned, collapse = ", ")))))
+    })
+
+    # An EC50 the joint fit put outside the tested range is flagged HERE, on the
+    # page that can repair it: the Fix boxes are a few lines down, and a user who
+    # works through the pairs without opening the ternary hub would otherwise
+    # never be told that the campaign's toxic units rest on an extrapolation
+    # (issue #11).
+    output$ec50_note <- shiny::renderUI({
+      b <- campaign_base(store)
+      shiny::req(b, store$raw, store$chems)
+      ec50_range_note(
+        store$raw, base_ec50s(b, length(store$chems)),
+        vapply(store$chems, function(k) axis_label(store, paste0("chem", k)),
+               character(1)),
+        chems = store$chems, on_singles = TRUE)
     })
   })
 }

@@ -170,29 +170,16 @@ ternary_server <- function(id, store) {
         sprintf("A1 %.3f | A2 %.3f | A3 %.3f", p[["A1"]], p[["A2"]], p[["A3"]]))
     })
 
-    # A TU share is only as good as the EC50 in its denominator: when a fitted
-    # EC50 sits above every dose actually tested for that stressor it is an
-    # extrapolation, and so is its contribution to the TU ratio. The note names
-    # the remedy rather than just the defect: the scientist usually knows a
-    # better EC50 than an unconstrained fit can find from truncated data, and
-    # since issue #12 can pin it on the Singles page -- at which point the TU
-    # ratios recompute from the pinned value and this note clears itself.
+    # The TU ratios in the hub above are only as good as the EC50s in their
+    # denominators; ec50_range_note() marks any the fit placed outside the
+    # tested range and points at the Fix box that repairs it.
     output$ec50_note <- shiny::renderUI({
       res <- asa_res(); shiny::req(res, store$raw)
-      ec  <- c(res$base[["ec50_1"]], res$base[["ec50_2"]], res$base[["ec50_3"]])
-      bad <- which(ec50_out_of_range(store$raw, ec, 1:3))
-      if (!length(bad)) return(NULL)
-      shiny::div(
-        class = "alert alert-warning mt-2",
-        shiny::tags$small(
-          "Extrapolated EC50 for ",
-          paste(vapply(bad, function(k) axis_label(store, paste0("chem", k)),
-                       character(1)), collapse = ", "),
-          ": the fitted EC50 lies above every dose tested for that stressor, ",
-          "so its share of the TU ratio is a model extrapolation rather than a ",
-          "measured quantity. If you have a better estimate, tick ",
-          shiny::tags$b("Fix"), " next to that stressor's EC50 on the Singles ",
-          "page and refit \u2014 the TU ratios follow the fixed value."))
+      ec50_range_note(
+        store$raw, base_ec50s(res$base, 3),
+        vapply(1:3, function(k) axis_label(store, paste0("chem", k)),
+               character(1)),
+        chems = 1:3)
     })
 
     output$hub <- DT::renderDT({
