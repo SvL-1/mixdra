@@ -113,13 +113,18 @@ curve_fit_ui <- function(id) {
 #' @param meta Shared reactiveValues for experiment metadata (axis labels).
 #' @param chem_field Optional meta field for the x-axis label (e.g. "chem1"); NULL
 #'   uses a generic "Concentration" label.
+#' @param preset Optional reactive returning a named numeric `c(max, slope,
+#'   ec50)` fitted elsewhere (the Singles page's campaign fit). Each new value
+#'   is written into the Value cells and drawn as the panel's curve, so the
+#'   numbers sit next to the curve they describe (issue #14).
 #' @return A list of two reactives: `fit`, the current fit (a
 #'   [analyse_single()]/[eval_single()] result, `NULL` before any fit), and
 #'   `constraints`, this panel's [panel_constraints()] (Lower/Upper cells plus
 #'   ticked Fix boxes). The Singles page feeds `constraints` into the campaign
 #'   base fit, so what the user constrains here is honoured downstream.
 #' @keywords internal
-curve_fit_server <- function(id, fit_df, meta, chem_field = NULL) {
+curve_fit_server <- function(id, fit_df, meta, chem_field = NULL,
+                             preset = NULL) {
   shiny::moduleServer(id, function(input, output, session) {
     current_fit <- shiny::reactiveVal(NULL)
 
@@ -173,6 +178,17 @@ curve_fit_server <- function(id, fit_df, meta, chem_field = NULL) {
       current_fit(eval_single(df$C1, resp,
                               vals[["max"]], vals[["slope"]], vals[["ec50"]]))
     })
+
+    if (!is.null(preset)) shiny::observeEvent(preset(), {
+      vals <- preset()
+      df <- fit_df()
+      shiny::req(!is.null(df), nrow(df) > 0)
+      for (p in names(vals))
+        shiny::updateNumericInput(session, paste0("val_", p),
+                                  value = round(vals[[p]], 4))
+      current_fit(eval_single(df$C1, obs_response(df),
+                              vals[["max"]], vals[["slope"]], vals[["ec50"]]))
+    }, ignoreNULL = TRUE)
 
     # Dose-response: show the raw observed points as soon as data is imported
     # (current_fit() is NULL -> no curve yet); the fitted curve overlays once

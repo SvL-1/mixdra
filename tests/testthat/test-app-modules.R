@@ -468,7 +468,11 @@ test_that("an exploratory single-stressor panel fit does not invalidate the camp
                       `singles-chem1-autofit` = 1)
     session$flushReact()
 
-    expect_equal(length(store$singles), 1)    # the panel fit is kept for display
+    # The campaign fit fills every panel (issue #14); the Autofit then replaces
+    # stressor 1's display with its own fit (analyse_single() reports a
+    # convergence code, the campaign preset's eval_single() does not).
+    expect_length(store$singles, 3)
+    expect_false(is.na(store$singles[["1"]]$convergence))
     expect_equal(store$base_version, v0)      # ... but the campaign is untouched
     expect_identical(store$base, b0)
   })

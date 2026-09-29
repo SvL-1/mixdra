@@ -144,7 +144,16 @@ singles_server <- function(id, store) {
           shiny::req(store$raw, kk %in% store$chems)
           single_df(store$raw, kk)
         }),
-        meta = store, chem_field = paste0("chem", kk))
+        meta = store, chem_field = paste0("chem", kk),
+        # The campaign fit's values for THIS stressor, so its panel shows the
+        # numbers and curve the downstream stages actually use (issue #14).
+        preset = shiny::reactive({
+          b <- campaign_base(store)
+          shiny::req(b, kk %in% store$chems)
+          nm <- base_param_names(match(kk, store$chems), length(store$chems))
+          c(max = b[["max"]], slope = b[[nm[["slope"]]]],
+            ec50 = b[[nm[["ec50"]]]])
+        }))
       fit <- panel$fit
       panel_bounds[[as.character(kk)]] <<- panel$constraints
 
@@ -185,6 +194,8 @@ singles_server <- function(id, store) {
         # one place that quietly frees a parameter the user pinned.
         store$base_bounds <- bounds
         campaign_bump_base(store)
+        shiny::updateNumericInput(session, "val_max",
+                                  value = round(b[["max"]], 4))
       }
     })
 
@@ -193,10 +204,11 @@ singles_server <- function(id, store) {
       if (is.null(b)) return(shiny::tags$small("Not fitted yet."))
       pinned <- split_fixed_bounds(store$base_bounds$lower,
                                    store$base_bounds$upper, b)$fixed
+      # The values themselves sit in each stressor panel below, next to their
+      # curve; this line only says the fit ran and what it held fixed.
       shiny::tagList(
-        shiny::tags$small(shiny::HTML(paste0(
-          "<b>Fitted base (shared max):</b> ",
-          paste(sprintf("%s = %.4g", names(b), b), collapse = " &middot; ")))),
+        shiny::tags$small(shiny::HTML(
+          "<b>Fitted.</b> The values are shown in each stressor panel below.")),
         if (length(pinned))
           shiny::tags$small(shiny::HTML(paste0(
             "<br><b>Held fixed:</b> ", paste(pinned, collapse = ", ")))))

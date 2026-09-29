@@ -15,6 +15,11 @@
 > recovers known parameters from synthetic data — but the API may still change,
 > and a few rough edges are tracked in the issues. Please get in touch before
 > using it for published work, so we can tell you what is and isn't nailed down.
+>
+> **Read the guidance first.** Correct use and interpretation of the results
+> depend on the accompanying guidance document and research paper (in
+> preparation). The model is still being refined, so treat its output as
+> provisional and do not use it without reading those first.
 
 `mixdra` fits single-chemical and **binary/ternary mixture** dose–response models, detects and
 quantifies how mixtures *deviate* from additivity (synergism, antagonism, dose-ratio- and
