@@ -119,14 +119,22 @@ singles_server <- function(id, store) {
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
+    # The panels depend on the stressor SET only. The headings are separate text
+    # outputs so a rename on the Introduction page does not rebuild the panels
+    # and wipe the Fix boxes and bounds the user set in them.
     output$panels <- shiny::renderUI({
       shiny::req(store$chems)
       shiny::tagList(lapply(store$chems, function(k) {
         shiny::div(
           class = if (k == store$chems[1]) "" else "mt-4",
-          shiny::h5(axis_label(store, paste0("chem", k))),
+          shiny::h5(shiny::textOutput(ns(paste0("heading_", k)), inline = TRUE)),
           curve_fit_ui(ns(paste0("chem", k))))
       }))
+    })
+    for (k in 1:3) local({
+      kk <- k
+      output[[paste0("heading_", kk)]] <- shiny::renderText(
+        axis_label(store, paste0("chem", kk)))
     })
 
     # One curve_fit_server per stressor. Registered for all three slots up front
