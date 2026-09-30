@@ -11,10 +11,16 @@
 [![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
 
 > **Pre-release.** `mixdra` is under active development and validation. The
-> science is settled — the engine reproduces the published Excel/VBA results and
-> recovers known parameters from synthetic data — but the API may still change,
-> and a few rough edges are tracked in the issues. Please get in touch before
-> using it for published work, so we can tell you what is and isn't nailed down.
+> engine recovers known parameters from synthetic data and is being checked
+> against the published Excel/VBA results, but the API may still change, and a
+> few rough edges are tracked in the issues. Please get in touch before using it
+> for published work, so we can tell you what is and isn't nailed down.
+>
+> **Known issue.** The order in which the multi-stressor workflow fits the upper
+> asymptote (per stressor for the singles, one per mixture for the binaries and
+> the ternary) is being revised, see
+> [#15](https://github.com/SvL-1/mixdra/issues/15). Interaction results from the
+> Multiple stressors tab can change once that is done.
 >
 > **Read the guidance first.** Correct use and interpretation of the results
 > depend on the accompanying guidance document and research paper (in
