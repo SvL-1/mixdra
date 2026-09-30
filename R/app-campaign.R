@@ -137,13 +137,33 @@ campaign_server <- function(id, meta) {
         sum(cls == "binary"), " pair, ", sum(cls == "ternary"), " ternary rows.")))
     })
 
-    # The sub-navigation is data-dependent, so it is rebuilt whenever the store
-    # changes (a finished pair fit, a stressor renamed in the Introduction tab).
+    # The sub-navigation's structure depends only on which stressors the file
+    # doses, so it is rebuilt only for a new file (see campaign_stage_nav()).
     # Re-read the currently open sub-tab with isolate() and hand it back as
     # `selected` so a rebuild does not snap the user back to Singles: isolate,
     # because a plain read would make every tab click rebuild the whole navset.
     output$stages <- shiny::renderUI(
       campaign_stage_nav(session$ns, store, selected = shiny::isolate(input$stage)))
+
+    # Pair titles follow stressor renames without rebuilding the navset, and
+    # each tab's content is re-rendered only when it actually changes
+    # (a reactiveVal ignores an identical value): see campaign_stage_nav().
+    for (p in list(c(1, 2), c(1, 3), c(2, 3))) local({
+      pp <- p
+      output[[paste0("title_", pair_key(pp[1], pp[2]))]] <- shiny::renderText(
+        paste(axis_label(store, paste0("chem", pp[1])), "×",
+              axis_label(store, paste0("chem", pp[2]))))
+    })
+    for (slot in c("12", "13", "23", "ternary")) local({
+      sl   <- slot
+      state <- shiny::reactiveVal(NULL)
+      shiny::observe(state(campaign_stage_state(store, sl)))
+      output[[paste0("body_", sl)]] <- shiny::renderUI({
+        st <- state()
+        shiny::req(st)
+        shiny::isolate(campaign_stage_body(session$ns, store, sl, st))
+      })
+    })
 
     singles_server("singles", store)
 
@@ -283,69 +303,104 @@ campaign_has_ternary_rows <- function(df) {
 
 #' Sub-navigation for the campaign stages
 #'
-#' Built server-side because which sub-tabs exist depends on the data: the
-#' Ternary sub-tab is absent for a two-stressor campaign, and pairs with no
-#' mixture rows are disabled.
+#' Built server-side because which sub-tabs exist depends on the data: pair
+#' tabs for every pair of dosed stressors, and a Ternary tab for a
+#' three-stressor campaign.
+#'
+#' Only the STRUCTURE lives here, and it reads nothing but `store$chems`, so it
+#' is rebuilt only when a new file changes the set of stressors. The Singles
+#' page is placed statically; the pair titles are `textOutput`s and every other
+#' tab's content is a `uiOutput` filled from [campaign_stage_body()]. A
+#' rebuild recreates every input inside the navset, so an earlier version that
+#' re-rendered on any store write (a fit, a rename) silently cleared the Fix
+#' boxes and constraints the user had just set on the Singles page.
 #' @param ns The module's namespace function.
 #' @param store The campaign store.
-#' @param selected Title of the sub-tab to open, or `NULL` for the first one.
-#'   The caller passes the currently open tab so that rebuilding the navset
-#'   (which happens on any store change) does not reset the user's position;
-#'   a title that no longer exists is ignored.
+#' @param selected Value of the sub-tab to open (`"Singles"`, `"pair12"`, ...,
+#'   `"Ternary"`), or `NULL` for the first one. A value that does not exist in
+#'   this campaign is ignored.
 #' @keywords internal
 campaign_stage_nav <- function(ns, store, selected = NULL) {
-  panels <- list(bslib::nav_panel("Singles", singles_ui(ns("singles"))))
-
-  ready <- !is.null(campaign_base(store))
+  panels <- list(bslib::nav_panel("Singles", singles_ui(ns("singles")),
+                                  value = "Singles"))
   for (p in campaign_pairs(store$chems)) {
-    k     <- pair_key(p[1], p[2])
-    title <- paste(axis_label(store, paste0("chem", p[1])), "\u00d7",
-                   axis_label(store, paste0("chem", p[2])))
-    body <- if (!pair_has_rows(store$raw, p[1], p[2])) {
-      shiny::div(class = "p-3 text-muted",
-                 "This experiment has no mixture rows for this pair.")
-    } else if (!ready) {
-      shiny::div(class = "p-3 text-muted",
-                 sprintf("Fit all %d single-stressor curves first.",
-                         store$n_chem))
-    } else {
-      pair_workspace_ui(ns(paste0("pair", k)))
-    }
-    panels <- c(panels, list(bslib::nav_panel(title, body)))
+    k <- pair_key(p[1], p[2])
+    panels <- c(panels, list(bslib::nav_panel(
+      shiny::textOutput(ns(paste0("title_", k)), inline = TRUE),
+      shiny::uiOutput(ns(paste0("body_", k))),
+      value = paste0("pair", k))))
   }
+  if (length(store$chems) == 3)
+    panels <- c(panels, list(bslib::nav_panel(
+      "Ternary", shiny::uiOutput(ns("body_ternary")), value = "Ternary")))
 
-  if (length(store$chems) == 3) {
-    body <- if (!campaign_has_ternary_rows(store$raw)) {
-      shiny::div(class = "p-3 text-muted",
-                 "This experiment has no ternary rows (all three stressors ",
-                 "dosed together), so the per-ratio A4 step has nothing to fit.")
-    } else if (!identical(store$reference, "CA")) {
-      shiny::div(class = "p-3 text-muted",
-                 "The ternary stage is not yet supported for Independent ",
-                 "Action. Switch the reference model to Concentration ",
-                 "Addition to use it.")
-    } else if (!identical(store$response, "continuous")) {
-      shiny::div(class = "p-3 text-muted",
-                 "The ternary stage is not yet supported for quantal data.")
-    } else if (is.null(campaign_pairwise(store))) {
-      shiny::div(class = "p-3 text-muted",
-                 if (campaign_pairs_fitted(store))
-                   paste("A single-stressor curve changed since these pairs ",
-                         "were fitted. Re-run \"Fit interaction models\" on ",
-                         "each pair tab to bring them up to date.")
-                 else
-                   "Fit the interaction models on all three pair tabs first.")
-    } else {
-      ternary_ui(ns("ternary"))
-    }
-    panels <- c(panels, list(bslib::nav_panel("Ternary", body)))
-  }
-
-  # `selected` is only honoured while the tab it names still exists (stressor
-  # renames change the pair titles); otherwise fall back to the first panel.
-  titles <- vapply(panels, function(p) as.character(p$attribs$title %||% ""),
-                   character(1))
-  sel <- if (!is.null(selected) && selected %in% titles) selected else NULL
+  values <- c("Singles", paste0("pair", vapply(
+    campaign_pairs(store$chems), function(p) pair_key(p[1], p[2]),
+    character(1))), if (length(store$chems) == 3) "Ternary")
+  sel <- if (!is.null(selected) && selected %in% values) selected else NULL
   do.call(bslib::navset_card_tab,
           c(panels, list(id = ns("stage"), selected = sel)))
+}
+
+#' Which state one campaign sub-tab is in
+#'
+#' A short key for what the tab should show: its workspace (`"ready"`) or one
+#' of the reasons it is not available yet. [campaign_server()] keeps this key
+#' in a `reactiveVal`, which ignores an identical value, so a tab's content is
+#' re-rendered (and its inputs reset) only when the key changes -- not on every
+#' store write. The key, not the rendered UI, is compared because the UI
+#' carries random tabset ids and is never identical twice.
+#' @param store The campaign store.
+#' @param slot A pair key (`"12"`, `"13"`, `"23"`) or `"ternary"`.
+#' @return A character key; `"absent"` for a slot this campaign does not have.
+#' @keywords internal
+campaign_stage_state <- function(store, slot) {
+  if (identical(slot, "ternary")) {
+    if (length(store$chems) != 3) return("absent")
+    if (!campaign_has_ternary_rows(store$raw)) return("no_rows")
+    if (!identical(store$reference, "CA")) return("not_ca")
+    if (!identical(store$response, "continuous")) return("quantal")
+    if (is.null(campaign_pairwise(store)))
+      return(if (campaign_pairs_fitted(store)) "stale" else "need_pairs")
+    return("ready")
+  }
+  ij <- as.integer(strsplit(slot, "")[[1]])
+  if (!all(ij %in% store$chems)) return("absent")
+  if (!pair_has_rows(store$raw, ij[1], ij[2])) return("no_rows")
+  if (is.null(campaign_base(store))) return(paste0("need_base:", store$n_chem))
+  "ready"
+}
+
+#' Content of one campaign sub-tab
+#'
+#' Either the stage's workspace or a note saying why it is not available yet.
+#' @param ns The module's namespace function.
+#' @param store The campaign store.
+#' @param slot A pair key (`"12"`, `"13"`, `"23"`) or `"ternary"`.
+#' @param state The tab's [campaign_stage_state()].
+#' @return A `shiny` tag, or `NULL` for a slot this campaign does not have.
+#' @keywords internal
+campaign_stage_body <- function(ns, store, slot,
+                                state = campaign_stage_state(store, slot)) {
+  note <- function(...) shiny::div(class = "p-3 text-muted", ...)
+  if (identical(state, "absent")) return(NULL)
+  if (identical(slot, "ternary"))
+    return(switch(state,
+      no_rows = note("This experiment has no ternary rows (all three stressors ",
+                     "dosed together), so the per-ratio A4 step has nothing to fit."),
+      not_ca  = note("The ternary stage is not yet supported for Independent ",
+                     "Action. Switch the reference model to Concentration ",
+                     "Addition to use it."),
+      quantal = note("The ternary stage is not yet supported for quantal data."),
+      stale   = note("A single-stressor curve changed since these pairs ",
+                     "were fitted. Re-run \"Fit interaction models\" on ",
+                     "each pair tab to bring them up to date."),
+      need_pairs = note("Fit the interaction models on all three pair tabs first."),
+      ternary_ui(ns("ternary"))))
+  if (identical(state, "no_rows"))
+    return(note("This experiment has no mixture rows for this pair."))
+  if (startsWith(state, "need_base"))
+    return(note(sprintf("Fit all %d single-stressor curves first.",
+                        store$n_chem)))
+  pair_workspace_ui(ns(paste0("pair", slot)))
 }

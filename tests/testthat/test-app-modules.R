@@ -468,7 +468,11 @@ test_that("an exploratory single-stressor panel fit does not invalidate the camp
                       `singles-chem1-autofit` = 1)
     session$flushReact()
 
-    expect_equal(length(store$singles), 1)    # the panel fit is kept for display
+    # The campaign fit fills every panel (issue #14); the Autofit then replaces
+    # stressor 1's display with its own fit (analyse_single() reports a
+    # convergence code, the campaign preset's eval_single() does not).
+    expect_length(store$singles, 3)
+    expect_false(is.na(store$singles[["1"]]$convergence))
     expect_equal(store$base_version, v0)      # ... but the campaign is untouched
     expect_identical(store$base, b0)
   })
@@ -699,25 +703,26 @@ test_that("campaign_stage_nav disables the Ternary sub-tab when there are no ter
   # returns its start point and the app would present A4 = 0 as a fitted value.
   # A campaign covering only the pairwise designs is legitimate, so the tab is
   # disabled with a reason rather than the upload being rejected.
+  ns <- shiny::NS("camp")
   df <- campaign_fixture()
   with_rows <- shiny::isolate(
-    as.character(campaign_stage_nav(shiny::NS("camp"), nav_store(df))))
+    as.character(campaign_stage_body(ns, nav_store(df), "ternary")))
   expect_match(with_rows, "camp-ternary-hub", fixed = TRUE)
   expect_false(grepl("no ternary rows", with_rows, fixed = TRUE))
 
   none <- df[!(df$C1 > 0 & df$C2 > 0 & df$C3 > 0), ]
   expect_length(validate_upload(none, "campaign", "continuous"), 0)  # not an error
   without <- shiny::isolate(
-    as.character(campaign_stage_nav(shiny::NS("camp"), nav_store(none))))
+    as.character(campaign_stage_body(ns, nav_store(none), "ternary")))
   expect_match(without, "no ternary rows", fixed = TRUE)
   expect_false(grepl("camp-ternary-hub", without, fixed = TRUE))
-  expect_match(without, "data-value=\"Ternary\"", fixed = TRUE)  # listed, not hidden
+  nav <- shiny::isolate(as.character(campaign_stage_nav(ns, nav_store(none))))
+  expect_match(nav, "data-value=\"Ternary\"", fixed = TRUE)  # listed, not hidden
 })
 
 test_that("campaign_stage_nav keeps the open sub-tab across a rebuild", {
-  # I3: the navset is re-rendered on every store write (a finished pair fit, a
-  # keystroke in the Introduction tab). Without an id/selected pair that snapped
-  # the user back to Singles and reset the workspace's accordion inputs.
+  # I3: the navset is rebuilt when a new file changes the stressors. Without an
+  # id/selected pair that snapped the user back to Singles.
   ns    <- shiny::NS("camp")
   store <- nav_store(campaign_fixture())
   active_tab <- function(html)
@@ -728,10 +733,43 @@ test_that("campaign_stage_nav keeps the open sub-tab across a rebuild", {
   expect_match(html, "id=\"camp-stage\"", fixed = TRUE)
   expect_match(active_tab(html), "data-value=\"Ternary\"", fixed = TRUE)
 
-  # a title that no longer exists (a stressor was renamed) falls back cleanly
+  # a tab that does not exist in this campaign falls back cleanly
   html2 <- shiny::isolate(
     as.character(campaign_stage_nav(ns, store, selected = "Gone")))
   expect_match(active_tab(html2), "data-value=\"Singles\"", fixed = TRUE)
+})
+
+test_that("campaign_stage_nav does not depend on fit state or stressor names", {
+  # The navset is rebuilt whenever what it reads changes, and a rebuild
+  # recreates the Singles page's inputs -- so a nav that read the base, the
+  # pair fits or the names cleared the user's Fix boxes and constraints after
+  # every fit (found reviewing issue #14). Fit state and names reach the page
+  # through campaign_stage_body() and the title outputs instead.
+  ns    <- shiny::NS("camp")
+  store <- nav_store(campaign_fixture())
+  # bslib stamps each tabset with a random id; everything else must match.
+  html  <- function() gsub("(tab-|tabsetid=\")[0-9]+", "\\1", shiny::isolate(
+    as.character(campaign_stage_nav(ns, store))))
+  before <- html()
+  store$base  <- NULL
+  store$pairs <- list()
+  store$chem1 <- "Renamed"
+  expect_identical(html(), before)
+  expect_match(before, "camp-body_12", fixed = TRUE)
+  expect_match(before, "camp-title_23", fixed = TRUE)
+})
+
+test_that("campaign_stage_state changes only when a tab's content should", {
+  store <- nav_store(campaign_fixture())
+  st <- function(slot) shiny::isolate(campaign_stage_state(store, slot))
+  expect_equal(st("12"), "ready")
+  expect_equal(st("ternary"), "ready")
+  store$base <- shiny::isolate(store$base) * 1.01   # a refit, new values
+  expect_equal(st("12"), "ready")
+  store$base <- NULL
+  expect_equal(st("12"), "need_base:3")
+  store$reference <- "IA"
+  expect_equal(st("ternary"), "not_ca")
 })
 
 test_that("campaign_fit_base reproduces the engine's own Stage-1 joint fit", {
@@ -807,6 +845,27 @@ test_that("singles_server starts with no fits and does not invent one", {
   shiny::testServer(singles_server, args = list(store = store), {
     expect_equal(length(store$singles), 0)
     expect_equal(store$base_version, 0L)
+  })
+})
+
+test_that("singles panels are not rebuilt by a stressor rename", {
+  # A rebuild would replace every panel input and silently untick the Fix
+  # boxes, so the stressor names live in separate heading outputs.
+  store <- shiny::reactiveValues(
+    n_chem = 2L, chems = c(1L, 2L), base_version = 0L, singles = list(),
+    chem1 = "CPF", chem2 = "IMI",
+    raw = data.frame(C1 = c(0, 1, 2, 3, 0, 0, 0),
+                     C2 = c(0, 0, 0, 0, 1, 2, 3),
+                     Res = c(100, 80, 60, 40, 90, 70, 50)))
+  norm <- function(h) gsub("(tab-|tabsetid=\"|id=\"[a-z_-]*)[0-9]+", "\\1", h)
+  shiny::testServer(singles_server, args = list(store = store), {
+    expect_equal(output$heading_1, "CPF")
+    before <- norm(as.character(output$panels$html))
+    store$chem1 <- "FBSA"
+    session$flushReact()
+    expect_equal(output$heading_1, "FBSA")
+    expect_identical(norm(as.character(output$panels$html)), before)
+    expect_false(grepl("FBSA", before, fixed = TRUE))
   })
 })
 

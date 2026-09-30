@@ -19,7 +19,7 @@ intro_ui <- function(id) {
       shiny::textInput(ns("unit1"), "Stressor 1 unit (e.g. mg/L)"),
       shiny::textInput(ns("chem2"), "Stressor 2 name"),
       shiny::textInput(ns("unit2"), "Stressor 2 unit (e.g. mg/L)"),
-      shiny::textInput(ns("chem3"), "Stressor 3 name (ternary)"),
+      shiny::textInput(ns("chem3"), "Stressor 3 name"),
       shiny::textInput(ns("unit3"), "Stressor 3 unit (e.g. mg/L)")
     ),
     bslib::card(
