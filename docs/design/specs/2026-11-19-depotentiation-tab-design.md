@@ -250,11 +250,11 @@ mixtures → Mixture toxicity.
   (level 1 agrees to 1e−8). Level 2's X² is a "≈ 0" check.
 - Level 3: SS₁ is a normal workbook match. SS₂ and X² are asserted against the
   **corrected** workbook values (411 358.37 / 7.166), with the source naming
-  the correction (AC31:AC74 `$P$17:$P$19` → `$Z$17:$Z$19`). Because the
-  corrected value was re-solved here rather than by Sam's Solver, the report
-  must not count it as an independent match: record it as a regression pin
-  (the report's "=" kind) with a note, unless Sam re-solves the corrected
-  workbook, in which case it becomes a match.
+  the correction (AC31:AC74 `$P$17:$P$19` → `$Z$17:$Z$19`). They are recorded
+  as `divergent` rows (the report's "≠"): reference = the workbook value as it
+  stands, expected = the corrected value, the note naming the cells. They do
+  not count towards the score. If Sam re-solves the corrected workbook, they
+  become matches.
 - Regenerate `VALIDATION.md` (CI checks it).
 - Unit tests: recovery from simulated data (no shift → not significant; EC50
   shifted → significant, right direction), borrowed vs own controls, quantal
