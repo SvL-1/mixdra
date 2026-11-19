@@ -3,8 +3,8 @@
 
 #' Assemble the navbar UI from the stage modules
 #'
-#' Introduction, Single Stressor and Multiple stressors are the app's three
-#' tabs. The legacy standalone Binary Mixture and Ternary Mixture tabs were
+#' Introduction, Single Stressor, (De)potentiation and Mixture toxicity are the
+#' app's four tabs. The legacy standalone Binary Mixture and Ternary Mixture tabs were
 #' retired in favour of that tab's per-pair sub-tabs and ternary sub-tab, which reuse
 #' the same [pair_workspace_ui()]/[pair_workspace_server()] and
 #' [ternary_ui()]/[ternary_server()] modules.
@@ -13,7 +13,7 @@ app_ui <- function() {
   bslib::page_navbar(
     title = "Mixture Toxicity (mixdra)",
     # Tabs use normal document flow and scroll rather than being squeezed into
-    # one viewport (the Multiple stressors tab in particular is tall: two panels +
+    # one viewport (the Mixture toxicity tab in particular is tall: two panels +
     # two gated stages per pair).
     fillable = FALSE,
     bslib::nav_panel("Introduction", intro_ui("intro")),
@@ -34,8 +34,8 @@ app_server <- function(input, output, session) {
 
 #' Launch the mixdra Shiny app
 #'
-#' Starts the interactive app: Introduction, Single Stressor and Multiple
-#' stressors are the app's three tabs.
+#' Starts the interactive app: Introduction, Single Stressor,
+#' (De)potentiation and Mixture toxicity are the app's four tabs.
 #' The UI stack (`shiny`, `bslib`, `plotly`, `DT`) is a set of Suggested
 #' dependencies; this function stops with an install hint if any are missing.
 #' @param ... Passed to [shiny::runApp()] (e.g. `launch.browser`, `port`).
