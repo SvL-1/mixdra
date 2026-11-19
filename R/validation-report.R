@@ -104,7 +104,15 @@ validation_datasets <- function() {
       fit   = function(df) analyse_ternary(df, "CA", "continuous", n_starts = 10,
                                            time_limit = 120,
                                            lower = c(ec50_2 = 5.579),
-                                           upper = c(ec50_2 = 5.581)))
+                                           upper = c(ec50_2 = 5.581))),
+    potentiation_example_continuous = list(
+      path  = file.path("potentiation", "potentiation_example_continuous.csv"),
+      # No `experiment`: the example data is not tied to a published experiment,
+      # so the report renders this section without a provenance block.
+      endpoint = "continuous response",
+      title = paste0("(De)potentiation example: stressor 1 with stressor 2 at ",
+                     "three levels, continuous response"),
+      fit   = function(df) analyse_potentiation(df))
   )
 }
 
@@ -156,6 +164,17 @@ validation_extract <- function(res, stage, parameter) {
                 else pick(as.list(res$joint$par), parameter),
     overall   = if (identical(parameter, "objective"))
                   res$fits$overall$objective %||% NA else NA,
+    # (De)potentiation: parameter is "<series>:<field>", field a column of
+    # `res$comparisons`, e.g. "Level 1:obj1".
+    comparison = {
+      key <- regmatches(parameter, regexpr(":", parameter), invert = TRUE)[[1]]
+      cmp <- res$comparisons
+      if (length(key) != 2 || is.null(cmp) || !key[2] %in% names(cmp)) NA
+      else {
+        v <- cmp[[key[2]]][cmp$series == key[1]]
+        if (length(v) == 1) v else NA
+      }
+    },
     NA)
 }
 
