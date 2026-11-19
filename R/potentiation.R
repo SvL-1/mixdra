@@ -20,7 +20,9 @@
 #' `"no significant influence"`.
 #' @param df Data frame with columns `Series` (curve label), `C1` (stressor-1
 #'   concentration, >= 0) and `Res` (continuous) or `Exposed`/`Affected`
-#'   (quantal). Labels are compared after `trimws(as.character())`.
+#'   (quantal). Labels are compared after `trimws(as.character())`. Missing
+#'   values in these columns are an error, as is an optimiser failure (both
+#'   name the rows or series concerned).
 #' @param reference Label of the reference series; defaults to the first series
 #'   in `df`.
 #' @param response "continuous" or "quantal".
@@ -51,6 +53,10 @@ analyse_potentiation <- function(df, reference = NULL,
     stop("analyse_potentiation: missing column(s) for ", response, " data: ",
          paste(missing, collapse = ", "))
   df <- df[cols]
+  incomplete <- which(!stats::complete.cases(df))
+  if (length(incomplete))
+    stop("analyse_potentiation: missing values in row(s) ",
+         paste(incomplete, collapse = ", "), "; remove or complete them.")
   df$Series <- trimws(as.character(df$Series))
 
   series <- unique(df$Series)
@@ -100,6 +106,14 @@ analyse_potentiation <- function(df, reference = NULL,
                                           slope = sp[["slope_reference"]],
                                           ec50 = sp[["ec50"]]))))
   }
+  # pot_optim() marks an optimiser that errored out with convergence 99 and
+  # returns its start; such a fit is not a result, so say which one failed.
+  for (s in series) if (isTRUE(fits[[s]]$convergence == 99))
+    stop("analyse_potentiation: the optimiser failed on the curve of series '",
+         s, "'; check that series' data.")
+  for (k in others) if (isTRUE(shared[[k]]$convergence == 99))
+    stop("analyse_potentiation: the optimiser failed on the shared-EC50 fit of '",
+         k, "' against '", reference, "'; check both series' data.")
 
   curves <- lapply(stats::setNames(series, series), function(s) {
     f <- fits[[s]]
@@ -157,35 +171,36 @@ pot_objective <- function(d, max, slope, ec50, response) {
   else obj_deviance(d$Exposed, d$Affected, pmin(pmax(pred, 1e-8), 1 - 1e-8))
 }
 
-# Exact gradient of pot_objective() in (max, slope, ec50). Steep curves (slope
-# near its bound of 50, as in the example data) put the optimum in a narrow,
-# curved valley where optim's finite-difference gradient is too coarse and
-# L-BFGS-B stalls short of the minimum (level 3's shared fit stops ~2 SS units
-# high); the exact gradient reaches it from the same seeds. With pred = max * w,
+# Exact gradient of the continuous pot_objective() (residual SS) in (max,
+# slope, ec50). Steep curves (slope near its bound of 50, as in the example
+# data) put the optimum in a narrow, curved valley where optim's
+# finite-difference gradient is too coarse and L-BFGS-B stalls short of the
+# minimum (level 3's shared fit stops ~2 SS units high); the exact gradient
+# reaches it from the same seeds. With pred = max * w,
 # w = 1 / (1 + (C/ec50)^slope): d pred / d slope = -max w (1 - w) log(C/ec50)
 # and d pred / d ec50 = max w (1 - w) slope / ec50; C = 0 rows contribute
-# nothing to either. A clamped quantal prediction has zero gradient.
-pot_gradient <- function(d, max, slope, ec50, response) {
+# nothing to either.
+#
+# Quantal fits do not use it: the deviance clamps predictions into (0, 1), and
+# a clamped row has zero exact gradient. At max = 1 (the natural start when a
+# control is 100%) every control row is clamped, so L-BFGS-B saw no reason to
+# leave the bound and stopped far from the minimum (deviance 243 instead of 47
+# on one fixture series). Quantal fits use optim's finite differences, as
+# fit_single() does.
+pot_gradient <- function(d, max, slope, ec50) {
   w <- 1 / (1 + (d$C1 / ec50)^slope)
   pred <- max * w
   log_ratio <- ifelse(d$C1 > 0, log(d$C1 / ec50), 0)
   dpred <- cbind(max = w, slope = -max * w * (1 - w) * log_ratio,
                  ec50 = max * w * (1 - w) * slope / ec50)
-  dobj <- if (response == "continuous") {
-    -2 * (d$Res - pred)
-  } else {
-    p <- pmin(pmax(pred, 1e-8), 1 - 1e-8)
-    ifelse(pred > 1e-8 & pred < 1 - 1e-8,
-           -2 * (d$Affected / p - (d$Exposed - d$Affected) / (1 - p)), 0)
-  }
-  colSums(dobj * dpred)
+  colSums(-2 * (d$Res - pred) * dpred)
 }
 
-# One L-BFGS-B descent, configured like fit_single() but with the exact
-# gradient `gr`. A non-finite objective is turned into a large finite one so
-# the optimiser can back off instead of failing; if it fails anyway the
-# (clamped) start is returned with convergence = 99, so a re-seeded fit is
-# never worse than its seed.
+# One L-BFGS-B descent, configured like fit_single(), with the exact gradient
+# `gr` (continuous) or finite differences (`gr = NULL`, quantal). A non-finite
+# objective is turned into a large finite one so the optimiser can back off
+# instead of failing; if it fails anyway the (clamped) start is returned with
+# convergence = 99, so a re-seeded fit is never worse than its seed.
 pot_optim <- function(start, fn, gr, lower, upper) {
   start <- pmin(pmax(start, lower), upper)
   safe_fn <- function(p) { v <- fn(p); if (is.finite(v)) v else 1e12 }
@@ -202,19 +217,22 @@ pot_optim <- function(start, fn, gr, lower, upper) {
 }
 
 # Run-1 fit of one series: three free parameters, best of `starts` (default:
-# fit_single()'s data-driven start).
+# fit_single()'s data-driven start; a quantal start max is kept at or below
+# 0.99, off the bound of 1, so the descent starts with every row unclamped).
 pot_fit_curve <- function(d, response, starts = NULL) {
   b <- pot_bounds(response)
   if (is.null(starts)) {
     obs <- if (response == "continuous") d$Res else d$Affected / d$Exposed
     pos <- d$C1[d$C1 > 0]
-    starts <- list(c(max = max(obs), slope = 1,
+    starts <- list(c(max = if (response == "continuous") max(obs)
+                           else min(max(obs), 0.99),
+                     slope = 1,
                      ec50 = if (length(pos)) stats::median(pos) else 1))
   }
   fn <- function(p) pot_objective(d, p[["max"]], p[["slope"]], p[["ec50"]],
                                   response)
-  gr <- function(p) pot_gradient(d, p[["max"]], p[["slope"]], p[["ec50"]],
-                                 response)
+  gr <- if (response == "continuous")
+    function(p) pot_gradient(d, p[["max"]], p[["slope"]], p[["ec50"]])
   best <- NULL
   for (st in starts) {
     res <- pot_optim(st[c("max", "slope", "ec50")], fn, gr, b$lower, b$upper)
@@ -239,11 +257,11 @@ pot_fit_shared <- function(d_ref, d_k, fit_ref, fit_k, response) {
                   p[["ec50"]], response) +
     pot_objective(d_k, p[["max_series"]], p[["slope_series"]], p[["ec50"]],
                   response)
-  gr <- function(p) {
+  gr <- if (response == "continuous") function(p) {
     g_ref <- pot_gradient(d_ref, p[["max_reference"]], p[["slope_reference"]],
-                          p[["ec50"]], response)
+                          p[["ec50"]])
     g_k <- pot_gradient(d_k, p[["max_series"]], p[["slope_series"]],
-                        p[["ec50"]], response)
+                        p[["ec50"]])
     c(g_ref[["max"]], g_ref[["slope"]], g_k[["max"]], g_k[["slope"]],
       g_ref[["ec50"]] + g_k[["ec50"]])
   }

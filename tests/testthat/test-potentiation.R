@@ -149,6 +149,76 @@ test_that("flat series does not error and is flagged", {
   expect_true(r$curves$Flat$ec50_extrapolated)
 })
 
+# A single-stressor series of the quantal binary fixture; by default its C2
+# series (C1 == 0 rows, C2 as the dose), whose controls are mostly 10/10, so a
+# start at max = 1 clamps them.
+quantal_series <- function(label = "Stressor 1", stressor = 2) {
+  q <- read.csv(test_path("fixtures", "binary", "survival",
+                          "binary_mps_cpf_quantal.csv"))
+  other <- if (stressor == 2) "C1" else "C2"
+  q <- q[q[[other]] == 0, ]
+  data.frame(Series = label, C1 = q[[paste0("C", stressor)]],
+             Affected = q$Affected, Exposed = q$Exposed)
+}
+
+test_that("quantal fit reaches the minimum when control rows are 100%", {
+  f <- pot_fit_curve(quantal_series(), "quantal")
+  expect_equal(f$objective, 47.079, tolerance = 1e-4)   # not 242.72 at max = 1
+  expect_equal(f$par[["max"]], 0.971, tolerance = 1e-3)
+  expect_identical(f$convergence, 0L)
+})
+
+test_that("quantal: a series identical to the reference is not significant", {
+  # The third series matters: its shared fit re-seeds the reference out of a
+  # stalled fit while the identical series stays stalled, which once gave
+  # "significantly more toxic, X2 = 195.6" for identical data.
+  d <- rbind(quantal_series("Stressor 1"), quantal_series("Same"),
+             quantal_series("Other", stressor = 1))
+  r <- keep("quantal_identical", analyse_potentiation(d, response = "quantal"))
+  cmp <- r$comparisons[r$comparisons$series == "Same", ]
+  expect_lt(cmp$chi, 1e-3)
+  expect_false(cmp$significant)
+  expect_equal(cmp$direction, "no significant influence")
+  expect_equal(r$curves$Same$objective, 47.079, tolerance = 1e-4)
+  expect_equal(r$curves[["Stressor 1"]]$objective, 47.079, tolerance = 1e-4)
+})
+
+test_that("missing values stop the analysis with a clear message", {
+  d <- ex(); d$Res[12] <- NA; d$C1[40] <- NA
+  expect_error(analyse_potentiation(d),
+               "missing values in row(s) 12, 40; remove or complete them",
+               fixed = TRUE)
+  d <- ex(); d$Series[5] <- NA
+  expect_error(analyse_potentiation(d), "missing values in row(s) 5;",
+               fixed = TRUE)
+  q <- rbind(quantal_series("Stressor 1"), quantal_series("Same"))
+  q$Affected[3] <- NA
+  expect_error(analyse_potentiation(q, response = "quantal"),
+               "missing values in row(s) 3;", fixed = TRUE)
+})
+
+test_that("an optimiser failure in a curve fit stops the analysis, naming the series", {
+  real_fit <- pot_fit_curve
+  local_mocked_bindings(pot_fit_curve = function(d, response, starts = NULL) {
+    f <- real_fit(d, response, starts)
+    if (any(d$Series == "Level 2")) f$convergence <- 99L
+    f
+  })
+  expect_error(analyse_potentiation(ex()),
+               "optimiser failed on the curve of series 'Level 2'", fixed = TRUE)
+})
+
+test_that("an optimiser failure in a shared-EC50 fit stops the analysis, naming the series", {
+  real_fit <- pot_fit_shared
+  local_mocked_bindings(pot_fit_shared = function(...) {
+    f <- real_fit(...)
+    f$convergence <- 99L
+    f
+  })
+  expect_error(analyse_potentiation(ex()),
+               "optimiser failed on the shared-EC50 fit of 'Level 1'", fixed = TRUE)
+})
+
 test_that("obj1 <= obj2 always", {
   results <- as.list(pot_results)
   expect_gte(length(results), 7)
@@ -159,21 +229,16 @@ test_that("obj1 <= obj2 always", {
   }
 })
 
-test_that("the exact gradient matches a central finite difference", {
+test_that("the exact (continuous) gradient matches a central finite difference", {
   num_grad <- function(f, p, h = 1e-6) vapply(seq_along(p), function(i) {
     e <- replace(numeric(length(p)), i, h * abs(p[[i]]))
     (f(p + e) - f(p - e)) / (2 * e[[i]])
   }, numeric(1))
   dc <- data.frame(C1 = c(0, 0, 0.05, 0.1, 0.2, 0.4), Res = c(98, 102, 90, 55, 20, 3))
-  dq <- data.frame(C1 = c(0, 0.5, 1, 2, 4), Exposed = 20,
-                   Affected = c(18, 15, 9, 4, 0))
-  for (case in list(list(d = dc, resp = "continuous", p = c(100, 3, 0.12)),
-                    list(d = dq, resp = "quantal",    p = c(0.9, 1.7, 1.1)))) {
-    f <- function(p) pot_objective(case$d, p[1], p[2], p[3], case$resp)
-    expect_equal(unname(pot_gradient(case$d, case$p[1], case$p[2], case$p[3],
-                                     case$resp)),
-                 num_grad(f, case$p), tolerance = 1e-5, label = case$resp)
-  }
+  p <- c(100, 3, 0.12)
+  f <- function(p) pot_objective(dc, p[1], p[2], p[3], "continuous")
+  expect_equal(unname(pot_gradient(dc, p[1], p[2], p[3])), num_grad(f, p),
+               tolerance = 1e-5)
 })
 
 test_that("errors on bad input", {

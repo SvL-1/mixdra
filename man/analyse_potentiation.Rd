@@ -15,7 +15,9 @@ analyse_potentiation(
 \arguments{
 \item{df}{Data frame with columns \code{Series} (curve label), \code{C1} (stressor-1
 concentration, >= 0) and \code{Res} (continuous) or \code{Exposed}/\code{Affected}
-(quantal). Labels are compared after \code{trimws(as.character())}.}
+(quantal). Labels are compared after \code{trimws(as.character())}. Missing
+values in these columns are an error, as is an optimiser failure (both
+name the rows or series concerned).}
 
 \item{reference}{Label of the reference series; defaults to the first series
 in \code{df}.}
