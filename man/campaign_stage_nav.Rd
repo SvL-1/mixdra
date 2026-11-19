@@ -11,14 +11,22 @@ campaign_stage_nav(ns, store, selected = NULL)
 
 \item{store}{The campaign store.}
 
-\item{selected}{Title of the sub-tab to open, or \code{NULL} for the first one.
-The caller passes the currently open tab so that rebuilding the navset
-(which happens on any store change) does not reset the user's position;
-a title that no longer exists is ignored.}
+\item{selected}{Value of the sub-tab to open (\code{"Singles"}, \code{"pair12"}, ...,
+\code{"Ternary"}), or \code{NULL} for the first one. A value that does not exist in
+this campaign is ignored.}
 }
 \description{
-Built server-side because which sub-tabs exist depends on the data: the
-Ternary sub-tab is absent for a two-stressor campaign, and pairs with no
-mixture rows are disabled.
+Built server-side because which sub-tabs exist depends on the data: pair
+tabs for every pair of dosed stressors, and a Ternary tab for a
+three-stressor campaign.
+}
+\details{
+Only the STRUCTURE lives here, and it reads nothing but \code{store$chems}, so it
+is rebuilt only when a new file changes the set of stressors. The Singles
+page is placed statically; the pair titles are \code{textOutput}s and every other
+tab's content is a \code{uiOutput} filled from \code{\link[=campaign_stage_body]{campaign_stage_body()}}. A
+rebuild recreates every input inside the navset, so an earlier version that
+re-rendered on any store write (a fit, a rename) silently cleared the Fix
+boxes and constraints the user had just set on the Singles page.
 }
 \keyword{internal}

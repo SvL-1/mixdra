@@ -4,7 +4,7 @@
 \alias{curve_fit_server}
 \title{Curve-fit panel server}
 \usage{
-curve_fit_server(id, fit_df, meta, chem_field = NULL)
+curve_fit_server(id, fit_df, meta, chem_field = NULL, preset = NULL)
 }
 \arguments{
 \item{id}{Module id.}
@@ -17,6 +17,10 @@ data is invalid; the panel fits whatever non-empty frame it is given.}
 
 \item{chem_field}{Optional meta field for the x-axis label (e.g. "chem1"); NULL
 uses a generic "Concentration" label.}
+
+\item{preset}{Optional reactive returning a named numeric \code{c(max, slope, ec50)} fitted elsewhere (the Singles page's campaign fit). Each new value
+is written into the Value cells and drawn as the panel's curve, so the
+numbers sit next to the curve they describe (issue #14).}
 }
 \value{
 A list of two reactives: \code{fit}, the current fit (a
