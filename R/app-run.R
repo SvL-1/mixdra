@@ -29,6 +29,7 @@ app_server <- function(input, output, session) {
   meta <- shiny::reactiveValues()
   intro_server("intro", meta)
   single_server("single", meta)
+  potentiation_server("potentiation", meta)
   campaign_server("campaign", meta)
 }
 

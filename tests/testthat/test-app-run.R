@@ -20,6 +20,20 @@ test_that("run_app is exported and errors clearly when a dependency is missing",
   expect_match(body_txt, "shiny")
 })
 
+test_that("app_server runs the (De)potentiation tab's server", {
+  skip_if_not_installed("DT")
+  skip_if_not_installed("plotly")
+  # Only the (De)potentiation wiring is under test; the other tabs' servers
+  # are stubbed so this stays quick.
+  local_mocked_bindings(intro_server = function(...) NULL,
+                        single_server = function(...) NULL,
+                        campaign_server = function(...) NULL)
+  shiny::testServer(app_server, {
+    html <- as.character(output[["potentiation-conclusion"]]$html)
+    expect_match(html, "significantly less toxic", fixed = TRUE)
+  })
+})
+
 test_that("app_ui exposes Introduction, Single Stressor, (De)potentiation and Mixture toxicity", {
   ui <- app_ui()
   txt <- paste(as.character(ui), collapse = " ")

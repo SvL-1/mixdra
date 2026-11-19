@@ -22,10 +22,18 @@ potentiation_ui <- function(id) {
         "Continuous = a measured amount (column ", shiny::tags$code("Res"),
         "). Quantal = counts (", shiny::tags$code("Affected"), " out of ",
         shiny::tags$code("Exposed"), ")."),
+      shiny::helpText(
+        "Quantal: ", shiny::tags$code("Affected"), paste0(
+          " counts the individuals still showing the response (e.g. alive), ",
+          "so the proportion declines with dose.")),
       shiny::downloadButton(ns("template"), "Download template"),
       shiny::fileInput(ns("file"), "Upload CSV", accept = ".csv"),
       shiny::uiOutput(ns("errors")),
-      shiny::selectInput(ns("reference"), "Reference series", choices = character(0))
+      shiny::selectInput(ns("reference"), "Reference series", choices = character(0)),
+      shiny::helpText(paste0(
+        "List the series in increasing stressor-2 level: the other series are ",
+        "taken in file order, and the conclusion's \u201cfrom \u2026 on\u201d ",
+        "depends on that order."))
     ),
     shiny::uiOutput(ns("source_note")),
     bslib::card(bslib::card_header("Dose-response curves"),
@@ -41,8 +49,10 @@ potentiation_ui <- function(id) {
 
 #' Controls note of a (de)potentiation result
 #'
-#' One sentence per comparison that borrowed the reference's controls; a single
-#' "own controls" sentence when none did.
+#' One sentence per comparison that borrowed the reference's controls. When
+#' nothing was borrowed: a sentence naming the series that have no control
+#' observations at all (their max rests on the dosed rows only), or, when every
+#' series has its own, a single "own controls" sentence.
 #' @param res Result of [analyse_potentiation()].
 #' @return Character vector.
 #' @keywords internal
@@ -50,8 +60,24 @@ potentiation_ui <- function(id) {
 potentiation_controls_note <- function(res) {
   cmp <- res$comparisons
   b <- which(cmp$controls_borrowed)
-  if (!length(b))
-    return("Controls: each series uses its own control observations.")
+  if (!length(b)) {
+    # Borrowing needs controls in the reference, so a series can only be left
+    # without any when the reference has none either.
+    none <- res$series[vapply(res$series, function(s)
+      !any(res$curves[[s]]$data$C1 == 0), logical(1))]
+    if (!length(none))
+      return("Controls: each series uses its own control observations.")
+    one <- length(none) == 1
+    join <- if (one) none else
+      paste(paste(none[-length(none)], collapse = ", "), "and", none[[length(none)]])
+    note <- paste0("Controls: ", join, if (one) " has" else " have",
+                   " no control observations, so ", if (one) "its" else "their",
+                   " max is estimated from the dosed rows only.")
+    if (length(setdiff(none, res$reference)))
+      note <- paste0(note, " Nothing could be borrowed: the reference series, ",
+                     res$reference, ", has none.")
+    return(note)
+  }
   k <- sum(res$curves[[res$reference]]$data$C1 == 0)
   vapply(b, function(i) paste0(
     "Controls: the ", k, " control observations of ", res$reference,
@@ -59,6 +85,26 @@ potentiation_controls_note <- function(res) {
     ", as in the Excel workbook, so they are counted twice (n = ", cmp$n[[i]],
     "). This is the approach used here; it makes the test slightly more ",
     "liberal than counting them once."), character(1))
+}
+
+#' Tests table of a (de)potentiation result
+#'
+#' One row per comparison. The run-1 and run-2 objectives (SS or deviance) are
+#' shown to 2 decimals so they can be compared with the Excel workbook.
+#' @param res Result of [analyse_potentiation()].
+#' @return Data frame.
+#' @keywords internal
+#' @noRd
+potentiation_tests_table <- function(res) {
+  cmp <- res$comparisons
+  what <- if (res$response == "quantal") "deviance" else "SS"
+  d <- data.frame(Series = cmp$series, n = cmp$n,
+                  round(cmp$obj1, 2), round(cmp$obj2, 2),
+                  signif(cmp$chi, 4), p = vapply(cmp$p, format_p, ""),
+                  Verdict = cmp$direction,
+                  check.names = FALSE, stringsAsFactors = FALSE)
+  names(d)[3:5] <- c(paste(what, "run 1"), paste(what, "run 2"), "X\u00b2")
+  d
 }
 
 #' (De)potentiation stage server
@@ -108,6 +154,8 @@ potentiation_server <- function(id, meta) {
     })
 
     # The analysis, run once; a failure becomes a message, not a Shiny error.
+    # It does not depend on the typed names (the conclusion text is rebuilt
+    # separately), so typing a name does not refit.
     analysis <- shiny::reactive({
       shiny::req(valid())
       s <- series_labels()
@@ -115,8 +163,7 @@ potentiation_server <- function(id, meta) {
       if (is.null(ref) || !ref %in% s) ref <- s[[1]]
       tryCatch(
         list(res = analyse_potentiation(parsed(), reference = ref,
-                                        response = response(),
-                                        stressor1 = name1()),
+                                        response = response()),
              error = NULL),
         error = function(e) list(res = NULL, error = paste0(
           "The analysis failed: ", conditionMessage(e))))
@@ -163,6 +210,8 @@ potentiation_server <- function(id, meta) {
 
     controls_note <- shiny::reactive(potentiation_controls_note(result()))
 
+    summary_text <- shiny::reactive(potentiation_summary(result(), name1()))
+
     axis <- shiny::reactive({
       nm <- name1(); u <- input$unit1 %||% ""
       if (nzchar(u)) paste0(nm, " (", u, ")") else nm
@@ -196,21 +245,11 @@ potentiation_server <- function(id, meta) {
       dt(d)
     })
 
-    output$tests <- DT::renderDT({
-      res <- result(); cmp <- res$comparisons
-      what <- if (response() == "quantal") "deviance" else "SS"
-      d <- data.frame(Series = cmp$series, n = cmp$n,
-                      signif(cmp$obj1, 4), signif(cmp$obj2, 4),
-                      signif(cmp$chi, 4), p = vapply(cmp$p, format_p, ""),
-                      Verdict = cmp$direction,
-                      check.names = FALSE, stringsAsFactors = FALSE)
-      names(d)[3:5] <- c(paste(what, "run 1"), paste(what, "run 2"), "X²")
-      dt(d)
-    })
+    output$tests <- DT::renderDT(dt(potentiation_tests_table(result())))
 
     output$controls <- shiny::renderUI(
       lapply(controls_note(), function(x) shiny::tags$p(x)))
 
-    output$conclusion <- shiny::renderUI(shiny::tags$p(result()$summary))
+    output$conclusion <- shiny::renderUI(shiny::tags$p(summary_text()))
   })
 }

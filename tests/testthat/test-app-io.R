@@ -443,6 +443,40 @@ test_that("potentiation: labels differing by whitespace are one series", {
                "at least two series", all = FALSE)
 })
 
+test_that("potentiation: rows with missing values are reported by row number", {
+  d <- pot_df(c("Stressor 1", "Level 1", "Level 2"))   # 18 rows
+  d$Res[12] <- NA; d$C1[4] <- NA
+  expect_match(validate_upload(d, "potentiation", "continuous"),
+               "Row(s) 4, 12 have missing values; remove or complete them.",
+               all = FALSE, fixed = TRUE)
+  t <- template_df("potentiation", "quantal")
+  t$Affected[2] <- NA; t$Exposed[7] <- NA
+  expect_match(validate_upload(t, "potentiation", "quantal"),
+               "Row(s) 2, 7 have missing values", all = FALSE, fixed = TRUE)
+  d3 <- pot_df(c("Stressor 1", "Level 1")); d3$Series[3] <- NA
+  expect_match(validate_upload(d3, "potentiation", "continuous"),
+               "Row(s) 3 have missing values", all = FALSE, fixed = TRUE)
+  # a long list is cut short
+  d4 <- pot_df(c("Stressor 1", "Level 1", "Level 2")); d4$Res <- NA_real_
+  expect_match(validate_upload(d4, "potentiation", "continuous"),
+               "Row(s) 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 and 8 more have missing values",
+               all = FALSE, fixed = TRUE)
+  expect_false(any(grepl("missing values",
+    validate_upload(pot_df(c("Stressor 1", "Level 1")), "potentiation", "continuous"))))
+})
+
+test_that("potentiation quantal template declines with dose, as the engine fits it", {
+  t <- template_df("potentiation", "quantal")
+  for (s in unique(t$Series)) {
+    p <- with(t[t$Series == s, ], Affected / Exposed)
+    expect_equal(p[[1]], 1, label = s)
+    expect_true(all(diff(p) <= 0), label = s)
+  }
+  r <- analyse_potentiation(t, response = "quantal")
+  expect_equal(r$curves[["Stressor 1"]]$par[["ec50"]], 3, tolerance = 0.3)
+  expect_true(all(r$comparisons$ratio < 1))
+})
+
 test_that("potentiation quantal: Exposed must be > 0", {
   t <- template_df("potentiation", "quantal")
   t$Exposed[2] <- 0; t$Affected[2] <- 0

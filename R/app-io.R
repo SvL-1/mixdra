@@ -48,8 +48,10 @@ template_df <- function(stage, response) {
       if (response == "continuous") {
         data.frame(Series = series[i], C1 = conc, Res = round(100 * p, 1))
       } else {
+        # The engine fits a declining curve to Affected / Exposed, so Affected
+        # counts the individuals still showing the response (e.g. alive).
         data.frame(Series = series[i], C1 = conc,
-                   Affected = round(10 * (1 - p)), Exposed = 10)
+                   Affected = round(10 * p), Exposed = 10)
       }
     })
     return(do.call(rbind, rows))
@@ -127,6 +129,19 @@ validate_upload <- function(df, stage, response) {
       errs <- c(errs, "Affected must be <= Exposed.")
     if (stage == "potentiation" && any(df$Exposed <= 0, na.rm = TRUE))
       errs <- c(errs, "Exposed must be greater than 0 in every row.")
+  }
+
+  if (stage == "potentiation" && length(present)) {
+    # analyse_potentiation() refuses missing values; name the rows here so the
+    # user can fix the file (row numbers count data rows, not the header).
+    na_rows <- which(!stats::complete.cases(df[present]))
+    if (length(na_rows)) {
+      shown <- utils::head(na_rows, 10)
+      errs <- c(errs, paste0(
+        "Row(s) ", paste(shown, collapse = ", "),
+        if (length(na_rows) > 10) paste0(" and ", length(na_rows) - 10, " more"),
+        " have missing values; remove or complete them."))
+    }
   }
 
   if (stage == "potentiation" && "Series" %in% present) {
