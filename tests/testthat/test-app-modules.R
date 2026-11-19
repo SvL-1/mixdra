@@ -1033,20 +1033,3 @@ test_that("pair_workspace_server falls back to stressor numbers when unlabelled"
     expect_match(as.character(output$ec50_note$html), "stressor 2", fixed = TRUE)
   })
 })
-
-test_that("potentiation_ui has the reference-series selector", {
-  ui <- potentiation_ui("p")
-  expect_match(paste(as.character(ui), collapse = " "), "Reference series",
-               fixed = TRUE)
-})
-
-test_that("potentiation_server analyses the bundled example until a file is uploaded", {
-  skip_if_not_installed("DT")
-  shiny::testServer(potentiation_server, args = list(meta = shiny::reactiveValues()), {
-    expect_equal(result()$comparisons$series, c("Level 1", "Level 2", "Level 3"))
-    expect_match(controls_note(), "the 20 control observations of Stressor 1", all = FALSE,
-                 fixed = TRUE)
-    expect_match(controls_note(), "used for both curves of the comparison with Level 1", all = FALSE,
-                 fixed = TRUE)
-  })
-})

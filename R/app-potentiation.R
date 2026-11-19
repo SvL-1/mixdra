@@ -14,7 +14,8 @@ potentiation_ui <- function(id) {
       shiny::textInput(ns("name1"), "Stressor 1 name"),
       shiny::textInput(ns("unit1"), "Stressor 1 unit (e.g. mg/L)"),
       shiny::textInput(ns("name2"), "Stressor 2 name"),
-      shiny::helpText("Used to label the axis and the conclusion."),
+      shiny::helpText("Stressor 1's name and unit label the axis and the ",
+                      "conclusion; stressor 2's name labels the plot title."),
       shiny::radioButtons(ns("response"), "Response type",
                           c("Continuous" = "continuous", "Quantal" = "quantal")),
       shiny::helpText(
@@ -77,23 +78,53 @@ potentiation_server <- function(id, meta) {
     use_example <- shiny::reactive(is.null(input$file))
 
     # The bundled (continuous) example stands in until the user uploads a file.
+    # A failed read is kept as a message (for the errors area), not re-raised.
+    parse_try <- shiny::reactive({
+      tryCatch(
+        list(data = if (use_example())
+               read_upload(system.file("extdata",
+                                       "potentiation_example_continuous.csv",
+                                       package = "mixdra"))
+             else read_upload(input$file$datapath),
+             error = NULL),
+        error = function(e) list(data = NULL, error = paste0(
+          "Could not read the file: ", conditionMessage(e))))
+    })
     parsed <- shiny::reactive({
-      if (use_example())
-        read_upload(system.file("extdata", "potentiation_example_continuous.csv",
-                                package = "mixdra"))
-      else read_upload(input$file$datapath)
+      shiny::req(is.null(parse_try()$error))
+      parse_try()$data
     })
 
     # With the example loaded the data are continuous whatever the radio says.
     response <- shiny::reactive(
       if (use_example()) "continuous" else input$response %||% "continuous")
 
-    errs <- shiny::reactive(validate_upload(
-      parsed(), "potentiation", input$response %||% "continuous"))
+    errs <- shiny::reactive({
+      if (!is.null(parse_try()$error)) return(parse_try()$error)
+      tryCatch(
+        validate_upload(parsed(), "potentiation", input$response %||% "continuous"),
+        error = function(e) paste0("Could not check the file: ",
+                                   conditionMessage(e)))
+    })
+
+    # The analysis, run once; a failure becomes a message, not a Shiny error.
+    analysis <- shiny::reactive({
+      shiny::req(valid())
+      s <- series_labels()
+      ref <- input$reference
+      if (is.null(ref) || !ref %in% s) ref <- s[[1]]
+      tryCatch(
+        list(res = analyse_potentiation(parsed(), reference = ref,
+                                        response = response(),
+                                        stressor1 = name1()),
+             error = NULL),
+        error = function(e) list(res = NULL, error = paste0(
+          "The analysis failed: ", conditionMessage(e))))
+    })
 
     output$errors <- shiny::renderUI({
       if (use_example()) return(NULL)
-      e <- errs()
+      e <- c(errs(), if (length(errs()) == 0) analysis()$error)
       if (length(e)) shiny::div(class = "text-danger",
                                 lapply(e, function(x) shiny::tags$p(x)))
     })
@@ -121,13 +152,13 @@ potentiation_server <- function(id, meta) {
     name1 <- shiny::reactive(
       if (nzchar(input$name1 %||% "")) input$name1 else "Stressor 1")
 
+    name2 <- shiny::reactive(
+      if (nzchar(input$name2 %||% "")) input$name2 else "Stressor 2")
+
     result <- shiny::reactive({
-      shiny::req(valid())
-      s <- series_labels()
-      ref <- input$reference
-      if (is.null(ref) || !ref %in% s) ref <- s[[1]]
-      analyse_potentiation(parsed(), reference = ref, response = response(),
-                           stressor1 = name1())
+      a <- analysis()
+      shiny::req(is.null(a$error))
+      a$res
     })
 
     controls_note <- shiny::reactive(potentiation_controls_note(result()))
@@ -137,10 +168,13 @@ potentiation_server <- function(id, meta) {
       if (nzchar(u)) paste0(nm, " (", u, ")") else nm
     })
 
-    output$plot <- plotly::renderPlotly(
-      plot_potentiation(result(), xlab = axis(),
-                        ylab = if (response() == "quantal") "proportion affected"
-                               else "response"))
+    plot_obj <- shiny::reactive(
+      plotly::layout(
+        plot_potentiation(result(), xlab = axis(),
+                          ylab = if (response() == "quantal") "proportion affected"
+                                 else "response"),
+        title = list(text = paste(name1(), "with and without", name2()))))
+    output$plot <- plotly::renderPlotly(plot_obj())
 
     dt <- function(d) DT::datatable(d, rownames = FALSE,
                                     options = list(dom = "t", paging = FALSE))
