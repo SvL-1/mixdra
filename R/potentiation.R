@@ -134,9 +134,11 @@ analyse_potentiation <- function(df, reference = NULL,
   }))
   rownames(comparisons) <- NULL
 
-  list(reference = reference, response = response, alpha = alpha,
-       series = series, curves = curves, comparisons = comparisons,
-       shared = shared, summary = NA_character_)
+  res <- list(reference = reference, response = response, alpha = alpha,
+              series = series, curves = curves, comparisons = comparisons,
+              shared = shared, summary = NA_character_)
+  res$summary <- potentiation_summary(res, stressor1)
+  res
 }
 
 # Parameter box shared by the separate and the shared-EC50 fits (fit_single()'s

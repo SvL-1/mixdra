@@ -63,7 +63,8 @@ test_that("series and comparisons keep file order", {
   expect_equal(r$reference, "Stressor 1")
   expect_equal(names(r$curves), r$series)
   expect_equal(names(r$shared), r$comparisons$series)
-  expect_identical(r$summary, NA_character_)
+  expect_type(r$summary, "character")
+  expect_length(r$summary, 1)
 })
 
 test_that("recovery: no shift is not significant, a shift is detected with the right direction", {
