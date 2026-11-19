@@ -1,13 +1,16 @@
 # mixdra (development version)
 
-* New **(De)potentiation** tab (and `analyse_potentiation()`): when stressor 2 is
-  applied at only one or a few fixed levels, it fits stressor 1's
-  dose-response curve per series and tests, per level, whether the EC50 differs
-  from the reference series with a one-degree-of-freedom likelihood-ratio test
-  (residual SS for continuous, deviance for quantal data). As in the Excel
-  workbook, a series without its own controls borrows the reference's, which
-  are then counted in both curves; the app says so next to the results. The
-  method is generic: any stressor pair, any number of levels.
+* New **(De)potentiation** tab: when stressor 2 is applied at only one or a few
+  fixed levels, it fits stressor 1's dose-response curve per series and tests,
+  per level, whether the EC50 differs from the reference series with a
+  one-degree-of-freedom likelihood-ratio test (residual SS for continuous,
+  deviance for quantal data). As in the Excel workbook, a series without its
+  own controls borrows the reference's, which are then counted in both curves;
+  the app says so next to the results. The method is generic: any stressor
+  pair, any number of levels.
+* Two new exported functions behind that tab: `analyse_potentiation()` runs the
+  analysis (curves, tests and the conclusion text) and `plot_potentiation()`
+  plots stressor 1's observed points and fitted curve for every series.
 * The **Multiple stressors** tab is now called **Mixture toxicity**. Only the
   user-facing labels changed; the uploaded-file format is unchanged.
 * The **Campaign** tab is now called **Multiple stressors** (#12). Only the

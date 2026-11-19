@@ -107,8 +107,9 @@ validation_datasets <- function() {
                                            upper = c(ec50_2 = 5.581))),
     potentiation_example_continuous = list(
       path  = file.path("potentiation", "potentiation_example_continuous.csv"),
-      # No `experiment`: the example data is not tied to a published experiment,
-      # so the report renders this section without a provenance block.
+      # No `experiment`: the example is deliberately not linked to an
+      # experiment, to keep the section generic, so the report renders it
+      # without a provenance block.
       endpoint = "continuous response",
       title = paste0("(De)potentiation example: stressor 1 with stressor 2 at ",
                      "three levels, continuous response"),

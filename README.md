@@ -152,13 +152,16 @@ install.packages(c("shiny", "bslib", "plotly", "DT"))
 mixdra::run_app()
 ```
 
-Opens a `bslib` dashboard with three tabs: **Introduction** for experiment
-metadata, **Single Stressor** for a standalone one-stressor experiment, and
-**Campaign** for a full mixture study.
+Opens a `bslib` dashboard with four tabs: **Introduction** for experiment
+metadata, **Single Stressor** for a standalone one-stressor experiment,
+**(De)potentiation** for stressor 1's dose-response curve measured without and
+with stressor 2 at one or a few fixed levels (does stressor 2 make stressor 1
+more or less toxic, and from which level on?), and **Mixture toxicity** for a
+full mixture study.
 
-A campaign is one uploaded file covering two or three stressors — single-stressor
-rows carry zeros in the other concentrations, pair rows carry zero in the third.
-Its sub-tabs run the study in order:
+On the Mixture toxicity tab, a campaign is one uploaded file covering two or
+three stressors — single-stressor rows carry zeros in the other concentrations,
+pair rows carry zero in the third. Its sub-tabs run the study in order:
 
 1. **Singles** — every stressor's dose-response curve, fitted once. These curves
    are the campaign's single source of truth.
@@ -193,6 +196,21 @@ Single chemicals and ternary mixtures use the matching entry points:
 ```r
 analyse_single(conc, resp)               # one log-logistic curve
 analyse_ternary(df, reference = "CA")    # 3-chemical fit + Advanced S/A
+```
+
+A (de)potentiation experiment — stressor 1's curve without stressor 2 and with
+it at one or a few fixed levels — has one row per observation with a `Series`
+label, `C1`, and `Res` (or `Exposed` / `Affected`). The first series is the
+reference; the others are tested against it in file order:
+
+```r
+pot_df <- read.csv(system.file("extdata", "potentiation_example_continuous.csv",
+                               package = "mixdra"))
+pot <- analyse_potentiation(pot_df)
+
+pot$comparisons      # per level: obj1 / obj2 (SS of run 1 / 2), chi (X²), p, direction
+pot$summary          # the conclusion in words
+plot_potentiation(pot)
 ```
 
 Need synthetic data to sanity-check a design before you run the experiment?
