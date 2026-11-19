@@ -372,3 +372,80 @@ test_that("pair_bounds drops bounds for a stressor outside the pair", {
   p <- pair_bounds(b, 2, 3)
   expect_equal(names(p$lower), "ec501")
 })
+
+# ---- "potentiation" stage ----------------------------------------------------
+
+pot_df <- function(series, conc = c(0, 0.1, 0.3, 1, 3, 10)) {
+  do.call(rbind, lapply(series, function(s)
+    data.frame(Series = s, C1 = conc, Res = round(100 / (1 + conc), 1))))
+}
+
+test_that("potentiation schema has Series first", {
+  expect_equal(upload_schema("potentiation", "continuous"), c("Series", "C1", "Res"))
+  expect_equal(upload_schema("potentiation", "quantal"),
+               c("Series", "C1", "Affected", "Exposed"))
+})
+
+test_that("potentiation template matches schema and validates", {
+  for (r in c("continuous", "quantal")) {
+    t <- template_df("potentiation", r)
+    expect_equal(names(t), upload_schema("potentiation", r))
+    expect_equal(unique(t$Series), c("Stressor 1", "Level 1", "Level 2"))
+    expect_equal(validate_upload(t, "potentiation", r), character(0))
+  }
+})
+
+test_that("potentiation: Series is text, C1/Res are still numeric-checked", {
+  d <- pot_df(c("Stressor 1", "Level 1"))
+  expect_equal(validate_upload(d, "potentiation", "continuous"), character(0))
+  d$C1 <- as.character(d$C1)
+  d$Res <- as.character(d$Res)
+  e <- validate_upload(d, "potentiation", "continuous")
+  expect_match(e, "Non-numeric column(s): C1, Res", all = FALSE, fixed = TRUE)
+  expect_false(any(grepl("Series", e[grepl("Non-numeric", e)])))
+})
+
+test_that("potentiation: missing Series, empty labels, one series", {
+  d <- pot_df(c("Stressor 1", "Level 1"))
+  expect_match(validate_upload(d[c("C1", "Res")], "potentiation", "continuous"),
+               "Missing column(s): Series", all = FALSE, fixed = TRUE)
+  d2 <- d; d2$Series[3] <- ""
+  expect_match(validate_upload(d2, "potentiation", "continuous"),
+               "Series labels must not be empty.", all = FALSE, fixed = TRUE)
+  d3 <- d; d3$Series[3] <- NA
+  expect_match(validate_upload(d3, "potentiation", "continuous"),
+               "Series labels must not be empty.", all = FALSE, fixed = TRUE)
+  expect_match(validate_upload(pot_df("Stressor 1"), "potentiation", "continuous"),
+               "at least two series", all = FALSE)
+})
+
+test_that("potentiation: a series needs 3 distinct positive concentrations", {
+  d <- rbind(pot_df("Stressor 1"), pot_df("Level 1", conc = c(0, 0.1, 1, 1)))
+  expect_match(validate_upload(d, "potentiation", "continuous"),
+               "Series 'Level 1' has only 2 positive concentrations",
+               all = FALSE, fixed = TRUE)
+})
+
+test_that("potentiation: numeric Series labels validate and analyse", {
+  d <- pot_df(c(1, 2))
+  expect_equal(validate_upload(d, "potentiation", "continuous"), character(0))
+  r <- analyse_potentiation(d)
+  expect_equal(r$series, c("1", "2"))
+})
+
+test_that("potentiation: labels differing by whitespace are one series", {
+  # untrimmed this would be 3 series; trimmed it is 2, so no error
+  d <- rbind(pot_df("Stressor 1"), pot_df("Level 1 "), pot_df("Level 1"))
+  expect_equal(validate_upload(d, "potentiation", "continuous"), character(0))
+  # trimmed, "Stressor 1" and " Stressor 1" are ONE series, so only one here
+  d1 <- rbind(pot_df("Stressor 1"), pot_df(" Stressor 1"))
+  expect_match(validate_upload(d1, "potentiation", "continuous"),
+               "at least two series", all = FALSE)
+})
+
+test_that("potentiation quantal: Exposed must be > 0", {
+  t <- template_df("potentiation", "quantal")
+  t$Exposed[2] <- 0; t$Affected[2] <- 0
+  expect_match(validate_upload(t, "potentiation", "quantal"),
+               "Exposed must be greater than 0 in every row.", all = FALSE, fixed = TRUE)
+})

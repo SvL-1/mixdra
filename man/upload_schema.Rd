@@ -7,7 +7,7 @@
 upload_schema(stage, response)
 }
 \arguments{
-\item{stage}{"single", "binary", "ternary", or "campaign".}
+\item{stage}{"single", "binary", "ternary", "campaign", or "potentiation".}
 
 \item{response}{"continuous" or "quantal".}
 }

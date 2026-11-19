@@ -2,13 +2,17 @@
 # are fully unit-testable and run without the UI stack installed.
 
 #' Fixed column schema for a stage and response type
-#' @param stage "single", "binary", "ternary", or "campaign".
+#' @param stage "single", "binary", "ternary", "campaign", or "potentiation".
 #' @param response "continuous" or "quantal".
 #' @return Character vector of required column names.
 #' @keywords internal
 upload_schema <- function(stage, response) {
-  stage <- match.arg(stage, c("single", "binary", "ternary", "campaign"))
+  stage <- match.arg(stage, c("single", "binary", "ternary", "campaign", "potentiation"))
   response <- match.arg(response, c("continuous", "quantal"))
+  if (stage == "potentiation") {
+    return(if (response == "continuous") c("Series", "C1", "Res")
+           else c("Series", "C1", "Affected", "Exposed"))
+  }
   if (stage == "single") {
     if (response == "continuous") c("Conc", "Res") else c("Conc", "Affected", "Exposed")
   } else if (stage == "binary" || stage == "campaign") {
@@ -34,6 +38,22 @@ template_df <- function(stage, response) {
   # A campaign template IS the ternary template: all four strata in one frame.
   if (stage == "campaign") stage <- "ternary"
   cols <- upload_schema(stage, response)
+  if (stage == "potentiation") {
+    # Three series: the reference and two levels whose curves sit further left.
+    conc <- c(0, 0.1, 0.3, 1, 3, 10)
+    series <- c("Stressor 1", "Level 1", "Level 2")
+    ec50 <- c(3, 1.5, 0.6)
+    rows <- lapply(seq_along(series), function(i) {
+      p <- 1 / (1 + (conc / ec50[i])^1.5)       # 1 at control, declining
+      if (response == "continuous") {
+        data.frame(Series = series[i], C1 = conc, Res = round(100 * p, 1))
+      } else {
+        data.frame(Series = series[i], C1 = conc,
+                   Affected = round(10 * (1 - p)), Exposed = 10)
+      }
+    })
+    return(do.call(rbind, rows))
+  }
   if (stage == "single") {
     conc <- c(0, 0.1, 0.3, 1, 3, 10)
     if (response == "continuous") {
@@ -72,7 +92,7 @@ template_df <- function(stage, response) {
 
 #' Validate an uploaded data frame against the fixed schema
 #'
-#' @param stage "single", "binary", "ternary", or "campaign".
+#' @param stage "single", "binary", "ternary", "campaign", or "potentiation".
 #' @param response "continuous" or "quantal".
 #' @param df The uploaded data frame.
 #' @return Character vector of human-readable error messages; empty if valid.
@@ -87,7 +107,9 @@ validate_upload <- function(df, stage, response) {
                            ". Expected exactly: ", paste(req_cols, collapse = ", "), "."))
 
   present <- intersect(req_cols, names(df))
-  non_num <- present[!vapply(df[present], is.numeric, logical(1))]
+  # Series is a free-text label, so it is exempt from the numeric check.
+  num_cols <- setdiff(present, "Series")
+  non_num <- num_cols[!vapply(df[num_cols], is.numeric, logical(1))]
   if (length(non_num))
     errs <- c(errs, paste0("Non-numeric column(s): ", paste(non_num, collapse = ", "), "."))
 
@@ -103,6 +125,32 @@ validate_upload <- function(df, stage, response) {
       errs <- c(errs, "Affected and Exposed must be non-negative.")
     if (any(df$Affected > df$Exposed, na.rm = TRUE))
       errs <- c(errs, "Affected must be <= Exposed.")
+    if (stage == "potentiation" && any(df$Exposed <= 0, na.rm = TRUE))
+      errs <- c(errs, "Exposed must be greater than 0 in every row.")
+  }
+
+  if (stage == "potentiation" && "Series" %in% present) {
+    # Trim so "Level 1 " and "Level 1" are one series; as.character so numeric
+    # labels (1, 2) work.
+    lab <- trimws(as.character(df$Series))
+    if (any(is.na(lab) | !nzchar(lab)))
+      errs <- c(errs, "Series labels must not be empty.")
+    lab <- lab[!is.na(lab) & nzchar(lab)]
+    series <- unique(lab)
+    if (length(series) < 2)
+      errs <- c(errs, paste0("Need at least two series (a reference and one to ",
+                             "compare); found ", length(series), "."))
+    if ("C1" %in% present && is.numeric(df$C1)) {
+      all_lab <- trimws(as.character(df$Series))
+      for (s in series) {
+        pos <- df$C1[!is.na(all_lab) & all_lab == s & !is.na(df$C1) & df$C1 > 0]
+        k <- length(unique(pos))
+        if (k < 3)
+          errs <- c(errs, paste0("Series '", s, "' has only ", k,
+                                 " positive concentrations; at least 3 are needed ",
+                                 "to fit a curve."))
+      }
+    }
   }
 
   if (stage == "single" && "Conc" %in% present && is.numeric(df$Conc)) {
