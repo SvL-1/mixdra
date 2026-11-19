@@ -33,6 +33,15 @@ dose-level-dependent interactions), and tells you **which interaction pattern th
 support** via likelihood-ratio testing. It ships with a point-and-click Shiny app for
 non-programmers and a clean scriptable API for everyone else.
 
+It handles the two experiments a multiple-stressor study usually comes down to:
+
+- **Mixture toxicity.** Every stressor has its own dose–response series and their
+  mixtures are dosed too. `mixdra` fits the full CA/IA interaction analysis.
+- **(De)potentiation.** One stressor's dose–response curve is measured without a
+  second stressor, and with it at one, two or three fixed levels. The second stressor
+  can be a chemical, microplastics, heat, or anything else. `mixdra` tells you whether
+  the second stressor makes the first **more or less toxic**, and from which level on.
+
 It replaces a manual Excel/VBA + GRG-Solver workflow — the kind that lives in one spreadsheet on
 one laptop and is almost impossible to reproduce or peer-review — with tested, version-controlled,
 open-source code.
@@ -83,6 +92,19 @@ For **1, 2, or 3 chemicals**, `mixdra`:
 - handles both **continuous** responses (sum-of-squares objective) and **binary / quantal**
   responses (binomial likelihood, *exposed* / *affected* counts).
 
+For a **(de)potentiation** experiment — stressor 1's curve without stressor 2 and with it at
+one or a few fixed levels — `mixdra`:
+
+- fits stressor 1's log-logistic curve for every series;
+- tests each level against the reference series by likelihood ratio. Each curve keeps its own
+  upper asymptote and slope, and the test asks whether the EC50 is shared or shifted. A shifted
+  EC50 means a real change in potency, not just an effect of stressor 2 on the controls;
+- reports the EC50 ratio, the direction (**more toxic** / **less toxic** / no significant
+  influence), and the level from which the effect starts;
+- flags EC50s that lie outside the tested concentrations, and states how the control
+  observations are counted;
+- writes the conclusion out in plain words.
+
 ## What it looks like
 
 **Start with one chemical.** Everything in `mixdra` is built on the three-parameter
@@ -102,13 +124,25 @@ with the likelihood-ratio test against the parent model and the selected (most
 parsimonious) model highlighted. Here the dose-level-dependent model wins for
 chlorpyrifos × FBSA (*p* = 0.033):
 
-![Campaign pair tab: the interaction model comparison table, with the DL model selected](man/figures/campaign-model-comparison.png)
+![Mixture toxicity tab, pair sub-tab: the interaction model comparison table, with the DL model selected](man/figures/campaign-model-comparison.png)
 
 **The diagnostics.** The selected model's fitted response surface and its isoboles
 against the additivity reference (dashed, red), so departures from additivity are
 visible rather than inferred from a number:
 
 ![Stage 3 diagnostics: 3-D response surface and 2-D isoboles versus the reference](man/figures/campaign-diagnostics.png)
+
+**Or a (de)potentiation experiment.** Upload stressor 1's dose–response data as a few labelled
+series: the reference without stressor 2, and one series per level of stressor 2. `mixdra`
+draws every curve, tests each level against the reference, and writes out what that means.
+The bundled example has three levels; levels 1 and 3 make stressor 1 significantly *less* toxic,
+level 2 has no significant influence:
+
+![(De)potentiation tab: stressor 1's fitted dose-response curve for the reference series and for three levels of stressor 2](man/figures/potentiation-curves.png)
+
+![(De)potentiation tab: likelihood-ratio tests of each level against the reference, with the verdict](man/figures/potentiation-tests.png)
+
+![(De)potentiation tab: the conclusion in plain words](man/figures/potentiation-conclusion.png)
 
 ## Features
 
@@ -123,11 +157,19 @@ visible rather than inferred from a number:
   for the non-smooth CA bisection surface), **multi-start** seeding, hard parameter **bounds**,
   and the ability to **fix / pin** individual parameters — plus a "joint refine all parameters"
   mode that mirrors the Excel single-SSR fit when you want a digit-for-digit comparison.
+- **(De)potentiation, for any second stressor.** `analyse_potentiation()` takes stressor 1's
+  curve in labelled series and tests each level's EC50 shift against the reference. It follows
+  the original workbook's method, including how it counts the controls, and says so in the app.
+  The output is a verdict in words: more toxic, less toxic, or no influence, and from which
+  level on.
 - **Rich diagnostics & plots.** Dose–response curves, observed-vs-predicted, 3-D response
-  surfaces, 2-D isoboles/contours, ternary **isoplanes** and **σ–TU** curves.
-- **Validated.** A `testthat` suite checks the engine against the original Excel workbooks *and*
-  against synthetic data with known parameters (params-in == params-out recovery on noise-free
-  data).
+  surfaces, 2-D isoboles/contours, ternary **isoplanes** and **σ–TU** curves, and curves per
+  series for (de)potentiation.
+- **Validated, in the open.** A `testthat` suite checks the engine against the original Excel
+  workbooks *and* against synthetic data with known parameters (params-in == params-out recovery
+  on noise-free data). Every reference value is in a generated [validation report](VALIDATION.md).
+  Where an original spreadsheet turned out to contain a formula error, the report shows both
+  numbers and names the cells.
 - **Lean.** The engine depends only on `stats` and `numDeriv`; the Shiny UI stack is optional
   (Suggested) and only needed if you launch the app.
 
@@ -228,6 +270,14 @@ the objective value (SS or −2·logL), and the LR-test comparison — plus tidy
 (`plot_dose_response()`, `plot_obs_pred()`, `plot_surface()`, `plot_isobole()`,
 `plot_isoplane()`, `plot_sigma_tu()`).
 
+A (de)potentiation analysis returns the following (`analyse_potentiation()`, plotted with
+`plot_potentiation()`):
+
+- `max`, slope and EC50 per series;
+- per level: the EC50 ratio against the reference, the two residuals (separate curves vs
+  shared EC50), the likelihood-ratio χ² and *p*, and the verdict;
+- the conclusion as a sentence.
+
 ## The method, briefly
 
 Each chemical is described by a three-parameter log-logistic curve. **CA** combines chemicals on a
@@ -288,6 +338,13 @@ attaches an HTML version. To rebuild locally:
 Rscript tools/validation-report.R
 ```
 
+The (de)potentiation analysis is checked the same way, against the workbook in which the method
+was first worked out: three comparisons of a reference curve against three levels of a second
+stressor. Two of them reproduce to the last digit. In the third, the workbook's shared-EC50
+residual turned out to come from a formula that referenced another comparison's parameters.
+The report records the workbook value next to the corrected one, names the cells, and counts
+the row as a deliberate difference rather than as a match.
+
 Adding a newly published dataset is a data-entry job: drop the fixture CSV in
 `tests/testthat/fixtures/`, register how to fit it in `validation_datasets()`, and add its rows to
 the oracle table. No new test code.
@@ -295,11 +352,28 @@ the oracle table. No new test code.
 ## Scope
 
 **In scope (v1):** single + binary + ternary mixtures; CA and IA references; S/A, DR, DL, and
-Advanced S/A deviations; continuous and quantal responses; run-locally Shiny app.
+Advanced S/A deviations; (de)potentiation experiments with any second stressor at one or a few
+fixed levels; continuous and quantal responses; run-locally Shiny app.
 
 **Out of scope (for now):** more than 3 chemicals; non-monotonic (J-shaped / hormesis)
 curves. There is deliberately no hosted web version: the app runs locally, so your data
 never leaves your machine.
+
+## Roadmap
+
+Planned work is tracked in the issues. Next up:
+
+- **Revised fitting order of the upper asymptote** in the mixture workflow
+  ([#15](https://github.com/SvL-1/mixdra/issues/15)).
+- **Training datasets** for every interaction pattern the tool detects, selectable in the
+  Mixture toxicity tab as exercises ([#16](https://github.com/SvL-1/mixdra/issues/16)).
+- **Interpretation texts** for every result, and a fuller introduction page
+  ([#18](https://github.com/SvL-1/mixdra/issues/18)).
+- **Biological as well as statistical significance**: comparing model values with the observed
+  values, to judge whether a significant difference also matters ecologically
+  ([#19](https://github.com/SvL-1/mixdra/issues/19)).
+- **A data-quality check** that warns when a design is a potentiation experiment rather than a
+  mixture dose–response study ([#13](https://github.com/SvL-1/mixdra/issues/13)).
 
 ## Citation
 

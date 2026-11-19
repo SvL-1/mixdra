@@ -12,7 +12,9 @@ Description: Fits single-chemical and binary/ternary mixture dose-response
     models with synergism/antagonism, dose-ratio-dependent, and
     dose-level-dependent deviation patterns, following Jonker et al. (2005)
     <doi:10.1897/04-431R.1>. Supports continuous and binary (quantal) responses
-    and likelihood-ratio model comparison.
+    and likelihood-ratio model comparison. Also analyses (de)potentiation
+    experiments: whether a second stressor, at one or a few fixed levels,
+    shifts the EC50 of a first stressor's dose-response curve.
 License: GPL (>= 3)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
