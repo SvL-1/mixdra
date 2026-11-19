@@ -20,7 +20,7 @@
 > asymptote (per stressor for the singles, one per mixture for the binaries and
 > the ternary) is being revised, see
 > [#15](https://github.com/SvL-1/mixdra/issues/15). Interaction results from the
-> Multiple stressors tab can change once that is done.
+> Mixture toxicity tab can change once that is done.
 >
 > **Read the guidance first.** Correct use and interpretation of the results
 > depend on the accompanying guidance document and research paper (in

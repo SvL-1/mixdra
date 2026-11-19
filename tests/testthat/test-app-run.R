@@ -20,12 +20,14 @@ test_that("run_app is exported and errors clearly when a dependency is missing",
   expect_match(body_txt, "shiny")
 })
 
-test_that("app_ui exposes Introduction, Single Stressor and Multiple stressors", {
+test_that("app_ui exposes Introduction, Single Stressor, (De)potentiation and Mixture toxicity", {
   ui <- app_ui()
   txt <- paste(as.character(ui), collapse = " ")
   expect_true(grepl("Introduction", txt))
   expect_true(grepl("Single Stressor", txt))
-  expect_true(grepl("Multiple stressors", txt, fixed = TRUE))
+  expect_true(grepl("(De)potentiation", txt, fixed = TRUE))
+  expect_true(grepl("Mixture toxicity", txt, fixed = TRUE))
+  expect_false(grepl("Multiple stressors", txt, fixed = TRUE))
   expect_false(grepl("Campaign", txt))
   expect_false(grepl("Binary Mixture", txt))
   expect_false(grepl("Ternary Mixture", txt))

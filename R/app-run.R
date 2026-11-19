@@ -18,7 +18,8 @@ app_ui <- function() {
     fillable = FALSE,
     bslib::nav_panel("Introduction", intro_ui("intro")),
     bslib::nav_panel("Single Stressor", single_ui("single")),
-    bslib::nav_panel("Multiple stressors", campaign_ui("campaign"))
+    bslib::nav_panel("(De)potentiation", potentiation_ui("potentiation")),
+    bslib::nav_panel("Mixture toxicity", campaign_ui("campaign"))
   )
 }
 

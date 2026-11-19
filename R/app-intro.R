@@ -25,8 +25,13 @@ intro_ui <- function(id) {
     bslib::card(
       bslib::card_header("Welcome"),
       shiny::p("Upload concentration-response data on the Single Stressor and ",
-               "Multiple stressors tabs. The experiment details entered here are used ",
-               "to label plots and axes.")
+               "Mixture toxicity tabs. The experiment details entered here are used ",
+               "to label plots and axes."),
+      shiny::p("Which tab? If stressor 2 was applied at only one or a few fixed ",
+               "levels (for example with and without heat stress), use ",
+               "(De)potentiation: it tests whether stressor 2 changes the toxicity ",
+               "of stressor 1. If every stressor has its own dose-response series ",
+               "and their mixtures were dosed too, use Mixture toxicity.")
     )
   )
 }
