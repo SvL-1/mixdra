@@ -63,6 +63,50 @@ plot_dose_response <- function(fit, df, chem = 1, log_x = TRUE) {
                  annotations = ann)
 }
 
+#' Plot the stressor-1 curve for every series of stressor 2
+#'
+#' One colour per series: observed points plus the fitted log-logistic curve.
+#' Controls are open circles at one decade below the lowest dose (log axis),
+#' labelled "0 (control)", as in [plot_dose_response()].
+#' @param res An [analyse_potentiation()] result.
+#' @param log_x Use a log10 concentration axis (default `TRUE`).
+#' @param xlab,ylab Axis titles.
+#' @return A plotly object.
+#' @export
+plot_potentiation <- function(res, log_x = TRUE, xlab = "Concentration",
+                              ylab = "response") {
+  require_plotly()
+  d <- potentiation_curve_data(res)
+  show_control <- log_x && !is.na(d$control_x)
+  pal <- grDevices::hcl.colors(max(length(res$series), 3), "Dark 3")
+  p <- plotly::plot_ly()
+  for (i in seq_along(res$series)) {
+    s <- res$series[i]; col <- pal[i]
+    o <- d$observed[d$observed$series == s, ]
+    cv <- d$curves[d$curves$series == s, ]
+    is_ctrl <- show_control & o$control
+    p <- plotly::add_markers(p, x = o$conc[!is_ctrl], y = o$response[!is_ctrl],
+                             name = s, legendgroup = s,
+                             marker = list(color = col, size = 6))
+    if (any(is_ctrl))
+      p <- plotly::add_markers(p, x = rep(d$control_x, sum(is_ctrl)),
+                               y = o$response[is_ctrl], name = "control",
+                               legendgroup = s, showlegend = FALSE,
+                               marker = list(color = col, size = 7,
+                                             symbol = "circle-open"))
+    p <- plotly::add_lines(p, x = cv$conc, y = cv$response, name = s,
+                           legendgroup = s, showlegend = FALSE,
+                           line = list(color = col))
+  }
+  ann <- NULL
+  if (show_control)
+    ann <- list(list(x = log10(d$control_x), y = 0, yref = "paper",
+                     yanchor = "top", yshift = -8, showarrow = FALSE,
+                     text = "0 (control)", font = list(size = 10)))
+  plotly::layout(p, xaxis = list(title = xlab, type = if (log_x) "log" else "linear"),
+                 yaxis = list(title = ylab), annotations = ann)
+}
+
 #' Plot observed vs predicted response
 #'
 #' Scatter of observed against predicted values with a 1:1 reference line, as a

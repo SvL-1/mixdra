@@ -150,3 +150,32 @@ test_that("isobole_data rejects out-of-range levels", {
   df <- data.frame(C1 = c(0, 1), C2 = c(0, 1), Affected = c(10, 1), Exposed = c(10, 10))
   expect_error(isobole_data(fit, df, levels = c(0.5, 1.5)), "between 0 and 1")
 })
+
+pot_res <- function() analyse_potentiation(read.csv(test_path(
+  "fixtures", "potentiation", "potentiation_example_continuous.csv")))
+
+test_that("potentiation_curve_data builds one shared-grid curve per series", {
+  res <- pot_res()
+  d <- potentiation_curve_data(res)
+  expect_equal(unique(d$curves$series), res$series)
+  expect_equal(as.vector(table(d$curves$series))[1], 200)
+  expect_true(all(table(d$curves$series) == 200))
+  expect_equal(min(d$curves$conc), d$control_x)
+  pos <- d$observed$conc[d$observed$conc > 0]
+  expect_equal(d$control_x, min(pos) / 10)
+  expect_equal(max(d$curves$conc), max(d$observed$conc))
+  # borrowed controls are not duplicated: shown once, under their own series
+  expect_equal(nrow(d$observed), 120)
+  expect_equal(sum(d$observed$control), 20)
+  expect_true(all(d$observed$series[d$observed$control] == "Stressor 1"))
+})
+
+test_that("potentiation_curve_data uses proportions for quantal data and NA control_x without controls", {
+  q <- data.frame(Series = rep(c("A", "B"), each = 4), C1 = rep(c(1, 2, 4, 8), 2),
+                  Exposed = 20, Affected = c(2, 6, 12, 18, 1, 4, 9, 16))
+  res <- analyse_potentiation(q, response = "quantal")
+  d <- potentiation_curve_data(res)
+  expect_true(is.na(d$control_x))
+  expect_equal(d$observed$response, q$Affected / q$Exposed)
+  expect_equal(min(d$curves$conc), 1)
+})

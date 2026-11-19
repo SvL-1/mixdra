@@ -68,3 +68,15 @@ test_that("plot_isobole builds a plotly object, including a reference overlay", 
   p <- plot_isobole(fit, df, levels = c(0.25, 0.5, 0.75), reference_fit = ref, n = 30)
   expect_s3_class(p, "plotly")
 })
+
+test_that("plot_potentiation builds a plotly object with a control marker", {
+  skip_if_not_installed("plotly")
+  res <- analyse_potentiation(read.csv(test_path(
+    "fixtures", "potentiation", "potentiation_example_continuous.csv")))
+  p <- plot_potentiation(res)
+  expect_s3_class(p, "plotly")
+  b <- plotly::plotly_build(p)
+  ctrl <- Filter(function(tr) isTRUE(tr$name == "control"), b$x$data)
+  expect_length(ctrl, 1)
+  expect_s3_class(plot_potentiation(res, log_x = FALSE), "plotly")
+})

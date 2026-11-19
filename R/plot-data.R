@@ -75,6 +75,39 @@ dr_curve_data <- function(fit, df, chem = 1) {
        chem      = conc_col)
 }
 
+#' Build the data for the per-series curves of a (de)potentiation analysis
+#'
+#' Every series is drawn on one shared log grid (200 points) running from the
+#' control offset (when any series has a control) or the lowest positive dose to
+#' the highest dose over all series. Observed points are each series' own rows:
+#' controls borrowed from the reference series are dropped, so controls appear
+#' once, under the series they belong to.
+#' @param res An [analyse_potentiation()] result.
+#' @return A list: `curves` (data frame series/conc/response), `observed` (data
+#'   frame series/conc/response/control), `control_x` (one decade below the
+#'   lowest positive dose over all series, `NA` without controls).
+#' @keywords internal
+potentiation_curve_data <- function(res) {
+  obs <- do.call(rbind, lapply(res$series, function(s) {
+    cv <- res$curves[[s]]
+    d <- cv$data
+    if (isTRUE(cv$controls_borrowed)) d <- d[d$C1 > 0, , drop = FALSE]
+    data.frame(series = s, conc = d$C1, response = obs_response(d),
+               control = d$C1 == 0, stringsAsFactors = FALSE)
+  }))
+  pos <- obs$conc[obs$conc > 0]
+  control_x <- if (any(obs$conc == 0) && length(pos)) min(pos) / 10 else NA_real_
+  lo <- if (is.na(control_x)) min(pos) else control_x
+  grid <- exp(seq(log(lo), log(max(obs$conc)), length.out = 200))
+  curves <- do.call(rbind, lapply(res$series, function(s) {
+    p <- res$curves[[s]]$par
+    data.frame(series = s, conc = grid,
+               response = ll3_predict(grid, p[["max"]], p[["slope"]], p[["ec50"]]),
+               stringsAsFactors = FALSE)
+  }))
+  list(curves = curves, observed = obs, control_x = control_x)
+}
+
 #' Observed vs predicted response for any fit
 #'
 #' Mixture fits carry their fitted values in `fit$pred`; single-chemical fits do
