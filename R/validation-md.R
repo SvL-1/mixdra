@@ -24,11 +24,11 @@
 # engine is expected to produce, not against the reference value beside it, and
 # a tick next to two visibly different numbers would read as a claim they match.
 .vm_mark <- function(kind, verdict) {
-  if (identical(verdict, "fail")) return("✗")
+  if (identical(verdict, "fail")) return("\u2717")
   if (identical(verdict, "pass"))
-    return(switch(kind, divergent = "≠", regression = "=", "✓"))
+    return(switch(kind, divergent = "\u2260", regression = "=", "\u2713"))
   if (identical(verdict, "missing")) return("?")
-  "–"
+  "\u2013"
 }
 
 # The provenance block above each table: what was actually measured, on what,
@@ -52,7 +52,7 @@
     field("Soil", e$soil),
     field("Units", e$units),
     field("Mixture ratios", e$ratios),
-    field("Published in", sprintf("%s — [doi:%s](https://doi.org/%s)",
+    field("Published in", sprintf("%s \u2014 [doi:%s](https://doi.org/%s)",
                                   e$publication, e$doi, e$doi)),
     field("Raw data", sprintf("[doi:%s](https://doi.org/%s)",
                               e$data_doi, e$data_doi)))
@@ -111,9 +111,9 @@ validation_report_md <- function(report, path = "VALIDATION.md") {
            "citable, and independent of the spreadsheet the data was extracted ",
            "from. Rows sourced from the **workbook** are cells in the ",
            "MixTox/Excel workbook itself, which covers quantities the paper ",
-           "does not print. Not every quantity is comparable across the two — ",
+           "does not print. Not every quantity is comparable across the two \u2014 ",
            "the published single-compound curves are fitted per compound with ",
-           "their own upper asymptote, while the mixture model shares one — and ",
+           "their own upper asymptote, while the mixture model shares one \u2014 and ",
            "where that matters the row says so."),
     "",
     "### Two fitting designs, and why a residual can look worse",
@@ -122,7 +122,7 @@ validation_report_md <- function(report, path = "VALIDATION.md") {
            "reasons: the chemicals interact, or one of them is simply more ",
            "potent than its own curve suggested. Both explanations fit the ",
            "data about equally well, and an optimiser has no way to prefer ",
-           "one — it takes whichever lowers the residual, which usually means ",
+           "one \u2014 it takes whichever lowers the residual, which usually means ",
            "quietly moving the curve and reporting no interaction."),
     "",
     paste0("This engine fits each chemical's curve from the single-compound ",
@@ -142,17 +142,17 @@ validation_report_md <- function(report, path = "VALIDATION.md") {
            "directly and no second fit is needed."),
     "",
     paste0("**Diff** is the distance from the reference value. **Tol.** is how ",
-           "much of the allowed tolerance that distance uses — a low ",
+           "much of the allowed tolerance that distance uses \u2014 a low ",
            "percentage is a strong agreement, near 100% only just qualifies."),
     "",
-    paste0("The last column reads: **✓** the engine matches the reference; ",
-           "**≠** it disagrees with the reference on purpose — read the ",
+    paste0("The last column reads: **\u2713** the engine matches the reference; ",
+           "**\u2260** it disagrees with the reference on purpose \u2014 read the ",
            "footnote; **=** there is no published counterpart, and the value is ",
            "pinned against what this engine produced before, to catch a ",
-           "regression in the fitter; **✗** it failed; **–** no point value is ",
+           "regression in the fitter; **\u2717** it failed; **\u2013** no point value is ",
            "claimed, and the bound is asserted in the test suite instead."),
     "",
-    paste0("Only the **✓** rows count towards the score above. A regression pin ",
+    paste0("Only the **\u2713** rows count towards the score above. A regression pin ",
            "is a claim about this engine's own stability, not about reproducing ",
            "anyone else's result, and counting it as evidence of the latter ",
            "would overstate the case."),
@@ -186,7 +186,7 @@ validation_report_md <- function(report, path = "VALIDATION.md") {
     for (i in which(!is.na(fn)))
       out <- c(out, sprintf("[^%s-%d]: %s%s", ds, fn[i],
                             if (nzchar(d$source[i]))
-                              sprintf("*%s — %s.* ", .vm_cell(d$source_type[i]),
+                              sprintf("*%s \u2014 %s.* ", .vm_cell(d$source_type[i]),
                                       .vm_cell(d$source[i])) else "",
                             .vm_cell(d$note[i])), "")
   }

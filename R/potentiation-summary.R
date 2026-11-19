@@ -18,7 +18,7 @@ potentiation_summary <- function(res, stressor1 = "Stressor 1") {
   S <- stressor1
   item <- function(i)
     paste0(cmp$series[[i]], " (EC50 ", format_num(cmp$ec50_reference[[i]]),
-           " → ", format_num(cmp$ec50_series[[i]]), ", ",
+           " \u2192 ", format_num(cmp$ec50_series[[i]]), ", ",
            format_p(cmp$p[[i]]),
            if (isTRUE(cmp$ec50_extrapolated[[i]])) ", extrapolated", ")")
   join <- function(x) if (length(x) < 2) x else

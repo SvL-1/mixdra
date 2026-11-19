@@ -151,7 +151,7 @@ campaign_server <- function(id, meta) {
     for (p in list(c(1, 2), c(1, 3), c(2, 3))) local({
       pp <- p
       output[[paste0("title_", pair_key(pp[1], pp[2]))]] <- shiny::renderText(
-        paste(axis_label(store, paste0("chem", pp[1])), "×",
+        paste(axis_label(store, paste0("chem", pp[1])), "\u00d7",
               axis_label(store, paste0("chem", pp[2]))))
     })
     for (slot in c("12", "13", "23", "ternary")) local({

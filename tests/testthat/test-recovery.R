@@ -35,6 +35,18 @@ test_that("recovery: continuous CA reference round-trips", {
   expect_equal(unname(ref["ec501"]), 0.08, tolerance = 1e-2)
   expect_equal(unname(ref["ec502"]), 1,    tolerance = 1e-2)
   expect_lt(res$fits$reference$objective, 1e-3)
+  # No model-selection check on these data. When the generating model is the
+  # reference itself, every nested deviation model also reaches SS ~ 1e-15, and the
+  # likelihood-ratio statistic n*log(SS_ref/SS_SA) then compares two rounding
+  # errors: R 4.6.2 picked "SA" here while R 4.6.0/4.6.1 picked "reference". The
+  # selection is tested on noisy data below, where the statistic means something.
+})
+
+test_that("recovery: noisy CA reference data select the reference model", {
+  par <- c(max = 800, slope1 = 4, slope2 = 1.5, ec501 = 0.08, ec502 = 1)
+  df <- simulate_mixture(par, "CA", "reference", "continuous", cv = 0.05,
+                         reps = 3, seed = 11)
+  res <- mute_1d(analyse_mixture(df, reference = "CA", response = "continuous", n_starts = 1))
   expect_equal(res$chosen, "reference")
 })
 
