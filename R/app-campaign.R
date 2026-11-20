@@ -54,7 +54,8 @@ campaign_ui <- function(id) {
         "An example experiment (FBSA + CPF + IMI, continuous) is loaded until ",
         "you upload your own.")),
       shiny::uiOutput(ns("errors")),
-      shiny::uiOutput(ns("summary"))
+      shiny::uiOutput(ns("summary")),
+      shiny::uiOutput(ns("design_note"))
     ),
     shiny::uiOutput(ns("stages"))
   )
@@ -135,6 +136,17 @@ campaign_server <- function(id, meta) {
         "<b>", store$n_chem, "</b> stressors &middot; ",
         sum(cls == "control"), " control, ", sum(cls == "single"), " single, ",
         sum(cls == "binary"), " pair, ", sum(cls == "ternary"), " ternary rows.")))
+    })
+
+    # A stressor at only a few levels is a (de)potentiation design, not a
+    # mixture one: say so on upload, before anything is fitted (issue #13).
+    output$design_note <- shiny::renderUI({
+      shiny::req(store$raw, store$chems)
+      potentiation_design_note(
+        store$raw,
+        vapply(store$chems, function(k) axis_label(store, paste0("chem", k)),
+               character(1)),
+        store$chems)
     })
 
     # The sub-navigation's structure depends only on which stressors the file

@@ -339,6 +339,32 @@ test_that("campaign_server detects stressor count from the upload", {
   })
 })
 
+test_that("campaign_server flags a (de)potentiation design on upload (#13)", {
+  pot_csv <- function(levels2) {
+    c1 <- c(0, 0.1, 0.2, 0.4, 0.8, 1.6)
+    path <- tempfile(fileext = ".csv")
+    utils::write.csv(data.frame(C1 = rep(c1, length(levels2)),
+                                C2 = rep(levels2, each = length(c1)),
+                                Res = seq(100, by = -1, length.out = 6 * length(levels2))),
+                     path, row.names = FALSE)
+    path
+  }
+  meta <- shiny::reactiveValues(chem2 = "Heat")
+  shiny::testServer(campaign_server, args = list(meta = meta), {
+    session$setInputs(response = "continuous", reference = "CA")
+    expect_null(output$design_note)        # the bundled example is a mixture design
+    # three levels pass validation: a warning next to the upload summary
+    session$setInputs(file = list(datapath = pot_csv(c(0, 0.5, 1, 2)), name = "a.csv"))
+    html <- paste(output$design_note$html, collapse = "")
+    expect_match(html, "Heat at only 3 concentrations", fixed = TRUE)
+    expect_match(html, "with caution", fixed = TRUE)
+    # one level is rejected: the hint is part of the upload errors instead
+    session$setInputs(file = list(datapath = pot_csv(c(0, 1)), name = "b.csv"))
+    errs <- paste(output$errors$html, collapse = "")
+    expect_match(errs, "(De)potentiation tab", fixed = TRUE)
+  })
+})
+
 test_that("changing the campaign reference invalidates every downstream fit", {
   meta <- shiny::reactiveValues()
   shiny::testServer(campaign_server, args = list(meta = meta), {

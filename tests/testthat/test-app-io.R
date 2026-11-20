@@ -189,6 +189,61 @@ test_that("campaign_chems reports the stressors that are actually dosed", {
   expect_equal(campaign_n_chem(two), 2L)
 })
 
+potentiation_shaped <- function(levels2 = c(0, 1)) {
+  c1 <- c(0, 0.1, 0.2, 0.4, 0.8, 1.6)
+  data.frame(C1  = rep(c1, length(levels2)),
+             C2  = rep(levels2, each = length(c1)),
+             Res = 100 - seq_len(length(c1) * length(levels2)))
+}
+
+test_that("sparse_level_stressors finds a stressor applied at only a few levels", {
+  expect_equal(sparse_level_stressors(potentiation_shaped(c(0, 1)), 1:2), c("2" = 1L))
+  expect_equal(sparse_level_stressors(potentiation_shaped(c(0, 0.5, 1, 2)), 1:2),
+               c("2" = 3L))
+  # four levels is a dose-response curve, not a handful of fixed levels
+  expect_length(sparse_level_stressors(potentiation_shaped(c(0, 0.5, 1, 2, 4)), 1:2), 0)
+})
+
+test_that("sparse_level_stressors stays quiet when no stressor has a full curve", {
+  # every stressor at three levels: nothing here is a reference curve to compare
+  # against, so this is not the (de)potentiation case
+  expect_length(sparse_level_stressors(campaign_fixture(), 1:3), 0)
+})
+
+test_that("the bundled example campaign is not flagged as (de)potentiation", {
+  df <- to_engine_df(read_upload(system.file(
+    "extdata", "ternary_ca_fbsa_cpf_imi_continuous.csv", package = "mixdra")),
+    "campaign")
+  expect_null(potentiation_design_note(df, c("FBSA", "CPF", "IMI"),
+                                       campaign_chems(df)))
+})
+
+test_that("potentiation_design_note names the stressor and points to the tab", {
+  note <- potentiation_design_note(potentiation_shaped(c(0, 0.5, 1)),
+                                   c("CPF (mg/kg)", "Heat (C)"), 1:2)
+  txt <- paste(as.character(note), collapse = "")
+  expect_match(txt, "Heat (C)", fixed = TRUE)
+  expect_match(txt, "only 2 concentrations", fixed = TRUE)
+  expect_match(txt, "(De)potentiation", fixed = TRUE)
+  expect_false(grepl("CPF", txt, fixed = TRUE))
+  one <- potentiation_design_note(potentiation_shaped(c(0, 1)), c("A", "B"), 1:2)
+  expect_match(paste(as.character(one), collapse = ""), "only 1 concentration.",
+               fixed = TRUE)
+})
+
+test_that("a rejected (de)potentiation-shaped campaign upload says where it belongs", {
+  errs <- validate_upload(potentiation_shaped(c(0, 1)), "campaign", "continuous")
+  expect_true(any(grepl("Stressor 2 has only 2 distinct", errs, fixed = TRUE)))
+  hint <- errs[grepl("(De)potentiation tab", errs, fixed = TRUE)]
+  expect_length(hint, 1)
+  expect_match(hint, "Stressor 2 at only 1 concentration.", fixed = TRUE)
+  expect_false(grepl("with caution", hint, fixed = TRUE))
+  # a mixture design that is merely short of single-stressor points gets no hint
+  thin_errs <- validate_upload(campaign_fixture()[-4, ], "campaign", "continuous")
+  expect_true(any(grepl("Stressor 1 has only 3 distinct", thin_errs, fixed = TRUE)))
+  expect_false(any(grepl("(De)potentiation", thin_errs, fixed = TRUE)))
+})
+
 test_that("single_df keeps the control row and renames the concentration to C1", {
   df <- campaign_fixture()
 

@@ -192,13 +192,20 @@ validate_upload <- function(df, stage, response) {
           "A campaign needs at least two stressors with a positive ",
           "concentration; found ", length(chems), "."))
       } else {
+        too_few <- FALSE
         for (k in chems) {
           nd <- length(unique(stats::na.omit(single_df(df, k)$C1)))
-          if (nd < 4)
+          if (nd < 4) {
+            too_few <- TRUE
             errs <- c(errs, paste0(
               "Stressor ", k, " has only ", nd, " distinct concentrations in ",
               "its single-stressor series; at least 4 are needed to fit a curve."))
+          }
         }
+        # Name where such a file does belong, not only why it fails here (#13).
+        if (too_few)
+          errs <- c(errs, potentiation_design_text(
+            df, paste("Stressor", chems), chems, rejected = TRUE))
       }
     }
   }
@@ -601,6 +608,72 @@ ec50_range_note <- function(df, ec50, labels, chems = seq_along(ec50),
       shiny::tags$b("Fix"), " next to that stressor's EC50 ",
       if (on_singles) "below" else "on the Singles page",
       " and refit \u2014 the toxic units follow the fixed value."))
+}
+
+#' Stressors applied at only a handful of concentrations
+#'
+#' A mixture dose-response analysis needs a dose-response curve for every
+#' stressor. A stressor dosed at only one to three non-zero concentrations,
+#' next to another stressor that does have a full curve, is the
+#' (de)potentiation design instead (issue #13). When no stressor has more than
+#' `max_levels` levels there is no reference curve either, so the design is not
+#' that and nothing is reported.
+#' @param df Campaign engine frame (`C1`, `C2`, optionally `C3`).
+#' @param chems Integer stressor indices, from [campaign_chems()].
+#' @param max_levels Most non-zero concentrations that still count as "a few
+#'   fixed levels"; 3 matches what the (De)potentiation tab takes.
+#' @return A named integer vector (names are stressor indices) of the number of
+#'   non-zero concentrations of each sparse stressor; empty when there is none.
+#' @keywords internal
+sparse_level_stressors <- function(df, chems, max_levels = 3L) {
+  n <- vapply(chems, function(k) {
+    x <- df[[paste0("C", k)]]
+    length(unique(x[!is.na(x) & x > 0]))
+  }, integer(1))
+  names(n) <- as.character(chems)
+  sparse <- n >= 1L & n <= max_levels
+  if (!any(sparse) || all(sparse)) return(stats::setNames(integer(0), character(0)))
+  n[sparse]
+}
+
+#' The "this looks like a (de)potentiation experiment" message
+#'
+#' One sentence for both places the Mixture toxicity tab says it: an upload
+#' with a stressor at one or two levels is rejected by [validate_upload()]
+#' (too few points for its curve), and this is appended to that error so the
+#' user learns where the data do belong; at three levels the upload passes and
+#' [potentiation_design_note()] shows it as a warning instead.
+#' @inheritParams sparse_level_stressors
+#' @param labels Display name per stressor, same order and length as `chems`.
+#' @param rejected Is the upload being rejected? Then there are no results
+#'   here to interpret with caution.
+#' @return A character string, or `NULL` when the design is a mixture design.
+#' @keywords internal
+potentiation_design_text <- function(df, labels, chems, rejected = FALSE) {
+  sparse <- sparse_level_stressors(df, chems)
+  if (!length(sparse)) return(NULL)
+  named <- paste(vapply(names(sparse), function(k) {
+    n <- sparse[[k]]
+    sprintf("%s at only %d concentration%s", labels[[match(as.integer(k), chems)]],
+            n, if (n == 1L) "" else "s")
+  }, character(1)), collapse = " and ")
+  paste0(
+    "This looks like a (de)potentiation experiment: the file applies ", named,
+    ". A mixture analysis needs a full dose-response curve for every stressor, ",
+    "so ", if (rejected) "analyse these data" else
+      "interpret the results here with caution, or analyse the data",
+    " in the (De)potentiation tab, which compares one stressor's curve with ",
+    "and without the other at a few fixed levels.")
+}
+
+#' The (de)potentiation warning for an upload that passed validation
+#' @inheritParams potentiation_design_text
+#' @return A `shiny` tag, or `NULL` when the design is a mixture design.
+#' @keywords internal
+potentiation_design_note <- function(df, labels, chems) {
+  txt <- potentiation_design_text(df, labels, chems)
+  if (is.null(txt)) return(NULL)
+  shiny::div(class = "alert alert-warning mt-2", shiny::tags$small(txt))
 }
 
 #' The EC50s of a campaign base, whatever its parameter naming

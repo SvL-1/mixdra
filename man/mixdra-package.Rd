@@ -6,7 +6,7 @@
 \alias{mixdra-package}
 \title{mixdra: Mixture Dose-Response Analysis (Jonker et al. 2005 Methodology)}
 \description{
-Fits single-chemical and binary/ternary mixture dose-response models using the concentration addition and independent action reference models with synergism/antagonism, dose-ratio-dependent, and dose-level-dependent deviation patterns, following Jonker et al. (2005) \doi{10.1897/04-431R.1}. Supports continuous and binary (quantal) responses and likelihood-ratio model comparison.
+Fits single-chemical and binary/ternary mixture dose-response models using the concentration addition and independent action reference models with synergism/antagonism, dose-ratio-dependent, and dose-level-dependent deviation patterns, following Jonker et al. (2005) \doi{10.1897/04-431R.1}. Supports continuous and binary (quantal) responses and likelihood-ratio model comparison. Also analyses (de)potentiation experiments: whether a second stressor, at one or a few fixed levels, shifts the EC50 of a first stressor's dose-response curve.
 }
 \author{
 \strong{Maintainer}: Sam van Loon \email{samvanloon94@hotmail.com}

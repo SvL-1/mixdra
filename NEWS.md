@@ -1,3 +1,13 @@
+# mixdra (development version)
+
+* The **Mixture toxicity** tab recognises a (de)potentiation design on upload
+  (#13): when one stressor is applied at only one to three concentrations next
+  to another stressor's full dose-response curve, it says so and points to the
+  **(De)potentiation** tab. With one or two levels the upload was already
+  rejected for having too few points; the error now also names where the data
+  do belong. With three levels the upload passes and a warning appears under
+  the upload summary.
+
 # mixdra 0.2.0
 
 Adds a second kind of experiment: (de)potentiation, where stressor 2 is applied
