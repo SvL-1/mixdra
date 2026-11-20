@@ -1,4 +1,8 @@
-# mixdra (development version)
+# mixdra 0.2.0
+
+Adds a second kind of experiment: (de)potentiation, where stressor 2 is applied
+at only one to three fixed levels. The app now separates it from full mixture
+toxicity designs.
 
 * New **(De)potentiation** tab: when stressor 2 is applied at only one or a few
   fixed levels, it fits stressor 1's dose-response curve per series and tests,
